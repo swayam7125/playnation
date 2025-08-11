@@ -314,24 +314,6 @@ body {
   margin-top: 2rem;
 }
 
-.feature-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 1.25rem;
-  background: var(--card-bg);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm);
-  transition: var(--transition-smooth);
-  border: 1px solid var(--border-color);
-}
-
-.feature-item:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--primary-green);
-}
-
 .feature-item .icon {
   font-size: 1.5rem;
   color: var(--primary-green);
@@ -2061,4 +2043,34 @@ body {
 .date-picker-container input {
   font-family: "Inter", sans-serif; /* Ensure consistent font */
   font-weight: 500;
+}
+
+/* --- NEW STYLES FOR UPDATED FEATURE CARDS --- */
+.feature-card-new {
+  background-color: var(--light-green-bg);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: var(--transition-smooth);
+  border: 1px solid transparent;
+}
+.feature-card-new:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary-green);
+}
+.feature-card-new .icon {
+  font-size: 1.5rem;
+  color: var(--dark-text);
+}
+.feature-card-new .title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--dark-text);
+}
+.feature-card-new .description {
+  color: var(--light-text);
+  font-size: 0.9rem;
 }
