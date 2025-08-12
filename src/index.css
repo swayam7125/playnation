@@ -336,15 +336,12 @@ body {
 }
 
 .hero-image {
-  background-color: var(--border-color-light);
-  height: 450px;
+  width: 100%;
+  height: auto;
+  max-width: 600px;
   border-radius: var(--radius-xl);
-  display: grid;
-  place-content: center;
-  font-weight: 600;
-  color: var(--medium-text);
   box-shadow: var(--shadow-md);
-  border: 1px solid var(--border-color);
+  object-fit: cover;
 }
 
 .offer-banner {
