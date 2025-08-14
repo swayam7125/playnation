@@ -69,7 +69,7 @@ export default function HomePage() {
 
         {/* --- Footer Section --- */}
         <footer className="section">
-            <p className="text-center text-light">Footer</p>
+            <p className="text-center text-light">Copyright @PlayNation 2025</p>
         </footer>
       </div>
     </div>
