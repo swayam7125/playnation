@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
-import { useAuth } from '../AuthContext';
+import { supabase } from '../../supabaseClient';
+import { useAuth } from '../../AuthContext';
 import { FaTrash, FaPlusCircle } from 'react-icons/fa';
 
 const getTodayString = () => {

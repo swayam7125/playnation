@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
-import { supabase } from '../supabaseClient';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../AuthContext';
+import React, { useState } from "react";
+import { supabase } from "../../supabaseClient";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../AuthContext";
 
 function LoginForm() {
   const navigate = useNavigate();
   const { updateUser } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -22,17 +22,16 @@ function LoginForm() {
         password: password,
       });
       if (error) throw error;
-      
+
       // Get the profile from the updated function
       const userProfile = await updateUser();
 
       // Check the user's role and navigate accordingly
-      if (userProfile && userProfile.role === 'venue_owner') {
-        navigate('/owner/dashboard');
+      if (userProfile && userProfile.role === "venue_owner") {
+        navigate("/owner/dashboard");
       } else {
-        navigate('/');
+        navigate("/");
       }
-
     } catch (error) {
       setError(error.message);
     } finally {
@@ -46,13 +45,29 @@ function LoginForm() {
       {error && <p className="auth-error">{error}</p>}
       <div className="form-group">
         <label htmlFor="email">Email Address</label>
-        <input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <input
+          id="email"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
       </div>
       <div className="form-group">
         <label htmlFor="password">Password</label>
-        <input id="password" type="password" placeholder="Your password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <input
+          id="password"
+          type="password"
+          placeholder="Your password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
       </div>
-      <button type="submit" className="auth-submit-button" disabled={loading}>{loading ? 'Logging in...' : 'Login'}</button>
+      <button type="submit" className="auth-submit-button" disabled={loading}>
+        {loading ? "Logging in..." : "Login"}
+      </button>
     </form>
   );
 }

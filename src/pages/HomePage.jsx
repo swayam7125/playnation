@@ -1,32 +1,16 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+// The '..' is changed to '.' because the file is now one level up
 import heroImage from '../assets/images/hero/hero-img-1.svg';
-
-// Helper component for feature cards
-const FeatureCard = ({ icon, title, description }) => (
-  // UPDATED: Changed className to apply new styles
-  <div className="feature-card-new">
-    <div className="icon">{icon}</div>
-    <div className="title">{title}</div>
-    <div className="description">{description}</div>
-  </div>
-);
-
-// UPDATED: CategoryCard now uses an <img> tag for the icon
-const CategoryCard = ({ imgSrc, name }) => (
-  <div className="sport-card">
-    <div className="icon">
-      <img src={imgSrc} alt={`${name} icon`} style={{ width: '24px', height: '24px' }} />
-    </div>
-    <span>{name}</span>
-  </div>
-);
+import { FeatureCard } from '../components/home/FeatureCard/FeatureCard';
+import { CategoryCard } from '../components/home/CategoryCard/CategoryCard';
+import { categories } from '../constants/categories';
 
 export default function HomePage() {
   return (
     <div className="dashboard-page">
       <div className="container">
-        {/* --- Hero Section --- */}
+        {/* Hero Section */}
         <section className="section hero-section">
           <div className="hero-content">
             <h1 className="hero-title">PlayNation: Book sports slots in seconds</h1>
@@ -47,29 +31,30 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* --- Offer Banner Section --- */}
+        {/* Offer Banner Section */}
         <section className="section">
-            <div className="offer-banner">
-                <p>Flat 20% Off on Weekday Morning Slots</p>
-            </div>
-        </section>
-
-        {/* --- Popular Categories Section --- */}
-        <section className="section">
-          <h2 className="section-heading">Popular categories</h2>
-          {/* UPDATED: Using image paths instead of emojis */}
-          <div className="sports-grid">
-            <CategoryCard imgSrc="/src/assets/images/categories/cricket.png" name="Cricket" />
-            <CategoryCard imgSrc="/src/assets/images/categories/pickle-ball.png" name="Pickleball" />
-            <CategoryCard imgSrc="/src/assets/images/categories/golf.png" name="Golf" />
-            <CategoryCard imgSrc="/src/assets/images/categories/pool.png" name="Pool" />
-            <CategoryCard imgSrc="/src/assets/images/categories/snooker.png" name="Snooker" />
+          <div className="offer-banner">
+            <p>Flat 20% Off on Weekday Morning Slots</p>
           </div>
         </section>
 
-        {/* --- Footer Section --- */}
+        {/* Popular Categories Section */}
+        <section className="section">
+          <h2 className="section-heading">Popular categories</h2>
+          <div className="sports-grid">
+            {categories.map(category => (
+              <CategoryCard 
+                key={category.id}
+                imgSrc={category.image} 
+                name={category.name}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Footer Section */}
         <footer className="section">
-            <p className="text-center text-light">Copyright @PlayNation 2025</p>
+          <p className="text-center text-light">Footer</p>
         </footer>
       </div>
     </div>

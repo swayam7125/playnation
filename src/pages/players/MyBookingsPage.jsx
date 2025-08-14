@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
-import { useAuth } from '../AuthContext';
+import { supabase } from '../../supabaseClient';
+import { useAuth } from '../../AuthContext';
 import BookingCard from '../components/BookingCard';
 
 function MyBookingsPage() {

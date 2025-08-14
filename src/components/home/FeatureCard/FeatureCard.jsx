@@ -1,5 +1,4 @@
 import React from 'react';
-import './FeatureCard.css';
 
 export const FeatureCard = ({ icon, title, description }) => (
   <div className="feature-card-new">

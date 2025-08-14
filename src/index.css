@@ -2071,3 +2071,71 @@ body {
   color: var(--light-text);
   font-size: 0.9rem;
 }
+
+.sport-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem; /* 12px */
+  padding: 1.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  background: var(--card-bg);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  text-align: center;
+  box-shadow: var(--shadow-md);
+}
+
+.sport-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary-green);
+}
+
+.sport-card .icon {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-lg);
+  background: var(--light-green-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sport-card .icon img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.sport-card span {
+  font-weight: 600;
+  font-size: 0.9rem; /* 14px */
+  color: var(--medium-text);
+}
+
+.feature-card-new {
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  min-width: 120px;
+  text-align: center;
+}
+
+.feature-card-new .icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.feature-card-new .title {
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.feature-card-new .description {
+  font-size: 14px;
+  color: #6b7280;
+}

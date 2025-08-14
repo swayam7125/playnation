@@ -22,12 +22,9 @@ function VenuePage() {
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // --- NEW: State to manage the selected date ---
   const [selectedDate, setSelectedDate] = useState(getTodayString());
 
   useEffect(() => {
-    // This data fetching logic remains the same
     const fetchVenueDetails = async () => {
       setLoading(true);
       setError(null);
@@ -50,13 +47,20 @@ function VenuePage() {
 
   const selectedFacility = venue?.facilities.find(f => f.facility_id === selectedFacilityId);
 
-  // --- NEW: Logic to filter time slots by the selected date ---
+  // --- THIS LOGIC IS NOW CORRECTED ---
   const filteredTimeSlots = useMemo(() => {
     if (!selectedFacility) return [];
     
+    const now = new Date(); // Get the current time
+
     return selectedFacility.time_slots.filter(slot => {
       const slotDate = new Date(slot.start_time).toISOString().split('T')[0];
-      return slot.is_available && slotDate === selectedDate;
+      
+      // New condition: Check if the slot's start time is in the future
+      const isFutureSlot = new Date(slot.start_time) > now;
+
+      // Return the slot only if it's available, on the selected date, AND in the future
+      return slot.is_available && slotDate === selectedDate && isFutureSlot;
     });
   }, [selectedFacility, selectedDate]);
 
@@ -112,7 +116,6 @@ function VenuePage() {
       <div className="time-slots-section">
         <h2 className="section-heading">Available Time Slots</h2>
         
-        {/* --- NEW: Date Picker Input --- */}
         <div className="date-picker-container form-group">
           <label htmlFor="slot-date">Select Date</label>
           <input 
@@ -120,11 +123,10 @@ function VenuePage() {
             id="slot-date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            min={getTodayString()} // Prevent selecting past dates
+            min={getTodayString()}
           />
         </div>
 
-        {/* --- UPDATED: Time Slots Grid now uses filteredTimeSlots --- */}
         <div className="time-slots-grid">
           {filteredTimeSlots.length > 0 ? (
             filteredTimeSlots.map(slot => (
