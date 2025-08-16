@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { useAuth } from '../AuthContext';
 import { FaClock, FaStar } from 'react-icons/fa';
 
 const getTodayString = () => {
@@ -46,7 +45,6 @@ function VenuePage() {
 
   const selectedFacility = venue?.facilities.find(f => f.facility_id === selectedFacilityId);
 
-  // --- THIS LOGIC IS NOW CORRECTED ---
   const filteredTimeSlots = useMemo(() => {
     if (!selectedFacility) return [];
     
@@ -56,7 +54,6 @@ function VenuePage() {
         const isFutureSlot = new Date(slot.start_time) > new Date();
         return slot.is_available && slotDate === selectedDate && isFutureSlot;
       })
-      // Add this .sort() function to ensure chronological order
       .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
       
   }, [selectedFacility, selectedDate]);
@@ -66,16 +63,32 @@ function VenuePage() {
     setSelectedFacilityId(facility.facility_id);
     setSelectedSlot(null);
   };
+
   const handleSlotSelect = (slot) => {
     setSelectedSlot(slot);
   };
+
   const handleProceedToBook = () => {
-    if (!selectedSlot) return;
-    navigate('/booking', { state: { venue, facility: selectedFacility, slot: selectedSlot } });
+    if (!selectedSlot || !selectedFacility) return;
+
+    // Use price_override if it exists, otherwise fall back to hourly_rate
+    const finalPrice = selectedSlot.price_override ?? selectedFacility.hourly_rate;
+
+    navigate('/booking', { 
+        state: { 
+            venue, 
+            facility: selectedFacility, 
+            slot: selectedSlot,
+            price: finalPrice // Pass the determined price to the booking page
+        } 
+    });
   };
   
   const allAmenities = venue?.facilities.flatMap(f => f.facility_amenities?.map(fa => fa.amenities?.name) ?? []).filter(Boolean);
   const uniqueAmenities = [...new Set(allAmenities)];
+  
+  // Determine the price to display in the button
+  const displayPrice = selectedSlot?.price_override ?? selectedFacility?.hourly_rate;
 
   if (loading) return <p className="container" style={{ textAlign: 'center', padding: '50px' }}>Loading venue details...</p>;
   if (error) return <p className="container" style={{ textAlign: 'center', color: 'red', padding: '50px' }}>Error: {error}</p>;
@@ -134,6 +147,8 @@ function VenuePage() {
               >
                 <FaClock />
                 {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
+                {/* Optionally, show a special indicator for overridden prices */}
+                {/* {slot.price_override && <span className="price-override-tag">Special Price!</span>} */}
               </button>
             ))
           ) : (
@@ -145,7 +160,7 @@ function VenuePage() {
       {selectedSlot && (
         <div className="booking-action-bar">
           <button onClick={handleProceedToBook} className="btn btn-primary">
-            Book Now (₹{selectedFacility.hourly_rate})
+            Book Now (₹{displayPrice})
           </button>
         </div>
       )}

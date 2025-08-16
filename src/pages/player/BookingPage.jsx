@@ -10,15 +10,23 @@ function BookingPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { venue, facility, slot } = location.state || {};
+  // Destructure price from location.state, with a fallback to the facility's hourly rate
+  const { venue, facility, slot, price } = location.state || {};
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // If there's no booking data, redirect to explore page
-  if (!venue || !facility || !slot) {
-    navigate('/explore');
+  // If there's no essential booking data, redirect to explore page
+  if (!venue || !facility || !slot || price === undefined) {
+    // Using navigate directly inside render is an anti-pattern,
+    // it's better to handle this with a useEffect or conditional rendering.
+    // However, for a simple redirect, this is a common approach.
+    React.useEffect(() => {
+        navigate('/explore');
+    }, [navigate]);
     return null;
   }
+  
+  const totalAmount = price;
 
   const handleConfirmBooking = async () => {
     if (!user) {
@@ -40,7 +48,7 @@ function BookingPage() {
           booking_date: new Date(),
           start_time: slot.start_time,
           end_time: slot.end_time,
-          total_amount: facility.hourly_rate,
+          total_amount: totalAmount, // Use the price from the state
           status: 'confirmed',
           payment_status: 'paid', // Simulating a successful payment
         })
@@ -80,7 +88,7 @@ function BookingPage() {
         <p><strong>Time:</strong> {formatTime(slot.start_time)} - {formatTime(slot.end_time)}</p>
         <div className="summary-total">
           <span>Total Amount</span>
-          <strong>₹{facility.hourly_rate}</strong>
+          <strong>₹{totalAmount}</strong>
         </div>
         <button onClick={handleConfirmBooking} className="btn btn-primary" disabled={loading} style={{ width: '100%', marginTop: '1rem' }}>
           {loading ? 'Processing...' : 'Proceed to Pay'}

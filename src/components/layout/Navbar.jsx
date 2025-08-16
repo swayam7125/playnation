@@ -33,7 +33,7 @@ function Navbar() {
             <>
               <Link to="/owner/dashboard">Dashboard</Link>
               <Link to="/owner/my-venues">My Venues</Link>
-              <Link to="/owner/calendar">Calendar</Link>
+              <Link to="/owner/calendar">Bookings</Link>
             </>
           )}
         </div>
