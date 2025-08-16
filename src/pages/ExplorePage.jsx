@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import VenueCard from '../components/VenueCard';
+import VenueCard from '../components/venues/VenueCard'; // Corrected import path
 
 function ExplorePage() {
   const [venues, setVenues] = useState([]);
@@ -48,8 +48,6 @@ function ExplorePage() {
     fetchData();
   }, []);
 
-  // --- THIS LINE IS CORRECTED ---
-  // The filter now correctly checks facility.sport_id
   const filteredVenues = selectedSport === 'all'
     ? venues
     : venues.filter(venue => 

@@ -1,18 +1,25 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Navbar from './components/Navbar';
-import HomePage from './pages/HomePage'; // Import HomePage
+import Navbar from './components/layout/Navbar';
+import OwnerProtectedRoute from './components/auth/OwnerProtectedRoute';
+
+// Public Pages
+import HomePage from './pages/HomePage';
 import DashboardPage from './pages/DashboardPage';
 import AuthPage from './pages/AuthPage';
 import ExplorePage from './pages/ExplorePage';
 import VenuePage from './pages/VenuePage';
-import MyBookingsPage from './pages/MyBookingsPage';
-import BookingPage from './pages/BookingPage';
-import OwnerProtectedRoute from './components/OwnerProtectedRoute';
-import OwnerDashboardPage from './pages/OwnerDashboardPage';
-import AddVenuePage from './pages/AddVenuePage';
-import EditVenuePage from './pages/EditVenuePage';
-import MyVenuesPage from './pages/MyVenuesPage';
+
+// Player Pages
+import MyBookingsPage from './pages/player/MyBookingsPage';
+import BookingPage from './pages/player/BookingPage';
+
+// Owner Pages
+import OwnerDashboardPage from './pages/owner/OwnerDashboardPage';
+import AddVenuePage from './pages/owner/AddVenuePage';
+import EditVenuePage from './pages/owner/EditVenuePage';
+import MyVenuesPage from './pages/owner/MyVenuesPage';
+import BookingCalendarPage from './pages/owner/BookingCalendarPage';
 
 function App() {
   return (
@@ -20,14 +27,14 @@ function App() {
       <Navbar />
       <main>
         <Routes>
-          {/* --- CHANGE THIS LINE --- */}
-          <Route path="/" element={<HomePage />} /> 
-          
-          {/* Other Routes */}
+          {/* Public Routes */}
+          <Route path="/" element={<HomePage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/explore" element={<ExplorePage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/venue/:venueId" element={<VenuePage />} />
+          
+          {/* Player-specific routes */}
           <Route path="/my-bookings" element={<MyBookingsPage />} />
           <Route path="/booking" element={<BookingPage />} />
           
@@ -37,6 +44,7 @@ function App() {
             <Route path="/owner/add-venue" element={<AddVenuePage />} />
             <Route path="/owner/edit-venue/:venueId" element={<EditVenuePage />} />
             <Route path="/owner/my-venues" element={<MyVenuesPage />} />
+            <Route path="/owner/calendar" element={<BookingCalendarPage />} />
           </Route>
         </Routes>
       </main>

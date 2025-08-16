@@ -4,7 +4,6 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../AuthContext';
 import { FaClock, FaStar } from 'react-icons/fa';
 
-// Helper to get today's date in YYYY-MM-DD format
 const getTodayString = () => {
     const today = new Date();
     const offset = today.getTimezoneOffset();
@@ -51,17 +50,15 @@ function VenuePage() {
   const filteredTimeSlots = useMemo(() => {
     if (!selectedFacility) return [];
     
-    const now = new Date(); // Get the current time
-
-    return selectedFacility.time_slots.filter(slot => {
-      const slotDate = new Date(slot.start_time).toISOString().split('T')[0];
+    return selectedFacility.time_slots
+      .filter(slot => {
+        const slotDate = new Date(slot.start_time).toISOString().split('T')[0];
+        const isFutureSlot = new Date(slot.start_time) > new Date();
+        return slot.is_available && slotDate === selectedDate && isFutureSlot;
+      })
+      // Add this .sort() function to ensure chronological order
+      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
       
-      // New condition: Check if the slot's start time is in the future
-      const isFutureSlot = new Date(slot.start_time) > now;
-
-      // Return the slot only if it's available, on the selected date, AND in the future
-      return slot.is_available && slotDate === selectedDate && isFutureSlot;
-    });
   }, [selectedFacility, selectedDate]);
 
 

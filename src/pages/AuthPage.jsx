@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import LoginForm from '../components/LoginForm';
-import RegisterForm from '../components/RegisterForm';
+import LoginForm from '../components/auth/LoginForm'; // Corrected import path
+import RegisterForm from '../components/auth/RegisterForm'; // Corrected import path
 
 function AuthPage() {
   const [isLoginView, setIsLoginView] = useState(true);
@@ -11,7 +11,7 @@ function AuthPage() {
 
   return (
     <div className="auth-container">
-      <div className="auth-card">
+      <div className={`auth-card ${isLoginView ? 'login-view' : 'register-view'}`}>
         {isLoginView ? (
           <>
             <h2 className="auth-title">Login to PlayNation</h2>
@@ -26,7 +26,6 @@ function AuthPage() {
         ) : (
           <>
             <h2 className="auth-title">Create Your Account</h2>
-            {/* The prop is no longer needed here */}
             <RegisterForm />
             <p className="auth-toggle-text">
               Already have an account?{' '}

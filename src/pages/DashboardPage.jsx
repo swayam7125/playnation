@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { supabase } from '../supabaseClient';
-import VenueCard from '../components/VenueCard';
+import VenueCard from '../components/venues/VenueCard'; // Corrected import path
 import { FaGolfBall, FaShieldAlt, FaTrophy, FaBolt } from 'react-icons/fa';
 import { GiCricketBat } from "react-icons/gi";
 import { IoIosAmericanFootball, IoIosTennisball } from "react-icons/io";
@@ -16,21 +16,17 @@ const sports = [
 ];
 
 function DashboardPage() {
-  const { profile, user } = useAuth(); // Get user profile from context
+  const { profile, user } = useAuth();
   const navigate = useNavigate();
   const [topVenues, setTopVenues] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // --- NEW: This useEffect handles the redirect for owners ---
   useEffect(() => {
-    // If a user is logged in and their role is 'venue_owner', redirect them.
     if (user && profile?.role === 'venue_owner') {
       navigate('/owner/dashboard');
     }
-  }, [user, profile, navigate]); // Rerun this check if the user or profile changes
+  }, [user, profile, navigate]);
 
-
-  // This useEffect fetches data for the public-facing dashboard
   useEffect(() => {
     const fetchTopVenues = async () => {
       setLoading(true);
@@ -50,14 +46,11 @@ function DashboardPage() {
       }
     };
 
-    // Only fetch the data if the user is NOT a venue owner
     if (!profile || profile.role !== 'venue_owner') {
         fetchTopVenues();
     }
   }, [profile]);
 
-  // --- NEW: Prevent homepage flash for owners ---
-  // If the user is an owner, show a simple loading message while they are being redirected.
   if (profile?.role === 'venue_owner') {
     return <p className="container" style={{ textAlign: 'center', padding: '50px' }}>Redirecting...</p>;
   }

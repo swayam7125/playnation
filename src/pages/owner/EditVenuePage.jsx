@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabaseClient';
-import { useAuth } from '../../AuthContext';
-import { FaTrash, FaPlusCircle } from 'react-icons/fa';
+import { supabase } from '../../supabaseClient'; // Corrected Path
+import { useAuth } from '../../AuthContext'; // Corrected Path
+import { FaTrash, FaPlusCircle, FaTimesCircle } from 'react-icons/fa';
 
 const getTodayString = () => {
     const today = new Date();
@@ -30,7 +30,11 @@ function EditVenuePage() {
     const fetchVenue = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase.from('venues').select('*, facilities(*, time_slots(*))').eq('venue_id', venueId).single();
+            const { data, error } = await supabase
+                .from('venues')
+                .select(`*, facilities(*, time_slots(*, bookings(booking_id)))`)
+                .eq('venue_id', venueId)
+                .single();
             if (error) throw error;
             if (data.owner_id !== user.id) { navigate('/owner/dashboard'); return; }
             setVenue(data);
@@ -65,9 +69,24 @@ function EditVenuePage() {
     };
 
     const handleDeleteSlot = async (slotId) => {
-        if (window.confirm("Are you sure you want to delete this slot?")) {
+        if (window.confirm("Are you sure you want to delete this available slot?")) {
             const { error } = await supabase.from('time_slots').delete().eq('slot_id', slotId);
             if (error) { alert(`Error deleting slot: ${error.message}`); } else { alert("Slot deleted."); fetchVenue(); }
+        }
+    };
+
+    const handleOwnerCancelBooking = async (bookingId, slotId) => {
+        if (window.confirm("Are you sure you want to cancel this user's booking? This action cannot be undone.")) {
+            try {
+                const { error: bookingError } = await supabase.from('bookings').update({ status: 'cancelled', payment_status: 'refunded', cancelled_by: user.id }).eq('booking_id', bookingId);
+                if (bookingError) throw bookingError;
+                const { error: slotError } = await supabase.from('time_slots').update({ is_available: true }).eq('slot_id', slotId);
+                if (slotError) throw slotError;
+                alert("Booking has been cancelled and the slot is now available.");
+                fetchVenue(); 
+            } catch (error) {
+                alert(`Error cancelling booking: ${error.message}`);
+            }
         }
     };
 
@@ -90,32 +109,26 @@ function EditVenuePage() {
         if (error) { alert(`Error adding slots: ${error.message}`); } else { alert(`${slotsToInsert.length} slot(s) added successfully!`); setSlotsToCreate(new Set()); fetchVenue(); }
     };
     
-    // --- THIS LOGIC IS UPDATED ---
     const daySchedule = useMemo(() => {
-        if (!venue?.opening_time || !venue?.closing_time) {
-            return []; // Return empty if venue times are not set
-        }
-
-        // Parse the opening and closing times to get hour numbers
+        if (!venue?.opening_time || !venue?.closing_time) return [];
         const openingHour = parseInt(venue.opening_time.split(':')[0], 10);
         const closingHour = parseInt(venue.closing_time.split(':')[0], 10);
-
-        // Generate the schedule array only for the hours the venue is open
         const schedule = [];
         for (let i = openingHour; i < closingHour; i++) {
             schedule.push({ hour: i, slot: null, status: 'empty' });
         }
-
-        // Fill in the schedule with existing slots
         const selectedFacility = venue?.facilities.find(f => f.facility_id === selectedFacilityId);
         if (selectedFacility) {
-            selectedFacility.time_slots.forEach(slot => {
+            const sortedTimeSlots = [...selectedFacility.time_slots].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+            sortedTimeSlots.forEach(slot => {
                 const slotDate = new Date(slot.start_time).toISOString().split('T')[0];
                 if (slotDate === selectedDate) {
                     const startHour = new Date(slot.start_time).getHours();
                     const scheduleIndex = schedule.findIndex(item => item.hour === startHour);
                     if (scheduleIndex !== -1) {
-                        schedule[scheduleIndex] = { hour: startHour, slot: slot, status: slot.is_available ? 'available' : 'booked' };
+                        const bookingForSlot = (slot.bookings || [])[0];
+                        const status = bookingForSlot ? 'booked' : (slot.is_available ? 'available' : 'blocked');
+                        schedule[scheduleIndex] = { hour: startHour, slot: slot, status, booking_id: bookingForSlot?.booking_id };
                     }
                 }
             });
@@ -160,7 +173,7 @@ function EditVenuePage() {
                         <div className="form-group"><label>Select Date</label><input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} /></div>
                     </div>
                     <div className="day-view-grid">
-                        {daySchedule.map(({ hour, slot, status }) => {
+                        {daySchedule.map(({ hour, slot, status, booking_id }) => {
                             const isSelectedForCreation = slotsToCreate.has(hour);
                             let className = `hour-block ${status}`;
                             if (isSelectedForCreation) className += ' to-create';
@@ -170,7 +183,8 @@ function EditVenuePage() {
                                     {status === 'empty' && (isSelectedForCreation ? <span className="status-text">Selected</span> : <span className="status-text">Click to Add</span>)}
                                     {status === 'available' && <span className="status-text">Available</span>}
                                     {status === 'booked' && <span className="status-text">Booked</span>}
-                                    {status !== 'empty' && <button onClick={(e) => { e.stopPropagation(); handleDeleteSlot(slot.slot_id); }} className="delete-slot-btn"><FaTrash /></button>}
+                                    {status === 'available' && <button onClick={(e) => { e.stopPropagation(); handleDeleteSlot(slot.slot_id); }} className="delete-slot-btn"><FaTrash /></button>}
+                                    {status === 'booked' && <button onClick={(e) => { e.stopPropagation(); handleOwnerCancelBooking(booking_id, slot.slot_id); }} className="delete-slot-btn" title="Cancel this user's booking"><FaTimesCircle /></button>}
                                 </div>
                             );
                         })}

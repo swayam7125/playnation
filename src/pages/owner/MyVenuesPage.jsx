@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
-import OwnerVenueCard from '../components/OwnerVenueCard';
+import OwnerVenueCard from '../../components/venues/OwnerVenueCard'; // Corrected import path
 
-// Renamed the function to match the file name
 function MyVenuesPage() {
   const { user } = useAuth();
   const [venues, setVenues] = useState([]);
