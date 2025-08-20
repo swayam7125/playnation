@@ -15,6 +15,7 @@ function Navbar() {
     <nav className="navbar">
       <div className="container nav-container">
         <div className="nav-links">
+          {/* Logo */}
           <Link to="/" className="nav-logo">
             <div className="nav-logo-box">PN</div>
             <span className="nav-logo-text">PlayNation</span>

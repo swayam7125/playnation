@@ -5,7 +5,6 @@ import OwnerProtectedRoute from './components/auth/OwnerProtectedRoute';
 
 // Public Pages
 import HomePage from './pages/HomePage';
-import DashboardPage from './pages/DashboardPage';
 import AuthPage from './pages/AuthPage';
 import ExplorePage from './pages/ExplorePage';
 import VenuePage from './pages/VenuePage';
@@ -29,7 +28,6 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/explore" element={<ExplorePage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route path="/venue/:venueId" element={<VenuePage />} />

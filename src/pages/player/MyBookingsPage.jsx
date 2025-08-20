@@ -60,12 +60,12 @@ function MyBookingsPage() {
 
         if (slotError) throw slotError;
 
-        alert("Booking cancelled successfully and the slot is now available.");
+        alert("Booking cancelled successfully.");
         setBookings(currentBookings => 
           currentBookings.map(b => b.booking_id === booking.booking_id ? updatedBooking : b)
         );
       } catch (error) {
-        alert(`Error cancelling booking: ${error.message}`);
+        alert(`Error in cancelling booking: ${error.message}`);
       }
     }
   };
