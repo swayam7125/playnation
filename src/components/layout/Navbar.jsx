@@ -35,6 +35,7 @@ function Navbar() {
               <Link to="/owner/dashboard">Dashboard</Link>
               <Link to="/owner/my-venues">My Venues</Link>
               <Link to="/owner/calendar">Bookings</Link>
+              <Link to="/owner/manage-slots">Manage Slots</Link>
             </>
           )}
         </div>

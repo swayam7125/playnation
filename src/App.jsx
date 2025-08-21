@@ -19,6 +19,7 @@ import AddVenuePage from './pages/owner/AddVenuePage';
 import EditVenuePage from './pages/owner/EditVenuePage';
 import MyVenuesPage from './pages/owner/MyVenuesPage';
 import BookingCalendarPage from './pages/owner/BookingCalendarPage';
+import ManageSlotsPage from './pages/owner/ManageSlotsPage';
 
 function App() {
   return (
@@ -43,6 +44,7 @@ function App() {
             <Route path="/owner/edit-venue/:venueId" element={<EditVenuePage />} />
             <Route path="/owner/my-venues" element={<MyVenuesPage />} />
             <Route path="/owner/calendar" element={<BookingCalendarPage />} />
+            <Route path="/owner/manage-slots" element={<ManageSlotsPage />} />
           </Route>
         </Routes>
       </main>

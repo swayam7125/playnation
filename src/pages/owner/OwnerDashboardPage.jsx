@@ -116,7 +116,12 @@ function OwnerDashboardPage() {
 
         if (bookingsError) throw bookingsError;
 
-        if (!bookingsData || bookingsData.length === 0) {
+        // Filter out cancelled bookings to get active ones for calculations
+        const activeBookings = bookingsData 
+          ? bookingsData.filter(b => b.status !== 'cancelled') 
+          : [];
+
+        if (!activeBookings || activeBookings.length === 0) {
           setStats({
             ...initialStats,
             revenue_by_facility: facilities.map((f) => ({
@@ -154,7 +159,7 @@ function OwnerDashboardPage() {
           const date = new Date();
           date.setDate(date.getDate() - i);
           const dateStr = date.toISOString().split("T")[0];
-          const dayRevenue = bookingsData
+          const dayRevenue = activeBookings
             .filter((b) =>
               new Date(b.start_time).toISOString().startsWith(dateStr)
             )
@@ -166,7 +171,7 @@ function OwnerDashboardPage() {
               day: "numeric",
             }),
             revenue: dayRevenue,
-            bookings: bookingsData.filter((b) =>
+            bookings: activeBookings.filter((b) =>
               new Date(b.start_time).toISOString().startsWith(dateStr)
             ).length,
           });
@@ -175,7 +180,7 @@ function OwnerDashboardPage() {
         // Calculate facility performance
         const facilityPerformance = facilities
           .map((facility) => {
-            const facilityBookings = bookingsData.filter(
+            const facilityBookings = activeBookings.filter(
               (b) => b.facility_id === facility.facility_id
             );
             return {
@@ -192,7 +197,7 @@ function OwnerDashboardPage() {
 
         // Calculate peak booking hours
         const hourlyBookings = Array(24).fill(0);
-        bookingsData.forEach((b) => {
+        activeBookings.forEach((b) => {
           const hour = new Date(b.start_time).getHours();
           hourlyBookings[hour]++;
         });
@@ -211,10 +216,10 @@ function OwnerDashboardPage() {
         const sportCounts = {};
         facilities.forEach((f) => {
           const sport = f.sports?.name || "Unknown";
-          const facilityBookings = bookingsData.filter(
+          const facilityBookings = activeBookings.filter(
             (b) => b.facility_id === f.facility_id
           ).length;
-          const facilityRevenue = bookingsData
+          const facilityRevenue = activeBookings
             .filter((b) => b.facility_id === f.facility_id)
             .reduce((sum, b) => sum + b.total_amount, 0);
 
@@ -237,7 +242,7 @@ function OwnerDashboardPage() {
         const mostPopularSport = sportDistribution[0]?.name || "N/A";
 
         // Calculate revenues
-        bookingsData.forEach((b) => {
+        activeBookings.forEach((b) => {
           const bookingDate = new Date(b.start_time);
           total_revenue += b.total_amount;
 
@@ -264,11 +269,11 @@ function OwnerDashboardPage() {
               : 0;
 
         // Count bookings
-        const todaysBookings = bookingsData.filter((b) =>
+        const todaysBookings = activeBookings.filter((b) =>
           new Date(b.start_time).toISOString().startsWith(today)
         ).length;
 
-        const upcomingBookings = bookingsData.filter(
+        const upcomingBookings = activeBookings.filter(
           (b) => new Date(b.start_time) > now
         ).length;
 
