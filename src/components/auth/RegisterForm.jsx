@@ -28,36 +28,32 @@ function RegisterForm() {
     setLoading(true);
 
     try {
-      // ... (signUp and insert logic remains the same)
+      // Step 1: Sign up the user in Supabase Auth.
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
-        options: {
-          data: {
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-          },
-        },
       });
-      if (authError) throw authError;
-      if (!authData.user)
-        throw new Error("Registration failed, please try again.");
 
-      const { error: profileError } = await supabase.from("users").insert({
-        user_id: authData.user.id,
-        username: formData.username,
-        email: formData.email,
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        phone_number: formData.phone_number,
-        role: formData.role,
-      });
+      if (authError) throw authError;
+      if (!authData.user) throw new Error("Registration failed, please try again.");
+
+      // Step 2: UPDATE the user profile that the database trigger created.
+      const { error: profileError } = await supabase
+        .from("users")
+        .update({
+          username: formData.username,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          phone_number: formData.phone_number,
+          role: formData.role,
+        })
+        .eq('user_id', authData.user.id); // Find the correct user to update
+
       if (profileError) throw profileError;
 
-      // Get the profile of the newly created user
+      // Step 3: Fetch the updated profile and navigate.
       const userProfile = await updateUser();
 
-      // Check the role and navigate accordingly
       if (userProfile && userProfile.role === "venue_owner") {
         navigate("/owner/dashboard");
       } else {
@@ -70,7 +66,6 @@ function RegisterForm() {
     }
   };
 
-  // ... (return statement remains the same)
   return (
     <form onSubmit={handleRegister} className="auth-form">
       {error && <p className="auth-error">{error}</p>}
