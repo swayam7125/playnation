@@ -30,7 +30,8 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
           <Route path="/explore" element={<ExplorePage />} />
-          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/login" element={<AuthPage />} />
+          <Route path="/signup" element={<AuthPage />} />
           <Route path="/venue/:venueId" element={<VenuePage />} />
           
           {/* Player-specific routes */}

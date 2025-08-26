@@ -1,10 +1,13 @@
+// src/components/auth/RegisterForm.jsx
+
 import React, { useState } from "react";
 import { supabase } from "../../supabaseClient";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 
 function RegisterForm() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { updateUser } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
@@ -18,6 +21,8 @@ function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const from = location.state?.from || null;
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -28,7 +33,6 @@ function RegisterForm() {
     setLoading(true);
 
     try {
-      // Step 1: Sign up the user in Supabase Auth.
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -37,7 +41,6 @@ function RegisterForm() {
       if (authError) throw authError;
       if (!authData.user) throw new Error("Registration failed, please try again.");
 
-      // Step 2: UPDATE the user profile that the database trigger created.
       const { error: profileError } = await supabase
         .from("users")
         .update({
@@ -47,15 +50,16 @@ function RegisterForm() {
           phone_number: formData.phone_number,
           role: formData.role,
         })
-        .eq('user_id', authData.user.id); // Find the correct user to update
+        .eq('user_id', authData.user.id);
 
       if (profileError) throw profileError;
 
-      // Step 3: Fetch the updated profile and navigate.
       const userProfile = await updateUser();
 
       if (userProfile && userProfile.role === "venue_owner") {
         navigate("/owner/dashboard");
+      } else if (from) {
+        navigate(from.pathname, { state: from.state, replace: true });
       } else {
         navigate("/");
       }

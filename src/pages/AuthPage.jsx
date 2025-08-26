@@ -1,12 +1,27 @@
-import React, { useState } from 'react';
-import LoginForm from '../components/auth/LoginForm'; // Corrected import path
-import RegisterForm from '../components/auth/RegisterForm'; // Corrected import path
+// src/pages/AuthPage.jsx
+
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import LoginForm from '../components/auth/LoginForm';
+import RegisterForm from '../components/auth/RegisterForm';
 
 function AuthPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [isLoginView, setIsLoginView] = useState(true);
 
+  useEffect(() => {
+    setIsLoginView(location.pathname === '/login');
+  }, [location.pathname]);
+
   const toggleView = () => {
-    setIsLoginView(!isLoginView);
+    if (isLoginView) {
+      // Pass the location state when navigating to signup
+      navigate('/signup', { state: location.state });
+    } else {
+      // Pass the location state back when navigating to login
+      navigate('/login', { state: location.state });
+    }
   };
 
   return (

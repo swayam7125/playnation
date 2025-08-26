@@ -52,8 +52,8 @@ function Navbar() {
             </>
           ) : (
             <>
-              <Link to="/auth" className="btn btn-secondary">Login</Link>
-              <Link to="/auth" className="btn btn-primary">Sign up</Link>
+              <Link to="/login" className="btn btn-secondary">Login</Link>
+              <Link to="/signup" className="btn btn-primary">Sign up</Link>
             </>
           )}
         </div>

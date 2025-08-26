@@ -10,16 +10,11 @@ function BookingPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  // Destructure price from location.state, with a fallback to the facility's hourly rate
   const { venue, facility, slot, price } = location.state || {};
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // If there's no essential booking data, redirect to explore page
   if (!venue || !facility || !slot || price === undefined) {
-    // Using navigate directly inside render is an anti-pattern,
-    // it's better to handle this with a useEffect or conditional rendering.
-    // However, for a simple redirect, this is a common approach.
     React.useEffect(() => {
         navigate('/explore');
     }, [navigate]);
@@ -31,14 +26,14 @@ function BookingPage() {
   const handleConfirmBooking = async () => {
     if (!user) {
       alert("Please log in to make a booking.");
-      navigate('/auth');
+      // Redirect to login, passing the current location as state
+      navigate('/login', { state: { from: location } });
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      // Step 1: Create the booking record
       const { data: bookingData, error: bookingError } = await supabase
         .from('bookings')
         .insert({
@@ -48,16 +43,15 @@ function BookingPage() {
           booking_date: new Date(),
           start_time: slot.start_time,
           end_time: slot.end_time,
-          total_amount: totalAmount, // Use the price from the state
+          total_amount: totalAmount,
           status: 'confirmed',
-          payment_status: 'paid', // Simulating a successful payment
+          payment_status: 'paid',
         })
         .select()
         .single();
       
       if (bookingError) throw bookingError;
 
-      // Step 2: Update the time slot to be unavailable
       const { error: slotError } = await supabase
         .from('time_slots')
         .update({ is_available: false })

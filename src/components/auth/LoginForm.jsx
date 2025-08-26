@@ -1,15 +1,20 @@
+// src/components/auth/LoginForm.jsx
+
 import React, { useState } from "react";
 import { supabase } from "../../supabaseClient";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 
 function LoginForm() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { updateUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const from = location.state?.from || null;
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -23,12 +28,12 @@ function LoginForm() {
       });
       if (error) throw error;
 
-      // Get the profile from the updated function
       const userProfile = await updateUser();
 
-      // Check the user's role and navigate accordingly
       if (userProfile && userProfile.role === "venue_owner") {
         navigate("/owner/dashboard");
+      } else if (from) {
+        navigate(from.pathname, { state: from.state, replace: true });
       } else {
         navigate("/");
       }
@@ -39,7 +44,6 @@ function LoginForm() {
     }
   };
 
-  // ... (return statement remains the same)
   return (
     <form onSubmit={handleLogin} className="auth-form">
       {error && <p className="auth-error">{error}</p>}
