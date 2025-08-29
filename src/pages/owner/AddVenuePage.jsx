@@ -25,6 +25,10 @@ function AddVenuePage() {
   const [sports, setSports] = useState([]);
   const [amenities, setAmenities] = useState([]);
 
+  // New state for file handling
+  const [imageFile, setImageFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -62,6 +66,12 @@ function AddVenuePage() {
     });
   };
 
+  const handleImageChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setImageFile(e.target.files[0]);
+    }
+  };
+
   // Add the currently defined facility to the list
   const handleAddFacility = () => {
     if (!currentFacility.name || !currentFacility.sport_id || !currentFacility.hourly_rate) {
@@ -78,20 +88,38 @@ function AddVenuePage() {
     e.preventDefault();
     if (!user) { setError("You must be logged in."); return; }
     if (facilities.length === 0) { alert("Please add at least one facility to the venue."); return; }
-    
+    if (!imageFile) { alert("Please upload an image for the venue."); return; }
+
     setLoading(true);
+    setUploading(true);
     setError(null);
 
     try {
-      // Step 1: Insert the main venue details
+      // Step 1: Upload the image to Supabase Storage
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('venue-images')
+        .upload(fileName, imageFile);
+
+      if (uploadError) throw uploadError;
+
+      // Step 2: Get the public URL of the uploaded image
+      const { data: urlData } = supabase.storage
+        .from('venue-images')
+        .getPublicUrl(fileName);
+
+      const imageUrl = urlData.publicUrl;
+
+      // Step 3: Insert the main venue details with the image URL
       const { data: newVenue, error: venueError } = await supabase
         .from('venues')
-        .insert({ ...venueDetails, owner_id: user.id, is_approved: false })
+        .insert({ ...venueDetails, owner_id: user.id, is_approved: false, image_url: imageUrl })
         .select()
         .single();
       if (venueError) throw venueError;
 
-      // Step 2: Insert each facility linked to the new venue
+      // Step 4: Insert each facility linked to the new venue
       for (const facility of facilities) {
         const { data: newFacility, error: facilityError } = await supabase
           .from('facilities')
@@ -106,7 +134,7 @@ function AddVenuePage() {
           .single();
         if (facilityError) throw facilityError;
 
-        // Step 3: Link the amenities to the new facility
+        // Step 5: Link the amenities to the new facility
         const amenitiesToInsert = Array.from(facility.selectedAmenities).map(amenityId => ({
           facility_id: newFacility.facility_id,
           amenity_id: amenityId,
@@ -127,6 +155,7 @@ function AddVenuePage() {
       setError(err.message);
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -149,6 +178,10 @@ function AddVenuePage() {
           <div className="form-group"><label>Opening Time</label><input name="opening_time" type="time" value={venueDetails.opening_time} onChange={handleVenueChange} required /></div>
           <div className="form-group"><label>Closing Time</label><input name="closing_time" type="time" value={venueDetails.closing_time} onChange={handleVenueChange} required /></div>
           <div className="form-group grid-col-span-2"><label>Description</label><textarea name="description" rows="3" value={venueDetails.description} onChange={handleVenueChange}></textarea></div>
+          <div className="form-group grid-col-span-2">
+            <label>Venue Image</label>
+            <input type="file" accept="image/*" onChange={handleImageChange} required />
+          </div>
         </div>
 
         {/* --- Facilities Management Section --- */}
@@ -181,8 +214,8 @@ function AddVenuePage() {
           ))}
         </div>
 
-        <button type="submit" className="auth-submit-button" disabled={loading}>
-          {loading ? "Submitting Venue..." : "Submit for Approval"}
+        <button type="submit" className="auth-submit-button" disabled={loading || uploading}>
+          {loading ? "Submitting Venue..." : uploading ? "Uploading Image..." : "Submit for Approval"}
         </button>
       </form>
     </div>
