@@ -1,5 +1,11 @@
 /* --- MODERN DESIGN SYSTEM --- */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap&display=swap&text=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
+
+/* Font performance optimization */
+@font-face {
+  font-family: "Inter";
+  font-display: swap;
+}
 
 :root {
   /* Enhanced Color Palette */
@@ -72,10 +78,10 @@ body {
 }
 
 .container {
-  width: 90%;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 1rem;
+  width: clamp(320px, 90%, 1280px);
+  margin-inline: auto;
+  padding-inline: 1rem;
+  contain: layout paint;
 }
 
 .section-heading {
@@ -113,6 +119,10 @@ body {
   text-decoration: none;
   font-family: inherit;
   white-space: nowrap;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  will-change: transform;
 }
 
 .btn-primary {
@@ -157,6 +167,12 @@ body {
   top: 0;
   z-index: 100;
   box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background-color: rgba(255, 255, 255, 0.95);
+  contain: layout paint;
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .nav-container {
@@ -729,18 +745,22 @@ body {
 
 .venue-card-image {
   width: 100%;
-  height: 200px;
+  height: 160px;
   object-fit: cover;
   background-color: var(--border-color-light);
+  aspect-ratio: 16/9;
+  contain: paint;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .venue-card-content {
-  padding: 1.5rem;
+  padding: 1rem;
 }
 
 .venue-card-content h3 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.3rem;
+  margin: 0 0 0.25rem 0;
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--dark-text);
 }
@@ -777,9 +797,9 @@ body {
 .feature-item {
   background-color: var(--light-green-bg);
   color: #065f46;
-  padding: 0.5rem 1rem;
+  padding: 0.35rem 0.75rem;
   border-radius: 50px;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   border: 1px solid rgba(16, 185, 129, 0.2);
 }
@@ -849,14 +869,14 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.5rem;
+  padding: 0.75rem 1rem;
   background-color: var(--hover-bg);
   border-bottom: 1px solid var(--border-color);
 }
 
 .booking-card-header h4 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--dark-text);
 }
@@ -864,9 +884,9 @@ body {
 .booking-status {
   background-color: var(--light-green-bg);
   color: #065f46;
-  padding: 0.5rem 1.25rem;
+  padding: 0.35rem 0.75rem;
   border-radius: 50px;
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1076,14 +1096,14 @@ body {
 .stat-card {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-xl);
-  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  padding: 1rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
   transition: var(--transition-smooth);
   box-shadow: var(--shadow-md);
-  border-top: 3px solid var(--primary-green);
+  border-top: 2px solid var(--primary-green);
 }
 
 .stat-card:hover {
@@ -1171,8 +1191,8 @@ body {
 .list-card {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-xl);
-  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  padding: 1rem;
   box-shadow: var(--shadow-lg);
   transition: var(--transition-smooth);
 }
@@ -1308,6 +1328,31 @@ body {
   background-color: var(--primary-green);
   border-radius: var(--radius-md);
   transition: width 0.8s ease;
+}
+
+/* --- MODERN PERFORMANCE OPTIMIZATIONS --- */
+@layer base {
+  img,
+  picture,
+  video,
+  canvas,
+  svg {
+    display: block;
+    max-width: 100%;
+  }
+
+  * {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  .scroll-animation {
+    animation-timeline: scroll();
+    animation-range: entry 50% cover 50%;
+  }
 }
 
 /* --- RESPONSIVE DESIGN --- */
@@ -2151,30 +2196,30 @@ body {
 }
 
 .btn-danger {
-  background-color: #FEF2F2; /* Light red */
-  color: #DC2626; /* Dark red */
-  border-color: #FCA5A5;
+  background-color: #fef2f2; /* Light red */
+  color: #dc2626; /* Dark red */
+  border-color: #fca5a5;
 }
 
 .btn-danger:hover {
-  background-color: #DC2626;
+  background-color: #dc2626;
   color: white;
-  border-color: #DC2626;
+  border-color: #dc2626;
 }
 
 /* --- Add these styles for Booking Status --- */
 
 /* Style for the cancelled status badge */
 .booking-status.cancelled {
-  background-color: #FEF2F2; /* Light red */
-  color: #DC2626; /* Dark red */
+  background-color: #fef2f2; /* Light red */
+  color: #dc2626; /* Dark red */
   border: 1px solid rgba(220, 38, 38, 0.3);
 }
 
 /* Style for the greyed-out cancelled card */
 .booking-card.cancelled-card {
-  background-color: #F9FAFB; /* Light grey */
-  border-left-color: #9CA3AF; /* Grey border */
+  background-color: #f9fafb; /* Light grey */
+  border-left-color: #9ca3af; /* Grey border */
   opacity: 0.8;
 }
 
@@ -2198,7 +2243,7 @@ body {
 }
 
 .calendar-date-picker {
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 600;
   font-size: 1rem;
   padding: 0.5rem 1rem;
@@ -2222,13 +2267,16 @@ body {
   min-width: 800px; /* Ensure grid has a minimum width */
 }
 
-.calendar-header, .time-slot-label, .calendar-slot {
+.calendar-header,
+.time-slot-label,
+.calendar-slot {
   padding: 1rem;
   text-align: center;
   border-bottom: 1px solid var(--border-color);
   border-right: 1px solid var(--border-color);
 }
-.calendar-header:last-child, .calendar-slot:last-child {
+.calendar-header:last-child,
+.calendar-slot:last-child {
   border-right: none;
 }
 
@@ -2314,7 +2362,7 @@ body {
 }
 
 .calendar-venue-select {
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 600;
   font-size: 1rem;
   padding: 0.5rem 1rem;

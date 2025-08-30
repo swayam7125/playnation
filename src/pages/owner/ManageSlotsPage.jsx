@@ -216,6 +216,19 @@ function ManageSlotsPage() {
 
     const currentFacility = selectedVenue?.facilities.find(f => f.facility_id === selectedFacilityId);
 
+    // STEP 1: Add handler functions
+    const handleSelectAllEmptySlots = () => {
+        const emptyHours = daySchedule
+            .filter(item => item.status === 'empty')
+            .map(item => item.hour);
+        setSlotsToCreate(new Set(emptyHours));
+    };
+
+    const handleDeselectAll = () => {
+        setSlotsToCreate(new Set());
+    };
+
+
     if (loading) return <p className="container">Loading...</p>;
 
     return (
@@ -253,6 +266,16 @@ function ManageSlotsPage() {
                                 <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
                             </div>
                         </div>
+
+                        {/* STEP 2: Add the new buttons to the JSX */}
+                        {selectedFacilityId && (
+                           <div className="slot-selection-actions" style={{ margin: '1rem 0', display: 'flex', gap: '1rem' }}>
+                                <button onClick={handleSelectAllEmptySlots} className="btn btn-secondary">Select All Empty Slots</button>
+                                {slotsToCreate.size > 0 && (
+                                    <button onClick={handleDeselectAll} className="btn btn-outline">Deselect All</button>
+                                )}
+                            </div>
+                        )}
                         
                         {selectedFacilityId ? (
                             <div className="day-view-grid">
