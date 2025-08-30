@@ -1,51 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import VenueCard from '../components/venues/VenueCard'; // Corrected import path
+import VenueCard from '../components/venues/VenueCard';
+import useVenues from '../hooks/useVenues'; // Import the custom hook
 
 function ExplorePage() {
-  const [venues, setVenues] = useState([]);
+  const { venues, loading, error } = useVenues(); // Use the custom hook to fetch all venues
   const [sports, setSports] = useState([]);
   const [selectedSport, setSelectedSport] = useState('all');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [sportsLoading, setSportsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
+    const fetchSports = async () => {
       try {
-        const { data: venueData, error: venueError } = await supabase
-          .from('venues')
-          .select(`
-            *,
-            facilities (
-              *,
-              sports (name),
-              facility_amenities (
-                amenities (name)
-              )
-            )
-          `)
-          .eq('is_approved', true);
-
-        if (venueError) throw venueError;
-
         const { data: sportsData, error: sportsError } = await supabase
           .from('sports')
           .select('*');
         
         if (sportsError) throw sportsError;
 
-        setVenues(venueData);
         setSports(sportsData);
       } catch (err) {
-        setError(err.message);
+        console.error("Error fetching sports:", err.message);
       } finally {
-        setLoading(false);
+        setSportsLoading(false);
       }
     };
 
-    fetchData();
+    fetchSports();
   }, []);
 
   const filteredVenues = selectedSport === 'all'
@@ -65,7 +46,7 @@ function ExplorePage() {
         >
           All Sports
         </button>
-        {sports.map(sport => (
+        {!sportsLoading && sports.map(sport => (
           <button 
             key={sport.sport_id} 
             onClick={() => setSelectedSport(sport.sport_id)}

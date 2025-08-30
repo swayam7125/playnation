@@ -2,44 +2,35 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
+import { useModal } from '../../ModalContext';
 
 function AddVenuePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { showModal } = useModal();
   
-  // State for the main venue details
   const [venueDetails, setVenueDetails] = useState({
     name: '', address: '', city: '', state: '', zip_code: '', description: '',
     contact_email: '', contact_phone: '', opening_time: '06:00', closing_time: '23:00'
   });
 
-  // State for managing the list of facilities to be added
   const [facilities, setFacilities] = useState([]);
   
-  // State for the current facility being added
   const [currentFacility, setCurrentFacility] = useState({
     name: '', sport_id: '', hourly_rate: '', capacity: '', selectedAmenities: new Set()
   });
 
-  // State to hold options fetched from the DB
   const [sports, setSports] = useState([]);
   const [amenities, setAmenities] = useState([]);
-
-  // New state for file handling
-  const [imageFile, setImageFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  // Fetch sports and amenities to populate the form options
   useEffect(() => {
     const fetchOptions = async () => {
       const { data: sportsData } = await supabase.from('sports').select('*');
       const { data: amenitiesData } = await supabase.from('amenities').select('*');
       setSports(sportsData || []);
       setAmenities(amenitiesData || []);
-      if (sportsData.length > 0) {
+      if (sportsData && sportsData.length > 0) {
         setCurrentFacility(prev => ({ ...prev, sport_id: sportsData[0].sport_id }));
       }
     };
@@ -66,60 +57,40 @@ function AddVenuePage() {
     });
   };
 
-  const handleImageChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setImageFile(e.target.files[0]);
-    }
-  };
-
-  // Add the currently defined facility to the list
-  const handleAddFacility = () => {
+  const handleAddFacility = async () => {
     if (!currentFacility.name || !currentFacility.sport_id || !currentFacility.hourly_rate) {
-      alert("Please provide a facility name, sport, and hourly rate.");
+      await showModal({
+        type: 'error',
+        title: 'Missing Information',
+        message: "Please provide a facility name, sport, and hourly rate.",
+      });
       return;
     }
-    setFacilities([...facilities, { ...currentFacility, id: Date.now() }]); // Use timestamp as temporary key
-    // Reset the form for the next facility
+    setFacilities([...facilities, { ...currentFacility, id: Date.now() }]);
     setCurrentFacility({ name: '', sport_id: sports[0]?.sport_id || '', hourly_rate: '', capacity: '', selectedAmenities: new Set() });
   };
 
-  // Main submission handler
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user) { setError("You must be logged in."); return; }
-    if (facilities.length === 0) { alert("Please add at least one facility to the venue."); return; }
-    if (!imageFile) { alert("Please upload an image for the venue."); return; }
-
+    if (!user) { return; }
+    if (facilities.length === 0) {
+      await showModal({
+        type: 'error',
+        title: 'No Facilities Added',
+        message: "Please add at least one facility to the venue before submitting.",
+      });
+      return;
+    }
+    
     setLoading(true);
-    setUploading(true);
-    setError(null);
-
     try {
-      // Step 1: Upload the image to Supabase Storage
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('venue-images')
-        .upload(fileName, imageFile);
-
-      if (uploadError) throw uploadError;
-
-      // Step 2: Get the public URL of the uploaded image
-      const { data: urlData } = supabase.storage
-        .from('venue-images')
-        .getPublicUrl(fileName);
-
-      const imageUrl = urlData.publicUrl;
-
-      // Step 3: Insert the main venue details with the image URL
       const { data: newVenue, error: venueError } = await supabase
         .from('venues')
-        .insert({ ...venueDetails, owner_id: user.id, is_approved: false, image_url: imageUrl })
+        .insert({ ...venueDetails, owner_id: user.id, is_approved: false })
         .select()
         .single();
       if (venueError) throw venueError;
 
-      // Step 4: Insert each facility linked to the new venue
       for (const facility of facilities) {
         const { data: newFacility, error: facilityError } = await supabase
           .from('facilities')
@@ -134,7 +105,6 @@ function AddVenuePage() {
           .single();
         if (facilityError) throw facilityError;
 
-        // Step 5: Link the amenities to the new facility
         const amenitiesToInsert = Array.from(facility.selectedAmenities).map(amenityId => ({
           facility_id: newFacility.facility_id,
           amenity_id: amenityId,
@@ -148,14 +118,22 @@ function AddVenuePage() {
         }
       }
       
-      alert("Venue submitted for approval successfully!");
+      await showModal({
+        type: 'info',
+        title: 'Venue Submitted',
+        message: 'Your venue has been submitted for approval successfully!',
+        confirmText: 'OK'
+      });
       navigate('/owner/my-venues');
 
     } catch (err) {
-      setError(err.message);
+      await showModal({
+        type: 'error',
+        title: 'Submission Error',
+        message: `An error occurred: ${err.message}`
+      });
     } finally {
       setLoading(false);
-      setUploading(false);
     }
   };
 
@@ -163,9 +141,7 @@ function AddVenuePage() {
     <div className="container dashboard-page">
       <h1 className="section-heading" style={{ textAlign: 'center' }}>Add a New Venue</h1>
       <form onSubmit={handleSubmit} className="auth-card" style={{ maxWidth: '900px', margin: 'auto' }}>
-        {error && <p className="auth-error">{error}</p>}
         
-        {/* --- Venue Details Form --- */}
         <h3 className="form-section-title">1. Venue Details</h3>
         <div className="form-grid">
           <div className="form-group grid-col-span-2"><label>Venue Name</label><input name="name" type="text" value={venueDetails.name} onChange={handleVenueChange} required /></div>
@@ -178,13 +154,8 @@ function AddVenuePage() {
           <div className="form-group"><label>Opening Time</label><input name="opening_time" type="time" value={venueDetails.opening_time} onChange={handleVenueChange} required /></div>
           <div className="form-group"><label>Closing Time</label><input name="closing_time" type="time" value={venueDetails.closing_time} onChange={handleVenueChange} required /></div>
           <div className="form-group grid-col-span-2"><label>Description</label><textarea name="description" rows="3" value={venueDetails.description} onChange={handleVenueChange}></textarea></div>
-          <div className="form-group grid-col-span-2">
-            <label>Venue Image</label>
-            <input type="file" accept="image/*" onChange={handleImageChange} required />
-          </div>
         </div>
 
-        {/* --- Facilities Management Section --- */}
         <h3 className="form-section-title">2. Add Facilities</h3>
         <div className="facility-subform">
           <div className="form-grid">
@@ -205,17 +176,16 @@ function AddVenuePage() {
           <button type="button" className="btn btn-secondary" onClick={handleAddFacility} style={{ alignSelf: 'flex-end' }}>Add Facility</button>
         </div>
         
-        {/* --- List of Added Facilities --- */}
         <div className="added-facilities-list">
-          {facilities.map((facility, index) => (
+          {facilities.map((facility) => (
             <div key={facility.id} className="added-facility-card">
               <strong>{facility.name}</strong> ({sports.find(s => s.sport_id === facility.sport_id)?.name}) - ₹{facility.hourly_rate}/hr
             </div>
           ))}
         </div>
 
-        <button type="submit" className="auth-submit-button" disabled={loading || uploading}>
-          {loading ? "Submitting Venue..." : uploading ? "Uploading Image..." : "Submit for Approval"}
+        <button type="submit" className="auth-submit-button" disabled={loading}>
+          {loading ? "Submitting Venue..." : "Submit for Approval"}
         </button>
       </form>
     </div>

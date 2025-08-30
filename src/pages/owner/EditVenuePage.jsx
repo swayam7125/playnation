@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
+import { useModal } from '../../ModalContext';
 import { FaTrash, FaPlusCircle, FaPlus } from 'react-icons/fa';
 
 function EditVenuePage() {
     const { venueId } = useParams();
     const { user } = useAuth();
     const navigate = useNavigate();
+    const { showModal } = useModal();
     const [venue, setVenue] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('details');
@@ -16,12 +18,7 @@ function EditVenuePage() {
         description: '', contact_email: '', contact_phone: '',
         opening_time: '', closing_time: ''
     });
-
-    // State for handling image updates
-    const [newImageFile, setNewImageFile] = useState(null);
-    const [uploading, setUploading] = useState(false);
     
-    // New facility form state
     const [sports, setSports] = useState([]);
     const [showAddFacilityForm, setShowAddFacilityForm] = useState(false);
     const [newFacility, setNewFacility] = useState({
@@ -32,7 +29,6 @@ function EditVenuePage() {
         description: ''
     });
 
-    // Fetch sports for facility creation
     const fetchSports = async () => {
         try {
             const { data, error } = await supabase
@@ -84,108 +80,13 @@ function EditVenuePage() {
     const handleDetailsUpdate = async (e) => {
         e.preventDefault();
         const { error } = await supabase.from('venues').update(venueDetails).eq('venue_id', venueId);
-        if (error) { alert(`Error updating details: ${error.message}`); } else { alert("Venue details updated successfully!"); }
+        if (error) { 
+            await showModal({ type: 'error', title: 'Update Error', message: `Error updating details: ${error.message}` });
+        } else { 
+            await showModal({ type: 'info', title: 'Success', message: "Venue details updated successfully!" });
+        }
     };
     
-    // Handler for image file selection
-    const handleImageChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            setNewImageFile(e.target.files[0]);
-        }
-    };
-
-    // Handler for updating the image
-    const handleImageUpdate = async () => {
-        if (!newImageFile) {
-            alert("Please select a new image to upload.");
-            return;
-        }
-        setUploading(true);
-        
-        try {
-            // Upload the new image first
-            const fileExt = newImageFile.name.split('.').pop();
-            const newFileName = `venue_${venueId}_${Date.now()}.${fileExt}`;
-            const { error: uploadError } = await supabase.storage
-                .from('venue-images')
-                .upload(newFileName, newImageFile);
-            if (uploadError) throw uploadError;
-
-            // Get the public URL of the new image
-            const { data: urlData } = supabase.storage
-                .from('venue-images')
-                .getPublicUrl(newFileName);
-            const newImageUrl = urlData.publicUrl;
-
-            // Update the venue's image_url in the database
-            const { error: dbError } = await supabase
-                .from('venues')
-                .update({ image_url: newImageUrl })
-                .eq('venue_id', venueId);
-            if (dbError) throw dbError;
-
-            // If an old image exists, delete it (after successful update)
-            if (venue.image_url) {
-                const oldFileName = venue.image_url.split('/').pop();
-                const { error: deleteError } = await supabase.rpc('delete_storage_object', {
-                    bucket: 'venue-images',
-                    object_path: oldFileName
-                });
-                if (deleteError) {
-                    console.warn("Could not delete old image, please check storage policies.", deleteError);
-                }
-            }
-
-            alert("Image updated successfully!");
-            setNewImageFile(null);
-            document.getElementById('new_image').value = ''; // Clear the file input
-            
-            fetchVenue(); // Refresh venue data to show new image
-        } catch (error) {
-            alert(`Error updating image: ${error.message}`);
-            console.error("Full error:", error);
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    // Handler for deleting the image
-    const handleImageDelete = async () => {
-        if (!venue.image_url) {
-            alert("There is no image to delete.");
-            return;
-        }
-        if (window.confirm("Are you sure you want to delete the venue image? This action cannot be undone.")) {
-            setUploading(true);
-            try {
-                // Delete the image file from storage using the RPC function
-                const oldFileName = venue.image_url.split('/').pop();
-                const { error: deleteError } = await supabase.rpc('delete_storage_object', {
-                    bucket: 'venue-images',
-                    object_path: oldFileName
-                });
-                if (deleteError) throw deleteError;
-
-                // Set the image_url in the database to null
-                const { error: dbError } = await supabase
-                    .from('venues')
-                    .update({ image_url: null })
-                    .eq('venue_id', venueId);
-                if (dbError) throw dbError;
-
-                alert("Image deleted successfully!");
-                fetchVenue(); // Refresh venue data
-            } catch (error) {
-                alert(`Error deleting image: ${error.message}`);
-                console.error("Delete error details:", error);
-            } finally {
-                setUploading(false);
-            }
-        }
-    };
-
-
-    // New facility form handlers
     const handleNewFacilityChange = (e) => {
         setNewFacility({ ...newFacility, [e.target.name]: e.target.value });
     };
@@ -194,7 +95,7 @@ function EditVenuePage() {
         e.preventDefault();
         
         if (!newFacility.name.trim() || !newFacility.sport_id || !newFacility.capacity || !newFacility.hourly_rate) {
-            alert("Please fill all required facility fields.");
+            await showModal({ type: 'error', title: 'Missing Fields', message: "Please fill all required facility fields." });
             return;
         }
 
@@ -209,24 +110,32 @@ function EditVenuePage() {
             };
             const { error } = await supabase.from('facilities').insert([facilityData]);
             if (error) throw error;
-            alert("Facility added successfully!");
+            await showModal({ type: 'info', title: 'Success', message: "Facility added successfully!" });
             setNewFacility({ name: '', sport_id: '', capacity: '', hourly_rate: '', description: '' });
             setShowAddFacilityForm(false);
             fetchVenue();
         } catch (error) {
-            alert(`Error adding facility: ${error.message}`);
+            await showModal({ type: 'error', title: 'Error', message: `Error adding facility: ${error.message}` });
         }
     };
 
     const handleDeleteFacility = async (facilityId, facilityName) => {
-        if (window.confirm(`Are you sure you want to delete the facility "${facilityName}"? This will also delete all associated time slots and bookings. This action cannot be undone.`)) {
+        const confirmed = await showModal({
+            type: 'confirm',
+            title: 'Confirm Deletion',
+            message: `Are you sure you want to delete the facility "${facilityName}"? This will also delete all associated time slots and bookings. This action cannot be undone.`,
+            confirmText: 'Delete',
+            cancelText: 'Cancel'
+        });
+
+        if (confirmed) {
             try {
                 const { error } = await supabase.from('facilities').delete().eq('facility_id', facilityId);
                 if (error) throw error;
-                alert("Facility deleted successfully!");
+                await showModal({ type: 'info', title: 'Success', message: "Facility deleted successfully!" });
                 fetchVenue();
             } catch (error) {
-                alert(`Error deleting facility: ${error.message}`);
+                await showModal({ type: 'error', title: 'Error', message: `Error deleting facility: ${error.message}` });
             }
         }
     };
@@ -244,34 +153,6 @@ function EditVenuePage() {
 
             {activeTab === 'details' && (
                 <form onSubmit={handleDetailsUpdate} className="auth-card venue-details-form">
-                    {/* Image Update Section */}
-                    <div style={{ marginBottom: '2rem' }}>
-                        <h3 className="form-section-title">Venue Image</h3>
-                        <div className="form-group">
-                            <label htmlFor="image">Current Image</label>
-                            {venue.image_url ? (
-                                <img src={venue.image_url} alt={venue.name} style={{ width: '100%', maxWidth: '300px', borderRadius: '8px', marginBottom: '1rem' }} />
-                            ) : (
-                                <p>No image uploaded.</p>
-                            )}
-                        </div>
-                        <div className="form-group">
-                            <label htmlFor="new_image">Upload New Image</label>
-                            <input id="new_image" type="file" accept="image/*" onChange={handleImageChange} />
-                        </div>
-                        <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                            <button type="button" onClick={handleImageUpdate} className="btn btn-secondary" disabled={uploading || !newImageFile}>
-                                {uploading ? 'Uploading...' : 'Update Image'}
-                            </button>
-                            {venue.image_url && (
-                                <button type="button" onClick={handleImageDelete} className="btn btn-danger" disabled={uploading}>
-                                    {uploading ? 'Deleting...' : 'Delete Image'}
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    <h3 className="form-section-title">Venue Details</h3>
                     <div className="form-grid">
                         <div className="form-group grid-col-span-2"><label htmlFor="name">Venue Name</label><input id="name" name="name" type="text" value={venueDetails.name} onChange={handleDetailsChange} /></div>
                         <div className="form-group grid-col-span-2"><label htmlFor="address">Address</label><input id="address" name="address" type="text" value={venueDetails.address} onChange={handleDetailsChange} /></div>
@@ -292,9 +173,7 @@ function EditVenuePage() {
                 <div className="facilities-manager">
                     <div className="facilities-header">
                         <h2>Manage Facilities</h2>
-                        <button onClick={() => setShowAddFacilityForm(!showAddFacilityForm)} className="btn btn-primary add-facility-btn">
-                            <FaPlus /> Add New Facility
-                        </button>
+                        <button onClick={() => setShowAddFacilityForm(!showAddFacilityForm)} className="btn btn-primary add-facility-btn"><FaPlus /> Add New Facility</button>
                     </div>
 
                     {showAddFacilityForm && (

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
+import { useModal } from '../../ModalContext';
 import { FaTrash, FaPlusCircle, FaTimesCircle, FaPlus, FaEdit, FaBan, FaCheck, FaTimes } from 'react-icons/fa';
 
 const getTodayString = () => {
@@ -12,6 +13,7 @@ const getTodayString = () => {
 
 function ManageSlotsPage() {
     const { user } = useAuth();
+    const { showModal } = useModal();
     const [loading, setLoading] = useState(true);
     const [venues, setVenues] = useState([]);
     const [selectedVenueId, setSelectedVenueId] = useState('');
@@ -35,7 +37,7 @@ function ManageSlotsPage() {
                 .eq('owner_id', user.id);
             if (error) throw error;
             setVenues(data || []);
-            if (data && data.length > 0) {
+            if (data && data.length > 0 && !selectedVenueId) {
                 setSelectedVenueId(data[0].venue_id);
                 if (data[0].facilities && data[0].facilities.length > 0) {
                     setSelectedFacilityId(data[0].facilities[0].facility_id);
@@ -66,23 +68,40 @@ function ManageSlotsPage() {
     };
 
     const handleDeleteSlot = async (slotId) => {
-        if (window.confirm("Are you sure you want to delete this available slot?")) {
+        const confirmed = await showModal({
+            type: 'confirm',
+            title: 'Confirm Deletion',
+            message: "Are you sure you want to delete this available slot?",
+            confirmText: 'Delete'
+        });
+        if (confirmed) {
             const { error } = await supabase.from('time_slots').delete().eq('slot_id', slotId);
-            if (error) { alert(`Error deleting slot: ${error.message}`); } else { alert("Slot deleted."); fetchOwnerVenues(); }
+            if (error) {
+                await showModal({ type: 'error', title: 'Error', message: `Error deleting slot: ${error.message}` });
+            } else {
+                await showModal({ type: 'info', title: 'Success', message: 'Slot deleted.' });
+                fetchOwnerVenues();
+            }
         }
     };
 
     const handleOwnerCancelBooking = async (bookingId, slotId) => {
-        if (window.confirm("Are you sure you want to cancel this user's booking? This action cannot be undone.")) {
+        const confirmed = await showModal({
+            type: 'confirm',
+            title: 'Confirm Cancellation',
+            message: "Are you sure you want to cancel this user's booking? This action cannot be undone.",
+            confirmText: 'Cancel Booking'
+        });
+        if (confirmed) {
             try {
                 const { error: bookingError } = await supabase.from('bookings').update({ status: 'cancelled', payment_status: 'refunded', cancelled_by: user.id }).eq('booking_id', bookingId);
                 if (bookingError) throw bookingError;
                 const { error: slotError } = await supabase.from('time_slots').update({ is_available: true }).eq('slot_id', slotId);
                 if (slotError) throw slotError;
-                alert("Booking has been cancelled and the slot is now available.");
+                await showModal({ type: 'info', title: 'Success', message: "Booking has been cancelled and the slot is now available." });
                 fetchOwnerVenues(); 
             } catch (error) {
-                alert(`Error cancelling booking: ${error.message}`);
+                await showModal({ type: 'error', title: 'Error', message: `Error cancelling booking: ${error.message}` });
             }
         }
     };
@@ -96,17 +115,17 @@ function ManageSlotsPage() {
         try {
             const priceValue = customPrice.trim() === '' ? null : parseFloat(customPrice);
             if (customPrice.trim() !== '' && (isNaN(priceValue) || priceValue < 0)) {
-                alert("Please enter a valid price (or leave empty to use default rate).");
+                await showModal({ type: 'error', title: 'Invalid Price', message: "Please enter a valid price (or leave empty to use default rate)." });
                 return;
             }
             const { error } = await supabase.from('time_slots').update({ price_override: priceValue }).eq('slot_id', slotId);
             if (error) throw error;
-            alert("Price updated successfully!");
+            await showModal({ type: 'info', title: 'Success', message: "Price updated successfully!" });
             setEditingSlot(null);
             setCustomPrice('');
             fetchOwnerVenues();
         } catch (error) {
-            alert(`Error updating price: ${error.message}`);
+            await showModal({ type: 'error', title: 'Error', message: `Error updating price: ${error.message}` });
         }
     };
 
@@ -128,28 +147,34 @@ function ManageSlotsPage() {
                 block_reason: blockReason.trim() || 'Blocked by owner'
             }).eq('slot_id', slotToBlock.slot_id);
             if (error) throw error;
-            alert("Slot blocked successfully!");
+            await showModal({ type: 'info', title: 'Success', message: "Slot blocked successfully!" });
             setShowBlockForm(false);
             setSlotToBlock(null);
             setBlockReason('');
             fetchOwnerVenues();
         } catch (error) {
-            alert(`Error blocking slot: ${error.message}`);
+            await showModal({ type: 'error', title: 'Error', message: `Error blocking slot: ${error.message}` });
         }
     };
 
     const handleUnblockSlot = async (slotId) => {
-        if (window.confirm("Are you sure you want to unblock this slot and make it available for booking?")) {
+        const confirmed = await showModal({
+            type: 'confirm',
+            title: 'Confirm Unblock',
+            message: 'Are you sure you want to unblock this slot and make it available for booking?',
+            confirmText: 'Unblock'
+        });
+        if (confirmed) {
             try {
                 const { error } = await supabase.from('time_slots').update({ 
                     is_available: true, 
                     block_reason: null 
                 }).eq('slot_id', slotId);
                 if (error) throw error;
-                alert("Slot unblocked successfully!");
+                await showModal({ type: 'info', title: 'Success', message: "Slot unblocked successfully!" });
                 fetchOwnerVenues();
             } catch (error) {
-                alert(`Error unblocking slot: ${error.message}`);
+                await showModal({ type: 'error', title: 'Error', message: `Error unblocking slot: ${error.message}` });
             }
         }
     };
@@ -163,14 +188,23 @@ function ManageSlotsPage() {
     };
     
     const handleBulkAddSlots = async () => {
-        if (slotsToCreate.size === 0) { alert("Please select one or more empty slots to add."); return; }
+        if (slotsToCreate.size === 0) { 
+            await showModal({ type: 'info', title: 'No Slots Selected', message: "Please select one or more empty slots to add." });
+            return;
+        }
         const slotsToInsert = Array.from(slotsToCreate).map(hour => ({
             facility_id: selectedFacilityId,
             start_time: `${selectedDate}T${hour.toString().padStart(2, '0')}:00:00`,
             end_time: `${selectedDate}T${(hour + 1).toString().padStart(2, '0')}:00:00`,
         }));
         const { error } = await supabase.from('time_slots').insert(slotsToInsert);
-        if (error) { alert(`Error adding slots: ${error.message}`); } else { alert(`${slotsToInsert.length} slot(s) added successfully!`); setSlotsToCreate(new Set()); fetchOwnerVenues(); }
+        if (error) {
+            await showModal({ type: 'error', title: 'Error', message: `Error adding slots: ${error.message}` });
+        } else {
+            await showModal({ type: 'info', title: 'Success', message: `${slotsToInsert.length} slot(s) added successfully!` });
+            setSlotsToCreate(new Set());
+            fetchOwnerVenues();
+        }
     };
     
     const selectedVenue = venues.find(v => v.venue_id === selectedVenueId);
@@ -216,19 +250,6 @@ function ManageSlotsPage() {
 
     const currentFacility = selectedVenue?.facilities.find(f => f.facility_id === selectedFacilityId);
 
-    // STEP 1: Add handler functions
-    const handleSelectAllEmptySlots = () => {
-        const emptyHours = daySchedule
-            .filter(item => item.status === 'empty')
-            .map(item => item.hour);
-        setSlotsToCreate(new Set(emptyHours));
-    };
-
-    const handleDeselectAll = () => {
-        setSlotsToCreate(new Set());
-    };
-
-
     if (loading) return <p className="container">Loading...</p>;
 
     return (
@@ -266,16 +287,6 @@ function ManageSlotsPage() {
                                 <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
                             </div>
                         </div>
-
-                        {/* STEP 2: Add the new buttons to the JSX */}
-                        {selectedFacilityId && (
-                           <div className="slot-selection-actions" style={{ margin: '1rem 0', display: 'flex', gap: '1rem' }}>
-                                <button onClick={handleSelectAllEmptySlots} className="btn btn-secondary">Select All Empty Slots</button>
-                                {slotsToCreate.size > 0 && (
-                                    <button onClick={handleDeselectAll} className="btn btn-outline">Deselect All</button>
-                                )}
-                            </div>
-                        )}
                         
                         {selectedFacilityId ? (
                             <div className="day-view-grid">

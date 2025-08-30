@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
 import BookingCard from '../../components/bookings/BookingCard';
+import { useModal } from '../../ModalContext';
 
 function MyBookingsPage() {
   const { user } = useAuth();
@@ -9,6 +10,7 @@ function MyBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('upcoming');
+  const { showModal } = useModal();
 
   const fetchBookings = async () => {
     if (!user) {
@@ -36,9 +38,16 @@ function MyBookingsPage() {
   }, [user]);
 
   const handleCancelBooking = async (booking) => {
-    if (window.confirm("Are you sure you want to cancel this booking?")) {
+    const confirmed = await showModal({
+      type: 'confirm',
+      title: 'Confirm Cancellation',
+      message: 'Are you sure you want to cancel this booking?',
+      confirmText: 'Yes, Cancel',
+      cancelText: 'No'
+    });
+
+    if (confirmed) {
       try {
-        // Step 1: Update the booking status
         const { data: updatedBooking, error: bookingError } = await supabase
           .from('bookings')
           .update({ 
@@ -52,7 +61,6 @@ function MyBookingsPage() {
         
         if (bookingError) throw bookingError;
 
-        // Step 2: Make the associated time slot available again
         const { error: slotError } = await supabase
           .from('time_slots')
           .update({ is_available: true })
@@ -60,12 +68,19 @@ function MyBookingsPage() {
 
         if (slotError) throw slotError;
 
-        alert("Booking cancelled successfully.");
-        setBookings(currentBookings => 
-          currentBookings.map(b => b.booking_id === booking.booking_id ? updatedBooking : b)
-        );
+        await showModal({
+          type: 'info',
+          title: 'Booking Cancelled',
+          message: 'Your booking has been cancelled successfully.'
+        });
+        
+        fetchBookings(); // Refresh the list of bookings
       } catch (error) {
-        alert(`Error in cancelling booking: ${error.message}`);
+        await showModal({
+          type: 'error',
+          title: 'Cancellation Failed',
+          message: `There was an error cancelling your booking: ${error.message}`
+        });
       }
     }
   };

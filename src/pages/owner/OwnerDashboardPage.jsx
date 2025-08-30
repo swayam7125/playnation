@@ -14,8 +14,8 @@ import {
   FaArrowDown,
 } from "react-icons/fa";
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -26,11 +26,9 @@ import {
   PieChart,
   Pie,
   Cell,
-  Area,
-  AreaChart,
 } from "recharts";
 
-const KpiCard = ({ icon, title, value, growth, subtitle, trend }) => (
+const KpiCard = ({ icon, title, value, growth, subtitle }) => (
   <div className="stat-card">
     <div className="stat-icon">{icon}</div>
     <div className="stat-info">
@@ -45,7 +43,6 @@ const KpiCard = ({ icon, title, value, growth, subtitle, trend }) => (
           last month
         </span>
       )}
-      {trend && <div className="stat-trend">{trend}</div>}
     </div>
   </div>
 );
@@ -69,236 +66,46 @@ function OwnerDashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState(initialStats);
   const [loading, setLoading] = useState(true);
-  const [timeframe, setTimeframe] = useState("7days"); // 7days, 30days, 90days
+  const [timeframe, setTimeframe] = useState("30days");
 
   useEffect(() => {
-    const fetchAndCalculateStats = async () => {
+    const fetchDashboardStats = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
-        if (!user) {
-          setStats(initialStats);
-          return;
-        }
-
-        // 1. Get all venues and facilities owned by the current user
-        const { data: venuesData, error: venuesError } = await supabase
-          .from("venues")
-          .select(
-            `
-            venue_id,
-            name,
-            facilities(
-              facility_id, 
-              name, 
-              sports(name)
-            )
-          `
-          )
-          .eq("owner_id", user.id);
-
-        if (venuesError) throw venuesError;
-
-        const facilityIds = venuesData.flatMap((v) =>
-          v.facilities.map((f) => f.facility_id)
-        );
-        const facilities = venuesData.flatMap((v) => v.facilities);
-
-        if (facilityIds.length === 0) {
-          setStats(initialStats);
-          return;
-        }
-
-        // 2. Get all bookings for those facilities
-        const { data: bookingsData, error: bookingsError } = await supabase
-          .from("bookings")
-          .select("*")
-          .in("facility_id", facilityIds);
-
-        if (bookingsError) throw bookingsError;
-
-        // Filter out cancelled bookings to get active ones for calculations
-        const activeBookings = bookingsData 
-          ? bookingsData.filter(b => b.status !== 'cancelled') 
-          : [];
-
-        if (!activeBookings || activeBookings.length === 0) {
-          setStats({
-            ...initialStats,
-            revenue_by_facility: facilities.map((f) => ({
-              name: f.name,
-              revenue: 0,
-              bookings: 0,
-              sport: f.sports?.name || "Unknown",
-            })),
-          });
-          return;
-        }
-
-        // 3. Calculate all statistics
-        const now = new Date();
-        const today = now.toISOString().split("T")[0];
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const lastMonthStart = new Date(
-          now.getFullYear(),
-          now.getMonth() - 1,
-          1
-        );
-        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-
-        let todays_revenue = 0;
-        let monthly_revenue = 0;
-        let last_monthly_revenue = 0;
-        let total_revenue = 0;
-
-        // Calculate revenue trends based on timeframe
-        const days =
-          timeframe === "7days" ? 7 : timeframe === "30days" ? 30 : 90;
-        const revenueTrend = [];
-
-        for (let i = days - 1; i >= 0; i--) {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          const dateStr = date.toISOString().split("T")[0];
-          const dayRevenue = activeBookings
-            .filter((b) =>
-              new Date(b.start_time).toISOString().startsWith(dateStr)
-            )
-            .reduce((sum, b) => sum + b.total_amount, 0);
-
-          revenueTrend.push({
-            date: date.toLocaleDateString("en-IN", {
-              month: "short",
-              day: "numeric",
-            }),
-            revenue: dayRevenue,
-            bookings: activeBookings.filter((b) =>
-              new Date(b.start_time).toISOString().startsWith(dateStr)
-            ).length,
-          });
-        }
-
-        // Calculate facility performance
-        const facilityPerformance = facilities
-          .map((facility) => {
-            const facilityBookings = activeBookings.filter(
-              (b) => b.facility_id === facility.facility_id
-            );
-            return {
-              name: facility.name,
-              revenue: facilityBookings.reduce(
-                (sum, b) => sum + b.total_amount,
-                0
-              ),
-              bookings: facilityBookings.length,
-              sport: facility.sports?.name || "Unknown",
-            };
-          })
-          .filter((f) => f.revenue > 0 || f.bookings > 0);
-
-        // Calculate peak booking hours
-        const hourlyBookings = Array(24).fill(0);
-        activeBookings.forEach((b) => {
-          const hour = new Date(b.start_time).getHours();
-          hourlyBookings[hour]++;
+        const days = timeframe === "7days" ? 7 : timeframe === "90days" ? 90 : 30;
+        
+        const { data, error } = await supabase.rpc('get_owner_dashboard_statistics', {
+          days_to_track: days 
         });
 
-        const peakHours = hourlyBookings
-          .map((count, hour) => ({
-            hour: `${hour.toString().padStart(2, "0")}:00`,
-            bookings: count,
-            hourNum: hour,
-          }))
-          .filter((h) => h.bookings > 0)
-          .sort((a, b) => b.bookings - a.bookings)
-          .slice(0, 8);
-
-        // Calculate sport distribution
-        const sportCounts = {};
-        facilities.forEach((f) => {
-          const sport = f.sports?.name || "Unknown";
-          const facilityBookings = activeBookings.filter(
-            (b) => b.facility_id === f.facility_id
-          ).length;
-          const facilityRevenue = activeBookings
-            .filter((b) => b.facility_id === f.facility_id)
-            .reduce((sum, b) => sum + b.total_amount, 0);
-
-          if (!sportCounts[sport]) {
-            sportCounts[sport] = { bookings: 0, revenue: 0 };
-          }
-          sportCounts[sport].bookings += facilityBookings;
-          sportCounts[sport].revenue += facilityRevenue;
-        });
-
-        const sportDistribution = Object.entries(sportCounts)
-          .map(([sport, data]) => ({
-            name: sport,
-            bookings: data.bookings,
-            revenue: data.revenue,
-          }))
-          .filter((s) => s.bookings > 0)
-          .sort((a, b) => b.revenue - a.revenue);
-
-        const mostPopularSport = sportDistribution[0]?.name || "N/A";
-
-        // Calculate revenues
-        activeBookings.forEach((b) => {
-          const bookingDate = new Date(b.start_time);
-          total_revenue += b.total_amount;
-
-          if (bookingDate.toISOString().startsWith(today)) {
-            todays_revenue += b.total_amount;
-          }
-          if (bookingDate >= monthStart) {
-            monthly_revenue += b.total_amount;
-          }
-          if (bookingDate >= lastMonthStart && bookingDate <= lastMonthEnd) {
-            last_monthly_revenue += b.total_amount;
-          }
-        });
-
-        const mom_revenue_growth =
-          last_monthly_revenue > 0
-            ? Math.round(
-              ((monthly_revenue - last_monthly_revenue) /
-                last_monthly_revenue) *
-              100
-            )
-            : monthly_revenue > 0
-              ? 100
-              : 0;
-
-        // Count bookings
-        const todaysBookings = activeBookings.filter((b) =>
-          new Date(b.start_time).toISOString().startsWith(today)
-        ).length;
-
-        const upcomingBookings = activeBookings.filter(
-          (b) => new Date(b.start_time) > now
-        ).length;
+        if (error) throw error;
 
         setStats({
-          todays_revenue,
-          monthly_revenue,
-          total_revenue,
-          todays_bookings: todaysBookings,
-          upcoming_bookings: upcomingBookings,
-          most_popular_sport: mostPopularSport,
-          mom_revenue_growth,
-          revenue_by_facility: facilityPerformance,
-          peak_booking_hours: peakHours,
-          revenue_trend: revenueTrend,
-          sport_distribution: sportDistribution,
+          todays_revenue: data.todays_revenue || 0,
+          monthly_revenue: data.monthly_revenue || 0,
+          total_revenue: data.total_revenue || 0,
+          todays_bookings: data.todays_bookings || 0,
+          upcoming_bookings: data.upcoming_bookings || 0,
+          most_popular_sport: data.most_popular_sport || "N/A",
+          mom_revenue_growth: data.mom_revenue_growth || 0,
+          revenue_by_facility: data.revenue_by_facility || [],
+          peak_booking_hours: data.peak_booking_hours || [],
+          revenue_trend: data.revenue_trend || [],
+          sport_distribution: data.sport_distribution || [],
         });
       } catch (error) {
-        console.error("Error calculating dashboard data:", error);
+        console.error("Error fetching dashboard stats:", error);
         setStats(initialStats);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAndCalculateStats();
+    fetchDashboardStats();
   }, [user, timeframe]);
 
   if (loading)
@@ -345,6 +152,8 @@ function OwnerDashboardPage() {
   };
 
   return (
+
+    
     <div className="container dashboard-page">
       <div className="owner-header">
         <div>
@@ -356,22 +165,19 @@ function OwnerDashboardPage() {
         <div className="header-actions">
           <div className="timeframe-selector">
             <button
-              className={`timeframe-btn ${timeframe === "7days" ? "active" : ""
-                }`}
+              className={`timeframe-btn ${timeframe === "7days" ? "active" : ""}`}
               onClick={() => setTimeframe("7days")}
             >
               7D
             </button>
             <button
-              className={`timeframe-btn ${timeframe === "30days" ? "active" : ""
-                }`}
+              className={`timeframe-btn ${timeframe === "30days" ? "active" : ""}`}
               onClick={() => setTimeframe("30days")}
             >
               30D
             </button>
             <button
-              className={`timeframe-btn ${timeframe === "90days" ? "active" : ""
-                }`}
+              className={`timeframe-btn ${timeframe === "90days" ? "active" : ""}`}
               onClick={() => setTimeframe("90days")}
             >
               90D
@@ -403,12 +209,16 @@ function OwnerDashboardPage() {
           value={`₹${stats.total_revenue.toLocaleString("en-IN")}`}
           subtitle={`Across all venues`}
         />
-        <KpiCard
-          icon={<FaCalendarCheck />}
-          title="Upcoming Bookings"
-          value={stats.upcoming_bookings}
-          subtitle={`${stats.todays_bookings} today`}
-        />
+        
+        <Link to="/owner/calendar" className="kpi-card-link">
+          <KpiCard
+            icon={<FaCalendarCheck />}
+            title="Upcoming Bookings"
+            value={stats.upcoming_bookings}
+            subtitle={`${stats.todays_bookings} today`}
+          />
+        </Link>
+        
         <KpiCard
           icon={<FaFutbol />}
           title="Most Popular Sport"
@@ -532,7 +342,7 @@ function OwnerDashboardPage() {
           </h3>
           {stats.peak_booking_hours.length > 0 ? (
             <div className="peak-hours-list">
-              {stats.peak_booking_hours.map((hour, index) => (
+              {stats.peak_booking_hours.map((hour) => (
                 <div key={hour.hour} className="peak-hour-item">
                   <div className="hour-info">
                     <span className="hour-time">{hour.hour}</span>

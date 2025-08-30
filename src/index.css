@@ -2512,3 +2512,130 @@ body {
   padding: 40px;
   color: #666;
 }
+
+/* Add these new styles to your index.css file */
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  transition: var(--transition-smooth);
+  box-shadow: var(--shadow-sm);
+  height: 100%; /* Ensure cards in a grid have the same height */
+}
+
+.card:hover {
+  box-shadow: var(--shadow-xl);
+  transform: translateY(-4px);
+  border-color: var(--primary-green);
+}
+
+.card-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Add this new class to your index.css file */
+.kpi-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block; /* Ensures the link takes up the full grid space */
+}
+
+/* --- Timeframe Selector Focus Fix --- */
+
+/* Remove the default outline from all states */
+.timeframe-btn:focus,
+.timeframe-btn:active {
+  outline: none;
+  box-shadow: none;
+}
+
+/* --- Add these styles for the Modal --- */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(17, 24, 39, 0.6); /* Using dark-text with opacity */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: var(--card-bg);
+  padding: 2rem;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  width: 90%;
+  max-width: 500px;
+  border-top: 4px solid var(--primary-green);
+  animation: modal-fade-in 0.3s ease;
+}
+
+@keyframes modal-fade-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+
+.modal-content.modal-error {
+  border-top-color: #dc2626;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.modal-icon {
+  font-size: 1.5rem;
+  margin-right: 1rem;
+}
+
+.modal-content.modal-info .modal-icon { color: var(--primary-green); }
+.modal-content.modal-confirm .modal-icon { color: var(--primary-green); }
+.modal-content.modal-error .modal-icon { color: #dc2626; }
+
+
+.modal-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--dark-text);
+  margin: 0;
+  flex-grow: 1;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--light-text);
+  transition: var(--transition-smooth);
+}
+
+.modal-close-btn:hover {
+  color: var(--dark-text);
+}
+
+.modal-body p {
+  font-size: 1rem;
+  color: var(--medium-text);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.modal-actions {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}

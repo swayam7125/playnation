@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
+import { useModal } from '../../ModalContext';
 
 const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 const formatTime = (dateString) => new Date(dateString).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -12,7 +13,7 @@ function BookingPage() {
   const { user } = useAuth();
   const { venue, facility, slot, price } = location.state || {};
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const { showModal } = useModal();
 
   if (!venue || !facility || !slot || price === undefined) {
     React.useEffect(() => {
@@ -25,14 +26,20 @@ function BookingPage() {
 
   const handleConfirmBooking = async () => {
     if (!user) {
-      alert("Please log in to make a booking.");
-      // Redirect to login, passing the current location as state
-      navigate('/login', { state: { from: location } });
+      const wantsToLogin = await showModal({
+        type: 'confirm',
+        title: 'Authentication Required',
+        message: 'You need to be logged in to make a booking. Would you like to log in now?',
+        confirmText: 'Login',
+        cancelText: 'Cancel'
+      });
+      if (wantsToLogin) {
+        navigate('/login', { state: { from: location } });
+      }
       return;
     }
 
     setLoading(true);
-    setError(null);
     try {
       const { data: bookingData, error: bookingError } = await supabase
         .from('bookings')
@@ -59,12 +66,29 @@ function BookingPage() {
       
       if (slotError) throw slotError;
 
-      alert("Booking confirmed successfully!");
+      await showModal({
+        type: 'info',
+        title: 'Success!',
+        message: 'Your booking has been confirmed.',
+        confirmText: 'View My Bookings'
+      });
       navigate('/my-bookings');
 
     } catch (err) {
-      setError(err.message);
-      alert(`Booking failed: ${err.message}`);
+      let userMessage = "An unexpected error occurred during booking. Please try again.";
+      if (err.code === '23505') {
+        userMessage = "Sorry, this time slot was just booked by someone else. Please select a different slot.";
+      }
+      
+      await showModal({
+        type: 'error',
+        title: 'Booking Failed',
+        message: userMessage,
+      });
+
+      if (err.code === '23505') {
+        navigate(`/venue/${venue.venue_id}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -73,9 +97,7 @@ function BookingPage() {
   return (
     <div className="container dashboard-page">
       <h1 className="section-heading" style={{ textAlign: 'center', fontSize: '2rem' }}>Confirm Your Booking</h1>
-      {error && <p style={{ textAlign: 'center', color: 'red' }}>Error: {error}</p>}
-
-      <div className="booking-summary-card">
+      <div className="booking-summary-card" style={{ maxWidth: '600px', margin: 'auto' }}>
         <h3>{venue.name}</h3>
         <p><strong>Facility:</strong> {facility.name} ({facility.sports.name})</p>
         <p><strong>Date:</strong> {formatDate(slot.start_time)}</p>
