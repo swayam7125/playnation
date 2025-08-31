@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
 import { useModal } from '../../ModalContext';
-import { FaTrash, FaPlusCircle, FaTimesCircle, FaPlus, FaEdit, FaBan, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaTrash, FaPlusCircle, FaTimesCircle, FaPlus, FaEdit, FaBan, FaCheck, FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 const getTodayString = () => {
     const today = new Date();
@@ -33,7 +33,7 @@ function ManageSlotsPage() {
         try {
             const { data, error } = await supabase
                 .from('venues')
-                .select(`*, facilities(*, sports(name), time_slots(*, bookings(booking_id)))`)
+                .select(`*, facilities(*, sports(name), time_slots(*, bookings(booking_id, status)))`)
                 .eq('owner_id', user.id);
             if (error) throw error;
             setVenues(data || []);
@@ -207,6 +207,12 @@ function ManageSlotsPage() {
         }
     };
     
+    const changeDate = (days) => {
+        const currentDate = new Date(selectedDate);
+        currentDate.setUTCDate(currentDate.getUTCDate() + days);
+        setSelectedDate(currentDate.toISOString().split('T')[0]);
+    };
+
     const selectedVenue = venues.find(v => v.venue_id === selectedVenueId);
 
     const daySchedule = useMemo(() => {
@@ -226,7 +232,8 @@ function ManageSlotsPage() {
                     const startHour = new Date(slot.start_time).getHours();
                     const scheduleIndex = schedule.findIndex(item => item.hour === startHour);
                     if (scheduleIndex !== -1) {
-                        const bookingForSlot = (slot.bookings || [])[0];
+                        const bookingForSlot = (slot.bookings || []).find(b => b.status === 'confirmed');
+                        
                         let status;
                         if (bookingForSlot) {
                             status = 'booked';
@@ -284,7 +291,20 @@ function ManageSlotsPage() {
                             </div>
                             <div className="form-group">
                                 <label>Select Date</label>
-                                <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
+                                <div className="date-controls">
+                                    <button onClick={() => changeDate(-1)} className="btn btn-secondary">
+                                        <FaChevronLeft />
+                                    </button>
+                                    <input 
+                                      type="date" 
+                                      className="calendar-date-picker"
+                                      value={selectedDate} 
+                                      onChange={e => setSelectedDate(e.target.value)} 
+                                    />
+                                    <button onClick={() => changeDate(1)} className="btn btn-secondary">
+                                        <FaChevronRight />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         

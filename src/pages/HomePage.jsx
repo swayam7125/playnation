@@ -84,11 +84,6 @@ export default function HomePage() {
             </div>
           )}
         </section>
-
-        {/* Footer Section */}
-        <footer className="section">
-          <p className="text-center text-light">Footer</p>
-        </footer>
       </div>
     </div>
   );

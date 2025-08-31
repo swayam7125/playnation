@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { FaClock, FaStar } from 'react-icons/fa';
+import { FaClock, FaStar, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 const getTodayString = () => {
     const today = new Date();
@@ -70,24 +70,32 @@ function VenuePage() {
 
   const handleProceedToBook = () => {
     if (!selectedSlot || !selectedFacility) return;
-
-    // Use price_override if it exists, otherwise fall back to hourly_rate
     const finalPrice = selectedSlot.price_override ?? selectedFacility.hourly_rate;
-
     navigate('/booking', { 
         state: { 
             venue, 
             facility: selectedFacility, 
             slot: selectedSlot,
-            price: finalPrice // Pass the determined price to the booking page
+            price: finalPrice
         } 
     });
+  };
+  
+  const changeDate = (days) => {
+    const currentDate = new Date(selectedDate);
+    currentDate.setUTCDate(currentDate.getUTCDate() + days);
+    
+    const todayString = getTodayString();
+    if (currentDate < new Date(todayString)) {
+        return;
+    }
+
+    setSelectedDate(currentDate.toISOString().split('T')[0]);
   };
   
   const allAmenities = venue?.facilities.flatMap(f => f.facility_amenities?.map(fa => fa.amenities?.name) ?? []).filter(Boolean);
   const uniqueAmenities = [...new Set(allAmenities)];
   
-  // Determine the price to display in the button
   const displayPrice = selectedSlot?.price_override ?? selectedFacility?.hourly_rate;
 
   if (loading) return <p className="container" style={{ textAlign: 'center', padding: '50px' }}>Loading venue details...</p>;
@@ -126,15 +134,27 @@ function VenuePage() {
       <div className="time-slots-section">
         <h2 className="section-heading">Available Time Slots</h2>
         
-        <div className="date-picker-container form-group">
-          <label htmlFor="slot-date">Select Date</label>
+        <div className="date-controls" style={{ marginBottom: '2rem', maxWidth: '350px' }}>
+          <button 
+            onClick={() => changeDate(-1)} 
+            className="btn btn-secondary" 
+            disabled={selectedDate <= getTodayString()}
+          >
+            <FaChevronLeft />
+          </button>
           <input 
             type="date" 
-            id="slot-date"
+            className="calendar-date-picker"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             min={getTodayString()}
           />
+          <button 
+            onClick={() => changeDate(1)} 
+            className="btn btn-secondary"
+          >
+            <FaChevronRight />
+          </button>
         </div>
 
         <div className="time-slots-grid">
@@ -147,8 +167,6 @@ function VenuePage() {
               >
                 <FaClock />
                 {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
-                {/* Optionally, show a special indicator for overridden prices */}
-                {/* {slot.price_override && <span className="price-override-tag">Special Price!</span>} */}
               </button>
             ))
           ) : (
