@@ -1,37 +1,43 @@
-import React from 'react';
-import { FaTimes, FaCheck, FaExclamationTriangle, FaInfoCircle } from 'react-icons/fa';
+import React, { useState } from 'react';
+import { FaTimes } from 'react-icons/fa';
 
-const icons = {
-  confirm: <FaCheck />,
-  error: <FaExclamationTriangle />,
-  info: <FaInfoCircle />,
-};
+function Modal({ title, message, onConfirm, onCancel, isInput = false, inputPlaceholder, confirmText = "Confirm", confirmStyle = "primary" }) {
+  const [inputValue, setInputValue] = useState('');
 
-const Modal = ({ type = 'info', title, message, onConfirm, onCancel, confirmText = 'OK', cancelText = 'Cancel' }) => {
-  if (!message) return null;
+  const handleConfirm = () => {
+    onConfirm(isInput ? inputValue : true);
+  };
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className={`modal-content modal-${type}`} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          {icons[type] && <span className="modal-icon">{icons[type]}</span>}
-          <h3 className="modal-title">{title || 'Notification'}</h3>
-          <button onClick={onCancel} className="modal-close-btn"><FaTimes /></button>
-        </div>
-        <div className="modal-body">
-          <p>{message}</p>
-        </div>
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <button className="modal-close-btn" onClick={onCancel}>
+          <FaTimes />
+        </button>
+        <h3 className="modal-title">{title}</h3>
+        <p className="modal-message">{message}</p>
+        
+        {isInput && (
+          <textarea
+            className="modal-input"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder={inputPlaceholder}
+            rows="4"
+          />
+        )}
+
         <div className="modal-actions">
-          {type === 'confirm' && (
-            <button onClick={onCancel} className="btn btn-secondary">{cancelText}</button>
-          )}
-          <button onClick={onConfirm} className={`btn ${type === 'error' ? 'btn-danger' : 'btn-primary'}`}>
+          <button className={`btn btn-${confirmStyle}`} onClick={handleConfirm}>
             {confirmText}
+          </button>
+          <button className="btn btn-secondary" onClick={onCancel}>
+            Cancel
           </button>
         </div>
       </div>
     </div>
   );
-};
+}
 
 export default Modal;

@@ -22,7 +22,7 @@ function Navbar() {
           </Link>
 
           {/* Links for Players and Guests */}
-          {profile?.role !== 'venue_owner' && (
+          {profile?.role !== 'venue_owner' && profile?.role !== 'admin' && (
             <>
               <Link to="/explore">Explore</Link>
               {user && <Link to="/my-bookings">My Bookings</Link>}
@@ -36,6 +36,13 @@ function Navbar() {
               <Link to="/owner/my-venues">My Venues</Link>
               <Link to="/owner/calendar">Bookings</Link>
               <Link to="/owner/manage-slots">Manage Slots</Link>
+            </>
+          )}
+
+          {/* Links for Admins */}
+          {profile?.role === 'admin' && (
+            <>
+              <Link to="/admin/venues">Admin Venues</Link>
             </>
           )}
         </div>

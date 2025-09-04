@@ -12,13 +12,13 @@ export const ModalProvider = ({ children }) => {
     return new Promise((resolve) => {
       setModalState({
         ...options,
-        onConfirm: () => {
+        onConfirm: (result) => {
           setModalState(null);
-          resolve(true); // Resolve with 'true' when confirmed
+          resolve(result); // Resolve with the input value or true
         },
         onCancel: () => {
           setModalState(null);
-          resolve(false); // Resolve with 'false' when cancelled
+          resolve(null); // Resolve with null when cancelled
         },
       });
     });

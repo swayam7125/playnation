@@ -1,16 +1,20 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
-import Footer from './components/layout/Footer';
 import OwnerProtectedRoute from './components/auth/OwnerProtectedRoute';
+import AdminProtectedRoute from './components/auth/AdminProtectedRoute'; // New import
 
-// --- Page Imports ---
+// Public Pages
 import HomePage from './pages/HomePage';
 import AuthPage from './pages/AuthPage';
 import ExplorePage from './pages/ExplorePage';
 import VenuePage from './pages/VenuePage';
+
+// Player Pages
 import MyBookingsPage from './pages/player/MyBookingsPage';
 import BookingPage from './pages/player/BookingPage';
+
+// Owner Pages
 import OwnerDashboardPage from './pages/owner/OwnerDashboardPage';
 import AddVenuePage from './pages/owner/AddVenuePage';
 import EditVenuePage from './pages/owner/EditVenuePage';
@@ -18,17 +22,12 @@ import MyVenuesPage from './pages/owner/MyVenuesPage';
 import BookingCalendarPage from './pages/owner/BookingCalendarPage';
 import ManageSlotsPage from './pages/owner/ManageSlotsPage';
 
-// A new component to handle the layout and conditional footer
-function AppLayout() {
-  const location = useLocation();
-  
-  // Add the paths of the pages where you DON'T want the footer
-  const pagesWithoutFooter = ['/login', '/signup'];
-  
-  const shouldShowFooter = !pagesWithoutFooter.includes(location.pathname);
+// Admin Pages
+import AdminVenueManagementPage from './pages/admin/AdminVenueManagementPage'; // New import
 
+function App() {
   return (
-    <>
+    <Router>
       <Navbar />
       <main>
         <Routes>
@@ -52,18 +51,13 @@ function AppLayout() {
             <Route path="/owner/calendar" element={<BookingCalendarPage />} />
             <Route path="/owner/manage-slots" element={<ManageSlotsPage />} />
           </Route>
+
+          {/* Admin Protected Routes */}
+          <Route element={<AdminProtectedRoute />}>
+            <Route path="/admin/venues" element={<AdminVenueManagementPage />} />
+          </Route>
         </Routes>
       </main>
-      {shouldShowFooter && <Footer />}
-    </>
-  );
-}
-
-
-function App() {
-  return (
-    <Router>
-      <AppLayout />
     </Router>
   );
 }
