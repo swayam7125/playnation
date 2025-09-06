@@ -1,12 +1,11 @@
 import React from 'react';
-import Card from '../../Card'; // Import the new Card component
 
 export const FeatureCard = ({ icon, title, description }) => (
-  <Card className="feature-card-new">
-    <div className="icon">{icon}</div>
-    <div className="title">{title}</div>
-    <div className="description">{description}</div>
-  </Card>
+  <div className="p-6 border border-border-color rounded-lg bg-card-bg text-center">
+    <div className="text-2xl mb-2">{icon}</div>
+    <div className="font-semibold text-base mb-1">{title}</div>
+    <div className="text-sm text-light-text">{description}</div>
+  </div>
 );
 
 export default FeatureCard;

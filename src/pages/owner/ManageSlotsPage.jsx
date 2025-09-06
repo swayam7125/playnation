@@ -1,19 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
-import { useModal } from '../../ModalContext';
-import { FaTrash, FaPlusCircle, FaTimesCircle, FaPlus, FaEdit, FaBan, FaCheck, FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaTrash, FaPlusCircle, FaTimesCircle, FaEdit, FaBan, FaCheck, FaTimes, FaChevronLeft, FaChevronRight, FaClock, FaCalendarAlt, FaMapMarkerAlt } from 'react-icons/fa';
 
-const getTodayString = () => {
-    const today = new Date();
-    const offset = today.getTimezoneOffset();
-    const todayWithOffset = new Date(today.getTime() - (offset * 60 * 1000));
-    return todayWithOffset.toISOString().split('T')[0];
-};
+const getTodayString = () => new Date().toISOString().split('T')[0];
 
 function ManageSlotsPage() {
     const { user } = useAuth();
-    const { showModal } = useModal();
     const [loading, setLoading] = useState(true);
     const [venues, setVenues] = useState([]);
     const [selectedVenueId, setSelectedVenueId] = useState('');
@@ -23,12 +16,15 @@ function ManageSlotsPage() {
     
     const [editingSlot, setEditingSlot] = useState(null);
     const [customPrice, setCustomPrice] = useState('');
-    const [blockReason, setBlockReason] = useState('');
     const [showBlockForm, setShowBlockForm] = useState(false);
     const [slotToBlock, setSlotToBlock] = useState(null);
-
+    const [blockReason, setBlockReason] = useState('');
+    
     const fetchOwnerVenues = async () => {
-        if (!user) { setLoading(false); return; }
+        if (!user) { 
+            setLoading(false); 
+            return; 
+        }
         setLoading(true);
         try {
             const { data, error } = await supabase
@@ -38,9 +34,10 @@ function ManageSlotsPage() {
             if (error) throw error;
             setVenues(data || []);
             if (data && data.length > 0 && !selectedVenueId) {
-                setSelectedVenueId(data[0].venue_id);
-                if (data[0].facilities && data[0].facilities.length > 0) {
-                    setSelectedFacilityId(data[0].facilities[0].facility_id);
+                const firstVenue = data[0];
+                setSelectedVenueId(firstVenue.venue_id);
+                if (firstVenue.facilities && firstVenue.facilities.length > 0) {
+                    setSelectedFacilityId(firstVenue.facilities[0].facility_id);
                 }
             }
         } catch (err) {
@@ -60,48 +57,44 @@ function ManageSlotsPage() {
         const newVenueId = e.target.value;
         setSelectedVenueId(newVenueId);
         const venue = venues.find(v => v.venue_id === newVenueId);
-        if (venue && venue.facilities.length > 0) {
-            setSelectedFacilityId(venue.facilities[0].facility_id);
-        } else {
-            setSelectedFacilityId('');
-        }
+        setSelectedFacilityId(venue?.facilities?.[0]?.facility_id || '');
     };
 
     const handleDeleteSlot = async (slotId) => {
-        const confirmed = await showModal({
-            type: 'confirm',
-            title: 'Confirm Deletion',
-            message: "Are you sure you want to delete this available slot?",
-            confirmText: 'Delete'
-        });
-        if (confirmed) {
+        if (window.confirm("Are you sure you want to delete this available slot?")) {
             const { error } = await supabase.from('time_slots').delete().eq('slot_id', slotId);
-            if (error) {
-                await showModal({ type: 'error', title: 'Error', message: `Error deleting slot: ${error.message}` });
-            } else {
-                await showModal({ type: 'info', title: 'Success', message: 'Slot deleted.' });
-                fetchOwnerVenues();
+            if (error) { 
+                alert(`Error deleting slot: ${error.message}`); 
+            } else { 
+                alert("Slot deleted."); 
+                fetchOwnerVenues(); 
             }
         }
     };
 
     const handleOwnerCancelBooking = async (bookingId, slotId) => {
-        const confirmed = await showModal({
-            type: 'confirm',
-            title: 'Confirm Cancellation',
-            message: "Are you sure you want to cancel this user's booking? This action cannot be undone.",
-            confirmText: 'Cancel Booking'
-        });
-        if (confirmed) {
+        if (window.confirm("Are you sure you want to cancel this user's booking? This action cannot be undone.")) {
             try {
-                const { error: bookingError } = await supabase.from('bookings').update({ status: 'cancelled', payment_status: 'refunded', cancelled_by: user.id }).eq('booking_id', bookingId);
+                const { error: bookingError } = await supabase
+                    .from('bookings')
+                    .update({ 
+                        status: 'cancelled', 
+                        payment_status: 'refunded', 
+                        cancelled_by: user.id 
+                    })
+                    .eq('booking_id', bookingId);
                 if (bookingError) throw bookingError;
-                const { error: slotError } = await supabase.from('time_slots').update({ is_available: true }).eq('slot_id', slotId);
+                
+                const { error: slotError } = await supabase
+                    .from('time_slots')
+                    .update({ is_available: true })
+                    .eq('slot_id', slotId);
                 if (slotError) throw slotError;
-                await showModal({ type: 'info', title: 'Success', message: "Booking has been cancelled and the slot is now available." });
+                
+                alert("Booking has been cancelled and the slot is now available.");
                 fetchOwnerVenues(); 
             } catch (error) {
-                await showModal({ type: 'error', title: 'Error', message: `Error cancelling booking: ${error.message}` });
+                alert(`Error cancelling booking: ${error.message}`);
             }
         }
     };
@@ -115,66 +108,66 @@ function ManageSlotsPage() {
         try {
             const priceValue = customPrice.trim() === '' ? null : parseFloat(customPrice);
             if (customPrice.trim() !== '' && (isNaN(priceValue) || priceValue < 0)) {
-                await showModal({ type: 'error', title: 'Invalid Price', message: "Please enter a valid price (or leave empty to use default rate)." });
+                alert("Please enter a valid price."); 
                 return;
             }
-            const { error } = await supabase.from('time_slots').update({ price_override: priceValue }).eq('slot_id', slotId);
+            const { error } = await supabase
+                .from('time_slots')
+                .update({ price_override: priceValue })
+                .eq('slot_id', slotId);
             if (error) throw error;
-            await showModal({ type: 'info', title: 'Success', message: "Price updated successfully!" });
-            setEditingSlot(null);
+            
+            alert("Price updated!");
+            setEditingSlot(null); 
             setCustomPrice('');
             fetchOwnerVenues();
         } catch (error) {
-            await showModal({ type: 'error', title: 'Error', message: `Error updating price: ${error.message}` });
+            alert(`Error updating price: ${error.message}`);
         }
     };
-
-    const handleCancelPriceEdit = () => {
-        setEditingSlot(null);
-        setCustomPrice('');
-    };
-
-    const handleBlockSlot = (slot) => {
-        setSlotToBlock(slot);
-        setBlockReason('');
-        setShowBlockForm(true);
+    
+    const handleBlockSlot = (slot) => { 
+        setSlotToBlock(slot); 
+        setShowBlockForm(true); 
     };
 
     const handleConfirmBlock = async () => {
         try {
-            const { error } = await supabase.from('time_slots').update({ 
-                is_available: false, 
-                block_reason: blockReason.trim() || 'Blocked by owner'
-            }).eq('slot_id', slotToBlock.slot_id);
+            const { error } = await supabase
+                .from('time_slots')
+                .update({ 
+                    is_available: false, 
+                    block_reason: blockReason.trim() || 'Blocked by owner' 
+                })
+                .eq('slot_id', slotToBlock.slot_id);
             if (error) throw error;
-            await showModal({ type: 'info', title: 'Success', message: "Slot blocked successfully!" });
-            setShowBlockForm(false);
-            setSlotToBlock(null);
+            
+            alert("Slot blocked!");
+            setShowBlockForm(false); 
+            setSlotToBlock(null); 
             setBlockReason('');
             fetchOwnerVenues();
         } catch (error) {
-            await showModal({ type: 'error', title: 'Error', message: `Error blocking slot: ${error.message}` });
+            alert(`Error blocking slot: ${error.message}`);
         }
     };
 
     const handleUnblockSlot = async (slotId) => {
-        const confirmed = await showModal({
-            type: 'confirm',
-            title: 'Confirm Unblock',
-            message: 'Are you sure you want to unblock this slot and make it available for booking?',
-            confirmText: 'Unblock'
-        });
-        if (confirmed) {
+        if (window.confirm("Are you sure you want to unblock this slot?")) {
             try {
-                const { error } = await supabase.from('time_slots').update({ 
-                    is_available: true, 
-                    block_reason: null 
-                }).eq('slot_id', slotId);
+                const { error } = await supabase
+                    .from('time_slots')
+                    .update({ 
+                        is_available: true, 
+                        block_reason: null 
+                    })
+                    .eq('slot_id', slotId);
                 if (error) throw error;
-                await showModal({ type: 'info', title: 'Success', message: "Slot unblocked successfully!" });
+                
+                alert("Slot unblocked!");
                 fetchOwnerVenues();
             } catch (error) {
-                await showModal({ type: 'error', title: 'Error', message: `Error unblocking slot: ${error.message}` });
+                alert(`Error unblocking slot: ${error.message}`);
             }
         }
     };
@@ -182,69 +175,69 @@ function ManageSlotsPage() {
     const toggleSlotForCreation = (hour) => {
         setSlotsToCreate(prev => {
             const newSlots = new Set(prev);
-            if (newSlots.has(hour)) { newSlots.delete(hour); } else { newSlots.add(hour); }
+            if (newSlots.has(hour)) {
+                newSlots.delete(hour);
+            } else {
+                newSlots.add(hour);
+            }
             return newSlots;
         });
     };
     
     const handleBulkAddSlots = async () => {
         if (slotsToCreate.size === 0) { 
-            await showModal({ type: 'info', title: 'No Slots Selected', message: "Please select one or more empty slots to add." });
-            return;
+            alert("Please select empty slots to add."); 
+            return; 
         }
+        
         const slotsToInsert = Array.from(slotsToCreate).map(hour => ({
             facility_id: selectedFacilityId,
-            start_time: `${selectedDate}T${hour.toString().padStart(2, '0')}:00:00`,
-            end_time: `${selectedDate}T${(hour + 1).toString().padStart(2, '0')}:00:00`,
+            start_time: `${selectedDate}T${String(hour).padStart(2, '0')}:00:00`,
+            end_time: `${selectedDate}T${String(hour + 1).padStart(2, '0')}:00:00`,
         }));
+        
         const { error } = await supabase.from('time_slots').insert(slotsToInsert);
-        if (error) {
-            await showModal({ type: 'error', title: 'Error', message: `Error adding slots: ${error.message}` });
+        if (error) { 
+            alert(`Error adding slots: ${error.message}`); 
         } else {
-            await showModal({ type: 'info', title: 'Success', message: `${slotsToInsert.length} slot(s) added successfully!` });
+            alert(`${slotsToInsert.length} slot(s) added successfully!`);
             setSlotsToCreate(new Set());
             fetchOwnerVenues();
         }
     };
-    
+
     const changeDate = (days) => {
         const currentDate = new Date(selectedDate);
-        currentDate.setUTCDate(currentDate.getUTCDate() + days);
+        currentDate.setDate(currentDate.getDate() + days);
         setSelectedDate(currentDate.toISOString().split('T')[0]);
     };
 
     const selectedVenue = venues.find(v => v.venue_id === selectedVenueId);
+    const currentFacility = selectedVenue?.facilities?.find(f => f.facility_id === selectedFacilityId);
 
     const daySchedule = useMemo(() => {
         if (!selectedVenue?.opening_time || !selectedVenue?.closing_time) return [];
+        
         const openingHour = parseInt(selectedVenue.opening_time.split(':')[0], 10);
         const closingHour = parseInt(selectedVenue.closing_time.split(':')[0], 10);
-        const schedule = [];
-        for (let i = openingHour; i < closingHour; i++) {
-            schedule.push({ hour: i, slot: null, status: 'empty' });
-        }
-        const selectedFacility = selectedVenue?.facilities.find(f => f.facility_id === selectedFacilityId);
-        if (selectedFacility) {
-            const sortedTimeSlots = [...selectedFacility.time_slots].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-            sortedTimeSlots.forEach(slot => {
+        const schedule = Array.from({ length: closingHour - openingHour }, (_, i) => ({ 
+            hour: openingHour + i, 
+            slot: null, 
+            status: 'empty' 
+        }));
+
+        if (currentFacility?.time_slots) {
+            currentFacility.time_slots.forEach(slot => {
                 const slotDate = new Date(slot.start_time).toISOString().split('T')[0];
                 if (slotDate === selectedDate) {
                     const startHour = new Date(slot.start_time).getHours();
                     const scheduleIndex = schedule.findIndex(item => item.hour === startHour);
                     if (scheduleIndex !== -1) {
                         const bookingForSlot = (slot.bookings || []).find(b => b.status === 'confirmed');
-                        
-                        let status;
-                        if (bookingForSlot) {
-                            status = 'booked';
-                        } else if (!slot.is_available) {
-                            status = 'blocked';
-                        } else {
-                            status = 'available';
-                        }
+                        const status = bookingForSlot ? 'booked' : (!slot.is_available ? 'blocked' : 'available');
                         schedule[scheduleIndex] = { 
                             hour: startHour, 
-                            slot: slot, 
+                            slot, 
                             status, 
                             booking_id: bookingForSlot?.booking_id 
                         };
@@ -253,189 +246,375 @@ function ManageSlotsPage() {
             });
         }
         return schedule;
-    }, [selectedVenue, selectedFacilityId, selectedDate]);
+    }, [selectedVenue, currentFacility, selectedDate]);
 
-    const currentFacility = selectedVenue?.facilities.find(f => f.facility_id === selectedFacilityId);
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+    };
 
-    if (loading) return <p className="container">Loading...</p>;
+    if (loading) return (
+        <div className="min-h-screen bg-background flex items-center justify-center">
+            <div className="flex flex-col items-center gap-4">
+                <div className="w-12 h-12 border-4 border-primary-green border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-medium-text font-medium">Loading your venues...</p>
+            </div>
+        </div>
+    );
 
     return (
-        <div className="container dashboard-page">
-            <h1 className="section-heading">Manage Time Slots</h1>
-            <div className="slot-manager-container">
+        <div className="min-h-screen bg-background">
+            {/* Header Section */}
+            <div className="bg-gradient-to-r from-primary-green to-primary-green-light">
+                <div className="container mx-auto px-6 py-8">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-white/20 rounded-xl">
+                            <FaClock className="text-white text-xl" />
+                        </div>
+                        <h1 className="text-3xl font-bold text-white">Manage Time Slots</h1>
+                    </div>
+                    <p className="text-white/90 text-lg">Create, edit, and manage your facility time slots</p>
+                </div>
+            </div>
+
+            <div className="container mx-auto px-6 py-8">
                 {venues.length === 0 ? (
-                    <div className="no-facilities-warning">
-                        <p>No venues found. Please add a venue first.</p>
+                    <div className="bg-card-bg rounded-2xl border border-border-color p-16 text-center shadow-sm">
+                        <div className="max-w-md mx-auto">
+                            <div className="p-4 bg-light-green-bg rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                                <FaMapMarkerAlt className="text-primary-green text-2xl" />
+                            </div>
+                            <h3 className="text-xl font-semibold text-dark-text mb-2">No Venues Found</h3>
+                            <p className="text-medium-text">You need to add a venue first before managing time slots.</p>
+                        </div>
                     </div>
                 ) : (
                     <>
-                        <div className="slot-manager-controls">
-                            <div className="form-group">
-                                <label>Select Venue</label>
-                                <select value={selectedVenueId} onChange={handleVenueChange}>
-                                    {venues.map(v => (
-                                        <option key={v.venue_id} value={v.venue_id}>{v.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label>Select Facility</label>
-                                <select value={selectedFacilityId} onChange={e => setSelectedFacilityId(e.target.value)} disabled={!selectedVenueId}>
-                                    <option value="">Select a facility</option>
-                                    {selectedVenue?.facilities.map(f => (
-                                        <option key={f.facility_id} value={f.facility_id}>
-                                            {f.name} ({f.sports?.name}) - Default: ₹{f.hourly_rate}/hr
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label>Select Date</label>
-                                <div className="date-controls">
-                                    <button onClick={() => changeDate(-1)} className="btn btn-secondary">
-                                        <FaChevronLeft />
-                                    </button>
-                                    <input 
-                                      type="date" 
-                                      className="calendar-date-picker"
-                                      value={selectedDate} 
-                                      onChange={e => setSelectedDate(e.target.value)} 
-                                    />
-                                    <button onClick={() => changeDate(1)} className="btn btn-secondary">
-                                        <FaChevronRight />
-                                    </button>
+                        {/* Control Panel */}
+                        <div className="bg-card-bg rounded-2xl border border-border-color p-8 shadow-sm mb-8">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                {/* Venue Selection */}
+                                <div className="space-y-3">
+                                    <label className="flex items-center gap-2 font-semibold text-dark-text">
+                                        <FaMapMarkerAlt className="text-primary-green" />
+                                        Select Venue
+                                    </label>
+                                    <select 
+                                        value={selectedVenueId} 
+                                        onChange={handleVenueChange} 
+                                        className="w-full p-4 border border-border-color rounded-xl text-dark-text bg-card-bg transition-all duration-200 focus:outline-none focus:border-primary-green focus:ring-4 focus:ring-primary-green/10 hover:border-primary-green/50"
+                                    >
+                                        {venues.map(v => (
+                                            <option key={v.venue_id} value={v.venue_id}>
+                                                {v.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                
+                                {/* Facility Selection */}
+                                <div className="space-y-3">
+                                    <label className="flex items-center gap-2 font-semibold text-dark-text">
+                                        <FaClock className="text-primary-green" />
+                                        Select Facility
+                                    </label>
+                                    <select 
+                                        value={selectedFacilityId} 
+                                        onChange={e => setSelectedFacilityId(e.target.value)} 
+                                        disabled={!selectedVenueId} 
+                                        className="w-full p-4 border border-border-color rounded-xl text-dark-text bg-card-bg transition-all duration-200 focus:outline-none focus:border-primary-green focus:ring-4 focus:ring-primary-green/10 hover:border-primary-green/50 disabled:bg-hover-bg disabled:cursor-not-allowed"
+                                    >
+                                        <option value="">Select a facility</option>
+                                        {selectedVenue?.facilities?.map(f => (
+                                            <option key={f.facility_id} value={f.facility_id}>
+                                                {f.name} ({f.sports?.name})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                
+                                {/* Date Selection */}
+                                <div className="space-y-3">
+                                    <label className="flex items-center gap-2 font-semibold text-dark-text">
+                                        <FaCalendarAlt className="text-primary-green" />
+                                        Select Date
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={() => changeDate(-1)} 
+                                            className="p-4 border border-border-color rounded-xl hover:bg-hover-bg transition-all duration-200 hover:border-primary-green"
+                                        >
+                                            <FaChevronLeft className="text-medium-text" />
+                                        </button>
+                                        <input 
+                                            type="date" 
+                                            value={selectedDate} 
+                                            onChange={e => setSelectedDate(e.target.value)} 
+                                            className="flex-1 p-4 border border-border-color rounded-xl text-dark-text bg-card-bg transition-all duration-200 focus:outline-none focus:border-primary-green focus:ring-4 focus:ring-primary-green/10" 
+                                        />
+                                        <button 
+                                            onClick={() => changeDate(1)} 
+                                            className="p-4 border border-border-color rounded-xl hover:bg-hover-bg transition-all duration-200 hover:border-primary-green"
+                                        >
+                                            <FaChevronRight className="text-medium-text" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
+                            
+                            {/* Date Display */}
+                            {selectedDate && (
+                                <div className="mt-6 pt-6 border-t border-border-color">
+                                    <div className="text-center">
+                                        <h3 className="text-lg font-semibold text-dark-text">
+                                            Schedule for {formatDate(selectedDate)}
+                                        </h3>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         
+                        {/* Time Slots Grid */}
                         {selectedFacilityId ? (
-                            <div className="day-view-grid">
-                                {daySchedule.map(({ hour, slot, status, booking_id }) => {
-                                    const isSelectedForCreation = slotsToCreate.has(hour);
-                                    let className = `hour-block ${status}`;
-                                    if (isSelectedForCreation) className += ' to-create';
-                                    
-                                    return (
-                                        <div key={hour} className={className} onClick={() => status === 'empty' && toggleSlotForCreation(hour)}>
-                                            <div className="hour-label">{hour}:00 - {hour + 1}:00</div>
-                                            
-                                            {status === 'empty' && (
-                                                isSelectedForCreation ? 
-                                                <span className="status-text">Selected</span> : 
-                                                <span className="status-text">Click to Add</span>
-                                            )}
-                                            
-                                            {status === 'available' && (
-                                                <div className="slot-details">
-                                                    <div className="slot-info">
-                                                        <span className="status-text">Available</span>
-                                                        <div className="price-display">
+                            <div className="bg-card-bg rounded-2xl border border-border-color p-8 shadow-sm">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+                                    {daySchedule.map(({ hour, slot, status, booking_id }) => {
+                                        const isSelected = slotsToCreate.has(hour);
+                                        
+                                        return (
+                                            <div 
+                                                key={hour} 
+                                                className={`
+                                                    relative rounded-2xl p-6 min-h-[160px] flex flex-col justify-between transition-all duration-300 border-2
+                                                    ${status === 'empty' && !isSelected ? 'border-border-color-light bg-hover-bg hover:border-primary-green hover:shadow-lg cursor-pointer transform hover:-translate-y-1' : ''}
+                                                    ${isSelected ? 'border-primary-green bg-light-green-bg shadow-lg ring-4 ring-primary-green/20 transform -translate-y-1' : ''}
+                                                    ${status === 'available' ? 'border-primary-green/30 bg-card-bg shadow-md' : ''}
+                                                    ${status === 'booked' ? 'border-red-200 bg-red-50 shadow-md' : ''}
+                                                    ${status === 'blocked' ? 'border-gray-300 bg-gray-100 shadow-md' : ''}
+                                                `}
+                                                onClick={() => status === 'empty' && toggleSlotForCreation(hour)}
+                                            >
+                                                {/* Time Header */}
+                                                <div className="text-center mb-4">
+                                                    <div className="font-bold text-xl text-dark-text mb-1">
+                                                        {hour}:00
+                                                    </div>
+                                                    <div className="text-xs text-medium-text">
+                                                        {hour}:00 - {hour + 1}:00
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Content based on status */}
+                                                {status === 'empty' && (
+                                                    <div className="text-center flex-1 flex flex-col justify-center">
+                                                        {isSelected ? (
+                                                            <div className="space-y-2">
+                                                                <div className="p-3 bg-primary-green/10 rounded-full w-12 h-12 mx-auto flex items-center justify-center">
+                                                                    <FaCheck className="text-primary-green text-lg" />
+                                                                </div>
+                                                                <p className="text-primary-green font-semibold text-sm">Selected</p>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-2">
+                                                                <div className="p-3 bg-gray-100 rounded-full w-12 h-12 mx-auto flex items-center justify-center">
+                                                                    <FaPlusCircle className="text-gray-400 text-lg" />
+                                                                </div>
+                                                                <p className="text-medium-text text-sm">Click to Add</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                
+                                                {status === 'available' && (
+                                                    <div className="space-y-4">
+                                                        {/* Price Section */}
+                                                        <div className="text-center">
                                                             {editingSlot === slot.slot_id ? (
-                                                                <div className="price-edit-form">
-                                                                    <input
-                                                                        type="number"
-                                                                        value={customPrice}
-                                                                        onChange={(e) => setCustomPrice(e.target.value)}
-                                                                        placeholder={`Default: ₹${currentFacility?.hourly_rate}`}
-                                                                        className="price-input"
-                                                                        step="0.01"
-                                                                        min="0"
+                                                                <div className="space-y-2">
+                                                                    <input 
+                                                                        type="number" 
+                                                                        value={customPrice} 
+                                                                        onChange={(e) => setCustomPrice(e.target.value)} 
+                                                                        placeholder={`₹${currentFacility?.hourly_rate}`} 
+                                                                        className="w-full text-center p-2 rounded-lg border border-border-color text-lg font-bold"
                                                                     />
-                                                                    <div className="price-edit-actions">
-                                                                        <button
-                                                                            onClick={(e) => { e.stopPropagation(); handleSavePrice(slot.slot_id); }}
-                                                                            className="save-price-btn" title="Save price"
-                                                                        ><FaCheck /></button>
-                                                                        <button
-                                                                            onClick={(e) => { e.stopPropagation(); handleCancelPriceEdit(); }}
-                                                                            className="cancel-price-btn" title="Cancel"
-                                                                        ><FaTimes /></button>
+                                                                    <div className="flex justify-center gap-1">
+                                                                        <button 
+                                                                            onClick={(e) => { 
+                                                                                e.stopPropagation(); 
+                                                                                handleSavePrice(slot.slot_id); 
+                                                                            }} 
+                                                                            className="p-2 bg-primary-green text-white rounded-lg hover:bg-primary-green-dark transition-colors"
+                                                                        >
+                                                                            <FaCheck className="text-sm" />
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={(e) => { 
+                                                                                e.stopPropagation(); 
+                                                                                setEditingSlot(null); 
+                                                                            }} 
+                                                                            className="p-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                                                                        >
+                                                                            <FaTimes className="text-sm" />
+                                                                        </button>
                                                                     </div>
                                                                 </div>
                                                             ) : (
-                                                                <div className="price-info">
-                                                                    <span className="price-amount">
-                                                                        ₹{slot.price_override || currentFacility?.hourly_rate}
-                                                                        {slot.price_override && <span className="custom-price-indicator">(Custom)</span>}
-                                                                    </span>
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleEditPrice(slot); }}
-                                                                        className="edit-price-btn" title="Edit price"
-                                                                    ><FaEdit /></button>
+                                                                <div className="space-y-2">
+                                                                    <div className="flex items-center justify-center gap-2">
+                                                                        <span className="text-2xl font-bold text-primary-green">
+                                                                            ₹{slot.price_override || currentFacility?.hourly_rate}
+                                                                        </span>
+                                                                        <button 
+                                                                            onClick={(e) => { 
+                                                                                e.stopPropagation(); 
+                                                                                handleEditPrice(slot); 
+                                                                            }} 
+                                                                            className="p-1 text-medium-text hover:text-primary-green transition-colors"
+                                                                        >
+                                                                            <FaEdit />
+                                                                        </button>
+                                                                    </div>
+                                                                    <div className="inline-block px-3 py-1 bg-primary-green/10 text-primary-green rounded-full text-xs font-medium">
+                                                                        Available
+                                                                    </div>
                                                                 </div>
                                                             )}
                                                         </div>
+                                                        
+                                                        {/* Action Buttons */}
+                                                        <div className="flex justify-center gap-2">
+                                                            <button 
+                                                                onClick={(e) => { 
+                                                                    e.stopPropagation(); 
+                                                                    handleBlockSlot(slot); 
+                                                                }} 
+                                                                className="p-2 bg-yellow-100 text-yellow-600 rounded-lg hover:bg-yellow-200 transition-colors" 
+                                                                title="Block this slot"
+                                                            >
+                                                                <FaBan />
+                                                            </button>
+                                                            <button 
+                                                                onClick={(e) => { 
+                                                                    e.stopPropagation(); 
+                                                                    handleDeleteSlot(slot.slot_id); 
+                                                                }} 
+                                                                className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors" 
+                                                                title="Delete slot"
+                                                            >
+                                                                <FaTrash />
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <div className="slot-actions">
-                                                        <button onClick={(e) => { e.stopPropagation(); handleBlockSlot(slot); }} className="block-slot-btn" title="Block this slot"><FaBan /></button>
-                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteSlot(slot.slot_id); }} className="delete-slot-btn" title="Delete slot"><FaTrash /></button>
+                                                )}
+
+                                                {status === 'booked' && (
+                                                    <div className="text-center space-y-4">
+                                                        <div className="space-y-2">
+                                                            <div className="p-3 bg-red-100 rounded-full w-12 h-12 mx-auto flex items-center justify-center">
+                                                                <FaTimesCircle className="text-red-600 text-lg" />
+                                                            </div>
+                                                            <div className="inline-block px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-bold">
+                                                                BOOKED
+                                                            </div>
+                                                        </div>
+                                                        <button 
+                                                            onClick={(e) => { 
+                                                                e.stopPropagation(); 
+                                                                handleOwnerCancelBooking(booking_id, slot.slot_id); 
+                                                            }} 
+                                                            className="w-full p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium" 
+                                                            title="Cancel Booking"
+                                                        >
+                                                            Cancel Booking
+                                                        </button>
                                                     </div>
-                                                </div>
-                                            )}
-                                            
-                                            {status === 'booked' && (
-                                                <div className="slot-details">
-                                                    <span className="status-text">Booked</span>
-                                                    <div className="price-display">
-                                                        <span className="price-amount">₹{slot.price_override || currentFacility?.hourly_rate}</span>
+                                                )}
+                                                
+                                                {status === 'blocked' && (
+                                                    <div className="text-center space-y-4">
+                                                        <div className="space-y-2">
+                                                            <div className="p-3 bg-gray-200 rounded-full w-12 h-12 mx-auto flex items-center justify-center">
+                                                                <FaBan className="text-gray-600 text-lg" />
+                                                            </div>
+                                                            <div className="inline-block px-3 py-1 bg-gray-200 text-gray-800 rounded-full text-xs font-bold">
+                                                                BLOCKED
+                                                            </div>
+                                                            {slot.block_reason && (
+                                                                <p className="text-gray-600 text-xs leading-tight">
+                                                                    {slot.block_reason}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button 
+                                                                onClick={(e) => { 
+                                                                    e.stopPropagation(); 
+                                                                    handleUnblockSlot(slot.slot_id); 
+                                                                }} 
+                                                                className="flex-1 p-2 bg-primary-green text-white rounded-lg hover:bg-primary-green-dark transition-colors text-sm font-medium" 
+                                                                title="Unblock"
+                                                            >
+                                                                Unblock
+                                                            </button>
+                                                            <button 
+                                                                onClick={(e) => { 
+                                                                    e.stopPropagation(); 
+                                                                    handleDeleteSlot(slot.slot_id); 
+                                                                }} 
+                                                                className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors" 
+                                                                title="Delete slot"
+                                                            >
+                                                                <FaTrash />
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <button onClick={(e) => { e.stopPropagation(); handleOwnerCancelBooking(booking_id, slot.slot_id); }} className="delete-slot-btn" title="Cancel this user's booking"><FaTimesCircle /></button>
-                                                </div>
-                                            )}
-                                            
-                                            {status === 'blocked' && (
-                                                <div className="slot-details">
-                                                    <span className="status-text blocked">Blocked</span>
-                                                    <div className="block-reason">
-                                                        {slot.block_reason && <small className="block-reason-text">Reason: {slot.block_reason}</small>}
-                                                    </div>
-                                                    <div className="slot-actions">
-                                                        <button onClick={(e) => { e.stopPropagation(); handleUnblockSlot(slot.slot_id); }} className="unblock-slot-btn" title="Unblock this slot"><FaCheck /></button>
-                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteSlot(slot.slot_id); }} className="delete-slot-btn" title="Delete slot"><FaTrash /></button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         ) : (
-                            <p>Please select a venue and facility to see the time slots.</p>
-                        )}
-                        
-                        {slotsToCreate.size > 0 && (
-                            <div className="bulk-add-bar">
-                                <span>{slotsToCreate.size} new slot(s) selected.</span>
-                                <button onClick={handleBulkAddSlots} className="btn btn-primary"><FaPlusCircle />Create Selected Slots</button>
+                            <div className="bg-card-bg rounded-2xl border border-border-color p-16 text-center shadow-sm">
+                                <div className="max-w-md mx-auto">
+                                    <div className="p-4 bg-light-green-bg rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                                        <FaClock className="text-primary-green text-2xl" />
+                                    </div>
+                                    <h3 className="text-xl font-semibold text-dark-text mb-2">Select Facility</h3>
+                                    <p className="text-medium-text">Please select a venue and facility to view and manage time slots.</p>
+                                </div>
                             </div>
                         )}
-
-                        {showBlockForm && (
-                            <div className="modal-overlay">
-                                <div className="modal-content">
-                                    <h3>Block Time Slot</h3>
-                                    <p>Block slot: {new Date(slotToBlock?.start_time).getHours()}:00 - {new Date(slotToBlock?.start_time).getHours() + 1}:00</p>
-                                    <div className="form-group">
-                                        <label htmlFor="block-reason">Reason for blocking (optional)</label>
-                                        <select id="block-reason" value={blockReason} onChange={(e) => setBlockReason(e.target.value)} className="block-reason-select">
-                                            <option value="">Select a reason</option>
-                                            <option value="Maintenance">Maintenance</option>
-                                            <option value="Private Event">Private Event</option>
-                                            <option value="Staff Training">Staff Training</option>
-                                            <option value="Equipment Repair">Equipment Repair</option>
-                                            <option value="Weather Conditions">Weather Conditions</option>
-                                            <option value="Other">Other</option>
-                                        </select>
-                                    </div>
-                                    {blockReason === 'Other' && (
-                                        <div className="form-group">
-                                            <label htmlFor="custom-reason">Custom reason</label>
-                                            <input id="custom-reason" type="text" value={blockReason === 'Other' ? '' : blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Enter custom reason" />
+                        
+                        {/* Bulk Actions Bar */}
+                        {slotsToCreate.size > 0 && (
+                            <div className="fixed bottom-6 left-6 right-6 z-40">
+                                <div className="bg-card-bg rounded-2xl border border-border-color shadow-2xl p-6 max-w-4xl mx-auto">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 bg-primary-green/10 rounded-xl">
+                                                <FaPlusCircle className="text-primary-green text-xl" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold text-dark-text">
+                                                    {slotsToCreate.size} time slot{slotsToCreate.size !== 1 ? 's' : ''} selected
+                                                </h4>
+                                                <p className="text-medium-text text-sm">Ready to create new time slots</p>
+                                            </div>
                                         </div>
-                                    )}
-                                    <div className="modal-actions">
-                                        <button onClick={handleConfirmBlock} className="btn btn-primary"><FaBan /> Block Slot</button>
-                                        <button onClick={() => { setShowBlockForm(false); setSlotToBlock(null); setBlockReason(''); }} className="btn btn-secondary">Cancel</button>
+                                        <button 
+                                            onClick={handleBulkAddSlots} 
+                                            className="px-8 py-3 bg-primary-green text-white rounded-xl font-semibold shadow-lg hover:bg-primary-green-dark transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
+                                        >
+                                            <FaPlusCircle />
+                                            Create Selected Slots
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -443,6 +622,61 @@ function ManageSlotsPage() {
                     </>
                 )}
             </div>
+
+            {/* Block Slot Modal */}
+            {showBlockForm && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+                    <div className="bg-card-bg rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100">
+                        <div className="p-8">
+                            <div className="text-center mb-6">
+                                <div className="p-4 bg-yellow-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                                    <FaBan className="text-yellow-600 text-2xl" />
+                                </div>
+                                <h3 className="text-2xl font-bold text-dark-text mb-2">Block Time Slot</h3>
+                                <p className="text-medium-text">
+                                    {slotToBlock && (
+                                        <>Time: {new Date(slotToBlock.start_time).getHours()}:00 - {new Date(slotToBlock.start_time).getHours() + 1}:00</>
+                                    )}
+                                </p>
+                            </div>
+                            
+                            <div className="space-y-4 mb-8">
+                                <label htmlFor="block-reason" className="block font-semibold text-dark-text">
+                                    Reason for blocking (optional)
+                                </label>
+                                <input 
+                                    id="block-reason"
+                                    type="text" 
+                                    value={blockReason} 
+                                    onChange={(e) => setBlockReason(e.target.value)} 
+                                    placeholder="e.g., Maintenance, Private event..." 
+                                    className="w-full p-4 border border-border-color rounded-xl text-dark-text bg-card-bg transition-all duration-200 focus:outline-none focus:border-primary-green focus:ring-4 focus:ring-primary-green/10" 
+                                />
+                            </div>
+                            
+                            <div className="flex gap-4">
+                                <button 
+                                    onClick={() => { 
+                                        setShowBlockForm(false); 
+                                        setSlotToBlock(null); 
+                                        setBlockReason('');
+                                    }} 
+                                    className="flex-1 py-3 px-6 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={handleConfirmBlock} 
+                                    className="flex-1 py-3 px-6 bg-yellow-500 text-white rounded-xl font-semibold hover:bg-yellow-600 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <FaBan />
+                                    Block Slot
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

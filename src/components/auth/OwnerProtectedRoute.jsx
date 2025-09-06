@@ -7,7 +7,7 @@ function OwnerProtectedRoute() {
 
   // Wait until the initial loading is done
   if (loading) {
-    return <p className="container" style={{ textAlign: 'center', padding: '50px' }}>Loading...</p>;
+    return <p className="container mx-auto text-center p-12">Loading...</p>;
   }
 
   // If the user is logged in AND their role is 'venue_owner', show the page.

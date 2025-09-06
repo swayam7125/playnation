@@ -1,13 +1,12 @@
 import React from 'react';
-import Card from '../../Card'; // Import the new Card component
 
 export const CategoryCard = ({ imgSrc, name }) => (
-  <Card className="sport-card">
-    <div className="icon">
-      <img src={imgSrc} alt={`${name} icon`} />
+  <div className="flex flex-col items-center gap-3 p-6 border border-border-color rounded-xl bg-card-bg cursor-pointer transition duration-300 text-center shadow-md hover:-translate-y-1 hover:shadow-lg hover:border-primary-green">
+    <div className="w-16 h-16 rounded-lg bg-light-green-bg flex items-center justify-center">
+      <img src={imgSrc} alt={`${name} icon`} className="w-8 h-8 object-contain" />
     </div>
-    <span>{name}</span>
-  </Card>
+    <span className="font-semibold text-sm text-medium-text">{name}</span>
+  </div>
 );
 
 export default CategoryCard;

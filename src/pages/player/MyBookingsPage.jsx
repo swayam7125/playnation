@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
 import BookingCard from '../../components/bookings/BookingCard';
-import { useModal } from '../../ModalContext';
 
 function MyBookingsPage() {
   const { user } = useAuth();
@@ -10,7 +9,6 @@ function MyBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('upcoming');
-  const { showModal } = useModal();
 
   const fetchBookings = async () => {
     if (!user) {
@@ -38,15 +36,7 @@ function MyBookingsPage() {
   }, [user]);
 
   const handleCancelBooking = async (booking) => {
-    const confirmed = await showModal({
-      type: 'confirm',
-      title: 'Confirm Cancellation',
-      message: 'Are you sure you want to cancel this booking?',
-      confirmText: 'Yes, Cancel',
-      cancelText: 'No'
-    });
-
-    if (confirmed) {
+    if (window.confirm("Are you sure you want to cancel this booking?")) {
       try {
         const { data: updatedBooking, error: bookingError } = await supabase
           .from('bookings')
@@ -68,19 +58,12 @@ function MyBookingsPage() {
 
         if (slotError) throw slotError;
 
-        await showModal({
-          type: 'info',
-          title: 'Booking Cancelled',
-          message: 'Your booking has been cancelled successfully.'
-        });
-        
-        fetchBookings(); // Refresh the list of bookings
+        alert("Booking cancelled successfully.");
+        setBookings(currentBookings => 
+          currentBookings.map(b => b.booking_id === booking.booking_id ? updatedBooking : b)
+        );
       } catch (error) {
-        await showModal({
-          type: 'error',
-          title: 'Cancellation Failed',
-          message: `There was an error cancelling your booking: ${error.message}`
-        });
+        alert(`Error in cancelling booking: ${error.message}`);
       }
     }
   };
@@ -89,18 +72,28 @@ function MyBookingsPage() {
   const upcomingBookings = bookings.filter(b => new Date(b.start_time) >= now && b.status === 'confirmed');
   const pastBookings = bookings.filter(b => new Date(b.start_time) < now || b.status !== 'confirmed');
 
-  if (loading) return <p className="container" style={{ textAlign: 'center', padding: '50px' }}>Loading your bookings...</p>;
-  if (error) return <p className="container" style={{ textAlign: 'center', color: 'red', padding: '50px' }}>Error: {error}</p>;
-  if (!user) return <p className="container" style={{ textAlign: 'center', padding: '50px' }}>Please log in to see your bookings.</p>;
+  if (loading) return <p className="container mx-auto text-center p-12">Loading your bookings...</p>;
+  if (error) return <p className="container mx-auto text-center text-red-600 p-12">Error: {error}</p>;
+  if (!user) return <p className="container mx-auto text-center p-12">Please log in to see your bookings.</p>;
 
   return (
-    <div className="container dashboard-page">
-      <h1 className="section-heading" style={{ textAlign: 'center', fontSize: '2rem' }}>My Bookings</h1>
-      <div className="booking-tabs">
-        <button onClick={() => setActiveTab('upcoming')} className={`tab-btn ${activeTab === 'upcoming' ? 'active' : ''}`}>Upcoming</button>
-        <button onClick={() => setActiveTab('past')} className={`tab-btn ${activeTab === 'past' ? 'active' : ''}`}>History</button>
+    <div className="container mx-auto px-4 py-12">
+      <h1 className="text-center text-3xl font-bold mb-8 text-dark-text">My Bookings</h1>
+      <div className="flex justify-center gap-4 mb-12 border-b border-border-color">
+        <button 
+          onClick={() => setActiveTab('upcoming')} 
+          className={`py-4 px-6 font-semibold text-base border-b-4 transition duration-300 ${activeTab === 'upcoming' ? 'border-primary-green text-primary-green' : 'border-transparent text-light-text hover:text-dark-text'}`}
+        >
+          Upcoming
+        </button>
+        <button 
+          onClick={() => setActiveTab('past')} 
+          className={`py-4 px-6 font-semibold text-base border-b-4 transition duration-300 ${activeTab === 'past' ? 'border-primary-green text-primary-green' : 'border-transparent text-light-text hover:text-dark-text'}`}
+        >
+          History
+        </button>
       </div>
-      <div className="bookings-list">
+      <div className="max-w-3xl mx-auto grid gap-8">
         {activeTab === 'upcoming' && (
           upcomingBookings.length > 0
             ? upcomingBookings.map(booking => (
@@ -111,12 +104,12 @@ function MyBookingsPage() {
                   onCancel={() => handleCancelBooking(booking)} 
                 />
               ))
-            : <p>You have no upcoming bookings.</p>
+            : <p className="text-center text-light-text">You have no upcoming bookings.</p>
         )}
         {activeTab === 'past' && (
           pastBookings.length > 0
             ? pastBookings.map(booking => <BookingCard key={booking.booking_id} booking={booking} />)
-            : <p>You have no past bookings.</p>
+            : <p className="text-center text-light-text">You have no past bookings.</p>
         )}
       </div>
     </div>

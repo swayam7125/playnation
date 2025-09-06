@@ -39,7 +39,6 @@ function VenuePage() {
         setLoading(false);
       }
     };
-
     fetchVenueDetails();
   }, [venueId]);
 
@@ -58,7 +57,6 @@ function VenuePage() {
       
   }, [selectedFacility, selectedDate]);
 
-
   const handleFacilityChange = (facility) => {
     setSelectedFacilityId(facility.facility_id);
     setSelectedSlot(null);
@@ -71,25 +69,13 @@ function VenuePage() {
   const handleProceedToBook = () => {
     if (!selectedSlot || !selectedFacility) return;
     const finalPrice = selectedSlot.price_override ?? selectedFacility.hourly_rate;
-    navigate('/booking', { 
-        state: { 
-            venue, 
-            facility: selectedFacility, 
-            slot: selectedSlot,
-            price: finalPrice
-        } 
-    });
+    navigate('/booking', { state: { venue, facility: selectedFacility, slot: selectedSlot, price: finalPrice } });
   };
   
   const changeDate = (days) => {
     const currentDate = new Date(selectedDate);
-    currentDate.setUTCDate(currentDate.getUTCDate() + days);
-    
-    const todayString = getTodayString();
-    if (currentDate < new Date(todayString)) {
-        return;
-    }
-
+    currentDate.setDate(currentDate.getDate() + days);
+    if (currentDate < new Date(getTodayString())) return;
     setSelectedDate(currentDate.toISOString().split('T')[0]);
   };
   
@@ -98,86 +84,83 @@ function VenuePage() {
   
   const displayPrice = selectedSlot?.price_override ?? selectedFacility?.hourly_rate;
 
-  if (loading) return <p className="container" style={{ textAlign: 'center', padding: '50px' }}>Loading venue details...</p>;
-  if (error) return <p className="container" style={{ textAlign: 'center', color: 'red', padding: '50px' }}>Error: {error}</p>;
-  if (!venue) return <p className="container" style={{ textAlign: 'center', padding: '50px' }}>Venue not found.</p>;
+  if (loading) return <p className="container mx-auto text-center p-12">Loading venue details...</p>;
+  if (error) return <p className="container mx-auto text-center text-red-600 p-12">Error: {error}</p>;
+  if (!venue) return <p className="container mx-auto text-center p-12">Venue not found.</p>;
 
   return (
-    <div className="container venue-page">
-      <div className="venue-header">
-        <h1>{venue.name}</h1>
-        <p>{venue.address}, {venue.city}, {venue.state}</p>
-        <p>{venue.description}</p>
-        <div className="amenities-section">
-          <div className="feature-list">
-            {uniqueAmenities.length > 0 && uniqueAmenities.map(amenity => (
-              <span key={amenity} className="feature-item">
-                <FaStar style={{ fontSize: '0.75rem' }}/> {amenity}
+    <div className="container mx-auto px-4 py-12">
+      <div className="border-b border-border-color pb-12 mb-12 relative after:content-[''] after:absolute after:-bottom-px after:left-0 after:w-24 after:h-1 after:bg-primary-green">
+        <h1 className="text-4xl font-extrabold mb-4 text-dark-text">{venue.name}</h1>
+        <p className="text-lg text-light-text">{venue.address}, {venue.city}, {venue.state}</p>
+        <p className="max-w-3xl text-light-text leading-relaxed">{venue.description}</p>
+        <div className="mt-8">
+          <div className="flex flex-wrap gap-3">
+            {uniqueAmenities.map(amenity => (
+              <span key={amenity} className="inline-flex items-center gap-2 bg-light-green-bg text-emerald-800 py-1.5 px-4 rounded-full text-xs font-semibold border border-emerald-200">
+                <FaStar className="text-xs" /> {amenity}
               </span>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="facility-tabs">
+      <div className="flex flex-wrap gap-4 mb-12 pb-8 border-b border-border-color">
         {venue.facilities.map(facility => (
           <button
             key={facility.facility_id}
             onClick={() => handleFacilityChange(facility)}
-            className={`facility-tab-btn ${selectedFacilityId === facility.facility_id ? 'active' : ''}`}
+            className={`py-3 px-6 font-sans text-sm font-semibold rounded-lg cursor-pointer transition duration-300 ${selectedFacilityId === facility.facility_id ? 'bg-primary-green text-white shadow-md' : 'bg-hover-bg text-medium-text'}`}
           >
             {facility.name} ({facility.sports.name})
           </button>
         ))}
       </div>
 
-      <div className="time-slots-section">
-        <h2 className="section-heading">Available Time Slots</h2>
+      <div className="mb-12">
+        <h2 className="text-2xl font-bold mb-8 text-dark-text relative after:content-[''] after:absolute after:-bottom-2 after:left-0 after:w-16 after:h-1 after:bg-primary-green after:rounded-sm">Available Time Slots</h2>
         
-        <div className="date-controls" style={{ marginBottom: '2rem', maxWidth: '350px' }}>
-          <button 
-            onClick={() => changeDate(-1)} 
-            className="btn btn-secondary" 
-            disabled={selectedDate <= getTodayString()}
-          >
+        <div className="flex items-center gap-4 mb-8 max-w-sm">
+          <button onClick={() => changeDate(-1)} disabled={selectedDate <= getTodayString()} className="py-2 px-4 border border-border-color rounded-lg font-semibold text-sm transition duration-300 bg-card-bg text-medium-text shadow-sm hover:bg-hover-bg disabled:opacity-50 disabled:cursor-not-allowed">
             <FaChevronLeft />
           </button>
           <input 
             type="date" 
-            className="calendar-date-picker"
+            className="flex-grow py-2 px-3 border border-border-color rounded-lg font-semibold text-center"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             min={getTodayString()}
           />
-          <button 
-            onClick={() => changeDate(1)} 
-            className="btn btn-secondary"
-          >
+          <button onClick={() => changeDate(1)} className="py-2 px-4 border border-border-color rounded-lg font-semibold text-sm transition duration-300 bg-card-bg text-medium-text shadow-sm hover:bg-hover-bg">
             <FaChevronRight />
           </button>
         </div>
 
-        <div className="time-slots-grid">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {filteredTimeSlots.length > 0 ? (
             filteredTimeSlots.map(slot => (
               <button
                 key={slot.slot_id}
                 onClick={() => handleSlotSelect(slot)}
-                className={`slot-btn available ${selectedSlot?.slot_id === slot.slot_id ? 'selected' : ''}`}
+                className={`py-5 font-sans text-sm font-semibold rounded-lg cursor-pointer flex items-center justify-center gap-2 transition duration-300 shadow-sm
+                  ${selectedSlot?.slot_id === slot.slot_id 
+                    ? 'bg-primary-green text-white scale-105 shadow-md' 
+                    : 'bg-card-bg text-primary-green border-2 border-primary-green hover:bg-primary-green hover:text-white hover:-translate-y-px hover:shadow-md'}`
+                }
               >
                 <FaClock />
-                {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
+                {formatTime(slot.start_time)}
               </button>
             ))
           ) : (
-            <p>No available slots for the selected date.</p>
+            <p className="col-span-full">No available slots for the selected date.</p>
           )}
         </div>
       </div>
       
       {selectedSlot && (
-        <div className="booking-action-bar">
-          <button onClick={handleProceedToBook} className="btn btn-primary">
+        <div className="sticky bottom-0 bg-card-bg py-6 px-8 border-t border-border-color shadow-xl flex justify-end -mx-4 -mb-12 rounded-t-xl">
+          <button onClick={handleProceedToBook} className="py-4 px-12 text-lg font-bold rounded-lg bg-primary-green text-white shadow-sm hover:bg-primary-green-dark transition duration-300">
             Book Now (₹{displayPrice})
           </button>
         </div>

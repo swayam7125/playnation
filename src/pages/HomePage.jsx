@@ -1,17 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { supabase } from '../supabaseClient';
 import heroImage from '../assets/images/hero/hero-img-1.svg';
 import { FeatureCard } from '../components/home/FeatureCard/FeatureCard';
 import { CategoryCard } from '../components/home/CategoryCard/CategoryCard';
 import VenueCard from '../components/venues/VenueCard';
 import { categories } from '../constants/categories';
-import useVenues from '../hooks/useVenues';
 
 export default function HomePage() {
   const { profile, user } = useAuth();
   const navigate = useNavigate();
-  const { venues: topVenues, loading, error } = useVenues({ limit: 4 });
+  const [topVenues, setTopVenues] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user && profile?.role === 'venue_owner') {
@@ -19,46 +20,72 @@ export default function HomePage() {
     }
   }, [user, profile, navigate]);
 
+  useEffect(() => {
+    const fetchTopVenues = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('venues')
+          .select(`*, facilities (sports (name), facility_amenities ( amenities (name) ) )`)
+          .eq('is_approved', true)
+          .order('created_at', { ascending: false })
+          .limit(4);
+        if (error) throw error;
+        setTopVenues(data);
+      } catch (error) {
+        console.error("Error fetching top venues:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!profile || profile.role !== 'venue_owner') {
+      fetchTopVenues();
+    }
+  }, [profile]);
+
   if (profile?.role === 'venue_owner') {
-    return <p className="container" style={{ textAlign: 'center', padding: '50px' }}>Redirecting...</p>;
+    return <p className="container mx-auto text-center p-12">Redirecting...</p>;
   }
 
   return (
-    <div className="dashboard-page">
-      <div className="container">
+    <div className="bg-background">
+      <div className="container mx-auto px-4">
         {/* Hero Section */}
-        <section className="section hero-section">
-          <div className="hero-content">
-            <h1 className="hero-title">PlayNation: Book sports slots in seconds</h1>
-            <p className="hero-subtitle">
+        <section className="py-12 mb-20 grid grid-cols-1 lg:grid-cols-2 items-center gap-12 min-h-[450px]">
+          <div className="flex flex-col gap-6">
+            <h1 className="text-5xl font-extrabold leading-tight text-dark-text">PlayNation: Book sports slots in seconds</h1>
+            <p className="text-lg text-light-text font-normal leading-relaxed">
               Real-time availability across turfs and tables near you. No calls. No waiting. Just play.
             </p>
-            <div className="hero-buttons">
-              <Link to="/explore" className="btn btn-primary">Let's goo!!</Link>
+            <div className="flex gap-4 my-4">
+              <Link to="/explore" className="py-3 px-6 rounded-lg font-semibold text-sm cursor-pointer transition duration-300 inline-flex items-center justify-center gap-2 no-underline whitespace-nowrap bg-primary-green text-white shadow-sm hover:bg-primary-green-dark hover:-translate-y-px hover:shadow-md">
+                Let's go!!
+              </Link>
             </div>
-            <div className="hero-features">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
               <FeatureCard icon="⚡️" title="Fast" description="Instant slot visibility" />
               <FeatureCard icon="🛡️" title="Secure" description="Reliable & Safe" />
-              <FeatureCard icon="🏟️" title="Venues" description="Verified Facilities" />
+              <FeatureCard icon="🏟️" title="Top Venues" description="Verified Facilities" />
               <FeatureCard icon="👥" title="Users" description="Satisfied Users" />
             </div>
           </div>
-          <div className="hero-image">
-            <img src={heroImage} alt="Collage of sports venues" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-xl)' }} />
+          <div className="w-full h-auto max-w-2xl rounded-xl shadow-md overflow-hidden">
+            <img src={heroImage} alt="Collage of sports venues" className="w-full h-full object-cover" />
           </div>
         </section>
 
         {/* Offer Banner Section */}
-        <section className="section">
-          <div className="offer-banner">
+        <section className="mb-20">
+          <div className="h-44 bg-light-green-bg rounded-xl flex items-center justify-center text-3xl font-bold text-primary-green shadow-md border border-primary-green">
             <p>Flat 20% Off on Weekday Morning Slots</p>
           </div>
         </section>
 
         {/* Popular Categories Section */}
-        <section className="section">
-          <h2 className="section-heading">Popular categories</h2>
-          <div className="sports-grid">
+        <section className="mb-20">
+          <h2 className="text-2xl font-bold mb-8 text-dark-text relative after:content-[''] after:absolute after:-bottom-2 after:left-0 after:w-16 after:h-1 after:bg-primary-green after:rounded-sm">Popular categories</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
             {categories.map(category => (
               <CategoryCard 
                 key={category.id}
@@ -70,12 +97,12 @@ export default function HomePage() {
         </section>
 
         {/* Top Venues Section */}
-        <section className="section">
-          <h2 className="section-heading">Top Venues</h2>
-          {loading && <p>Loading top venues...</p>}
-          {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-          {!loading && !error && (
-            <div className="venue-grid">
+        <section className="mb-20">
+          <h2 className="text-2xl font-bold mb-8 text-dark-text relative after:content-[''] after:absolute after:-bottom-2 after:left-0 after:w-16 after:h-1 after:bg-primary-green after:rounded-sm">Top Venues</h2>
+          {loading ? (
+            <p>Loading top venues...</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {topVenues.length > 0 ? (
                 topVenues.map((venue) => <VenueCard key={venue.venue_id} venue={venue} />)
               ) : (

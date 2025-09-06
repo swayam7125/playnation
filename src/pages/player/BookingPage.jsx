@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
-import { useModal } from '../../ModalContext';
 
 const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 const formatTime = (dateString) => new Date(dateString).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -13,7 +12,7 @@ function BookingPage() {
   const { user } = useAuth();
   const { venue, facility, slot, price } = location.state || {};
   const [loading, setLoading] = useState(false);
-  const { showModal } = useModal();
+  const [error, setError] = useState(null);
 
   if (!venue || !facility || !slot || price === undefined) {
     React.useEffect(() => {
@@ -26,22 +25,15 @@ function BookingPage() {
 
   const handleConfirmBooking = async () => {
     if (!user) {
-      const wantsToLogin = await showModal({
-        type: 'confirm',
-        title: 'Authentication Required',
-        message: 'You need to be logged in to make a booking. Would you like to log in now?',
-        confirmText: 'Login',
-        cancelText: 'Cancel'
-      });
-      if (wantsToLogin) {
-        navigate('/login', { state: { from: location } });
-      }
+      alert("Please log in to make a booking.");
+      navigate('/login', { state: { from: location } });
       return;
     }
 
     setLoading(true);
+    setError(null);
     try {
-      const { data: bookingData, error: bookingError } = await supabase
+      const { error: bookingError } = await supabase
         .from('bookings')
         .insert({
           user_id: user.id,
@@ -53,9 +45,7 @@ function BookingPage() {
           total_amount: totalAmount,
           status: 'confirmed',
           payment_status: 'paid',
-        })
-        .select()
-        .single();
+        });
       
       if (bookingError) throw bookingError;
 
@@ -66,47 +56,34 @@ function BookingPage() {
       
       if (slotError) throw slotError;
 
-      await showModal({
-        type: 'info',
-        title: 'Success!',
-        message: 'Your booking has been confirmed.',
-        confirmText: 'View My Bookings'
-      });
+      alert("Booking confirmed successfully!");
       navigate('/my-bookings');
 
     } catch (err) {
-      let userMessage = "An unexpected error occurred during booking. Please try again.";
-      if (err.code === '23505') {
-        userMessage = "Sorry, this time slot was just booked by someone else. Please select a different slot.";
-      }
-      
-      await showModal({
-        type: 'error',
-        title: 'Booking Failed',
-        message: userMessage,
-      });
-
-      if (err.code === '23505') {
-        navigate(`/venue/${venue.venue_id}`);
-      }
+      setError(err.message);
+      alert(`Booking failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="container dashboard-page">
-      <h1 className="section-heading" style={{ textAlign: 'center', fontSize: '2rem' }}>Confirm Your Booking</h1>
-      <div className="booking-summary-card" style={{ maxWidth: '600px', margin: 'auto' }}>
-        <h3>{venue.name}</h3>
-        <p><strong>Facility:</strong> {facility.name} ({facility.sports.name})</p>
-        <p><strong>Date:</strong> {formatDate(slot.start_time)}</p>
-        <p><strong>Time:</strong> {formatTime(slot.start_time)} - {formatTime(slot.end_time)}</p>
-        <div className="summary-total">
-          <span>Total Amount</span>
-          <strong>₹{totalAmount}</strong>
+    <div className="container mx-auto px-4 py-12">
+      <h1 className="text-center text-3xl font-bold mb-8 text-dark-text">Confirm Your Booking</h1>
+      {error && <p className="text-center text-red-600 mb-4">Error: {error}</p>}
+
+      <div className="max-w-lg mx-auto bg-card-bg p-8 rounded-xl border border-border-color shadow-lg">
+        <h3 className="text-2xl font-bold text-dark-text mb-2">{venue.name}</h3>
+        <p className="text-medium-text mb-6"><strong>Facility:</strong> {facility.name} ({facility.sports.name})</p>
+        <div className="space-y-4 text-medium-text border-t border-b border-border-color py-6">
+            <p><strong>Date:</strong> {formatDate(slot.start_time)}</p>
+            <p><strong>Time:</strong> {formatTime(slot.start_time)} - {formatTime(slot.end_time)}</p>
         </div>
-        <button onClick={handleConfirmBooking} className="btn btn-primary" disabled={loading} style={{ width: '100%', marginTop: '1rem' }}>
+        <div className="flex justify-between items-center text-xl font-bold text-dark-text mt-6">
+          <span>Total Amount</span>
+          <span>₹{totalAmount}</span>
+        </div>
+        <button onClick={handleConfirmBooking} className="w-full mt-8 py-4 px-6 rounded-lg font-semibold text-lg transition duration-300 bg-primary-green text-white shadow-sm hover:bg-primary-green-dark hover:-translate-y-px hover:shadow-md disabled:bg-gray-400" disabled={loading}>
           {loading ? 'Processing...' : 'Proceed to Pay'}
         </button>
       </div>
