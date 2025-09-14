@@ -18,7 +18,7 @@ function AuthPage() {
   };
 
   return (
-    <div className="bg-background flex justify-center items-center min-h-screen p-5">
+    <div className="bg-background flex justify-center items-center p-5">
       <div className="bg-card-bg p-8 rounded-xl border border-border-color shadow-xl w-full max-w-2xl">
         {isLoginView ? (
           <>

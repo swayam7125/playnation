@@ -48,7 +48,6 @@ function RegisterForm() {
       if (authError) throw authError;
       if (!authData.user) throw new Error("Registration failed, please try again.");
       
-      // The profile is now created via the trigger, so we just need to update the session
       const userProfile = await updateUser();
 
       if (userProfile && userProfile.role === "venue_owner") {
@@ -65,7 +64,7 @@ function RegisterForm() {
     }
   };
 
-  const inputStyles = "py-3 px-4 border border-border-color rounded-lg text-sm bg-card-bg text-dark-text transition duration-300 focus:outline-none focus:border-primary-green focus:ring-2 focus:ring-primary-green/20";
+  const inputStyles = "w-full py-3 px-4 border border-border-color rounded-lg text-sm bg-card-bg text-dark-text transition duration-300 focus:outline-none focus:border-primary-green focus:ring-2 focus:ring-primary-green/20";
   const labelStyles = "font-semibold text-sm text-dark-text";
 
   return (

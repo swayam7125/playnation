@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
-import { FaTrash, FaPlusCircle, FaTimesCircle, FaEdit, FaBan, FaCheck, FaTimes, FaChevronLeft, FaChevronRight, FaClock, FaCalendarAlt, FaMapMarkerAlt } from 'react-icons/fa';
+import { useModal } from '../../ModalContext';
+import { FaTrash, FaPlusCircle, FaTimesCircle, FaEdit, FaBan, FaCheck, FaTimes, FaChevronLeft, FaChevronRight, FaClock, FaCalendarAlt, FaMapMarkerAlt, FaCheckDouble } from 'react-icons/fa';
 
 const getTodayString = () => new Date().toISOString().split('T')[0];
 
@@ -110,6 +111,7 @@ const TimeSlotCard = ({ item, isSelected, facility, actions }) => {
 
 function ManageSlotsPage() {
     const { user } = useAuth();
+    const { showModal } = useModal();
     const [venues, setVenues] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedVenueId, setSelectedVenueId] = useState('');
@@ -153,21 +155,33 @@ function ManageSlotsPage() {
         try {
             const { error } = await action();
             if (error) throw error;
-            alert(successMsg);
+            await showModal({ title: "Success", message: successMsg });
             fetchOwnerVenues();
         } catch (error) {
-            alert(`${errorMsgPrefix}: ${error.message}`);
+            await showModal({ title: "Error", message: `${errorMsgPrefix}: ${error.message}` });
         }
     };
 
     const handleDeleteSlot = async (slotId) => {
-        if (window.confirm("Delete this available slot?")) {
+        const isConfirmed = await showModal({
+            title: "Delete Slot",
+            message: "Delete this available slot?",
+            confirmText: "Delete",
+            confirmStyle: "danger"
+        });
+        if (isConfirmed) {
             await runSupabaseAction(() => supabase.from('time_slots').delete().eq('slot_id', slotId), "Slot deleted.", "Error deleting slot");
         }
     };
     
     const handleOwnerCancelBooking = async (bookingId, slotId) => {
-        if (window.confirm("Cancel this user's booking? This is irreversible.")) {
+        const isConfirmed = await showModal({
+            title: "Cancel Booking",
+            message: "Cancel this user's booking? This is irreversible.",
+            confirmText: "Cancel",
+            confirmStyle: "danger"
+        });
+        if (isConfirmed) {
             await runSupabaseAction(async () => {
                 const { error: bookingError } = await supabase.from('bookings').update({ status: 'cancelled', payment_status: 'refunded', cancelled_by: user.id }).eq('booking_id', bookingId);
                 if (bookingError) throw bookingError;
@@ -179,7 +193,7 @@ function ManageSlotsPage() {
     const handleSavePrice = async (slotId) => {
         const priceValue = customPrice.trim() === '' ? null : parseFloat(customPrice);
         if (customPrice.trim() !== '' && (isNaN(priceValue) || priceValue < 0)) {
-            alert("Please enter a valid price."); return;
+            await showModal({ title: "Invalid Price", message: "Please enter a valid price." }); return;
         }
         await runSupabaseAction(() => supabase.from('time_slots').update({ price_override: priceValue }).eq('slot_id', slotId), "Price updated!", "Error updating price");
         setEditingSlot(null); setCustomPrice('');
@@ -193,13 +207,18 @@ function ManageSlotsPage() {
     };
 
     const handleUnblockSlot = async (slotId) => {
-        if (window.confirm("Unblock this slot?")) {
+        const isConfirmed = await showModal({
+            title: "Unblock Slot",
+            message: "Unblock this slot?",
+            confirmText: "Unblock"
+        });
+        if (isConfirmed) {
             await runSupabaseAction(() => supabase.from('time_slots').update({ is_available: true, block_reason: null }).eq('slot_id', slotId), "Slot unblocked!", "Error unblocking slot");
         }
     };
 
     const handleBulkAddSlots = async () => {
-        if (slotsToCreate.size === 0) { alert("Please select empty slots to add."); return; }
+        if (slotsToCreate.size === 0) { await showModal({ title: "No Slots Selected", message: "Please select slots to add." }); return; }
         const slotsToInsert = Array.from(slotsToCreate).map(hour => ({
             facility_id: selectedFacilityId,
             start_time: `${selectedDate}T${String(hour).padStart(2, '0')}:00:00`,
@@ -209,6 +228,13 @@ function ManageSlotsPage() {
         setSlotsToCreate(new Set());
     };
     
+    const handleSelectAll = () => {
+        const allAvailableHours = daySchedule
+            .filter(item => item.status === 'empty')
+            .map(item => item.hour);
+        setSlotsToCreate(new Set(allAvailableHours));
+    };
+
     const toggleSlotForCreation = (hour) => setSlotsToCreate(prev => {
         const newSlots = new Set(prev);
         newSlots.has(hour) ? newSlots.delete(hour) : newSlots.add(hour);
@@ -272,7 +298,26 @@ function ManageSlotsPage() {
                         {slotsToCreate.size > 0 && (
                             <div className="sticky top-4 z-50 mb-6">
                                 <div className="bg-card-bg rounded-2xl border border-primary-green shadow-2xl p-6">
-                                    <div className="flex items-center justify-between"><div className="flex items-center gap-4"><div className="p-3 bg-primary-green/10 rounded-xl"><FaPlusCircle className="text-primary-green text-xl" /></div><div><h4 className="font-semibold text-dark-text">{slotsToCreate.size} time slot{slotsToCreate.size !== 1 && 's'} selected</h4><p className="text-medium-text text-sm">Ready to create new time slots</p></div></div><div className="flex items-center gap-3"><button onClick={() => setSlotsToCreate(new Set())} className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200">Clear Selection</button><button onClick={handleBulkAddSlots} className="px-8 py-3 bg-primary-green text-white rounded-xl font-semibold shadow-lg hover:bg-primary-green-dark transition-transform hover:scale-105 flex items-center gap-2"><FaPlusCircle />Create Selected Slots</button></div></div>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 bg-primary-green/10 rounded-xl"><FaPlusCircle className="text-primary-green text-xl" /></div>
+                                            <div>
+                                                <h4 className="font-semibold text-dark-text">{slotsToCreate.size} time slot{slotsToCreate.size !== 1 && 's'} selected</h4>
+                                                <p className="text-medium-text text-sm">Ready to create new time slots</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <button onClick={handleSelectAll} className="px-6 py-3 bg-primary-green/10 text-primary-green rounded-xl font-semibold hover:bg-primary-green/20">
+                                                Select All
+                                            </button>
+                                            <button onClick={() => setSlotsToCreate(new Set())} className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200">
+                                                Clear Selection
+                                            </button>
+                                            <button onClick={handleBulkAddSlots} className="px-8 py-3 bg-primary-green text-white rounded-xl font-semibold shadow-lg hover:bg-primary-green-dark transition-transform hover:scale-105 flex items-center gap-2">
+                                                <FaPlusCircle />Create Selected Slots
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}

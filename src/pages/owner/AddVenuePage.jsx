@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
+import { useModal } from '../../ModalContext';
 
 function AddVenuePage() {
   const { user } = useAuth();
+  const { showModal } = useModal();
   const navigate = useNavigate();
   
   const [venueDetails, setVenueDetails] = useState({
@@ -47,9 +49,12 @@ function AddVenuePage() {
     });
   };
 
-  const handleAddFacility = () => {
+  const handleAddFacility = async () => {
     if (!currentFacility.name || !currentFacility.sport_id || !currentFacility.hourly_rate) {
-      alert("Please provide a facility name, sport, and hourly rate.");
+      await showModal({
+        title: "Required Fields",
+        message: "Please provide a facility name, sport, and hourly rate."
+      });
       return;
     }
     setFacilities([...facilities, { ...currentFacility, id: Date.now() }]);
@@ -59,7 +64,13 @@ function AddVenuePage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) { setError("You must be logged in."); return; }
-    if (facilities.length === 0) { alert("Please add at least one facility to the venue."); return; }
+    if (facilities.length === 0) {
+      await showModal({
+        title: "Missing Facilities",
+        message: "Please add facility to the venue."
+      });
+      return;
+    }
     
     setLoading(true);
     setError(null);
@@ -90,7 +101,10 @@ function AddVenuePage() {
         }
       }
       
-      alert("Venue submitted for approval successfully!");
+      await showModal({
+        title: "Submission Successful",
+        message: "Venue submitted for approval successfully!"
+      });
       navigate('/owner/my-venues');
     } catch (err) {
       setError(err.message);

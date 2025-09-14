@@ -23,7 +23,8 @@ function BookingCalendarPage() {
         const { data: venuesData, error: venuesError } = await supabase
           .from('venues')
           .select('venue_id, name, opening_time, closing_time, facilities (*, sports(name))')
-          .eq('owner_id', user.id);
+          .eq('owner_id', user.id)
+          .eq('is_approved', true);
         if (venuesError) throw venuesError;
         setVenues(venuesData || []);
 

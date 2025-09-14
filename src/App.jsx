@@ -1,8 +1,9 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
 import OwnerProtectedRoute from './components/auth/OwnerProtectedRoute';
-import AdminProtectedRoute from './components/auth/AdminProtectedRoute'; // New import
+import AdminProtectedRoute from './components/auth/AdminProtectedRoute';
+import Footer from './components/layout/Footer';
 
 // Public Pages
 import HomePage from './pages/HomePage';
@@ -23,13 +24,16 @@ import BookingCalendarPage from './pages/owner/BookingCalendarPage';
 import ManageSlotsPage from './pages/owner/ManageSlotsPage';
 
 // Admin Pages
-import AdminVenueManagementPage from './pages/admin/AdminVenueManagementPage'; // New import
+import AdminVenueManagementPage from './pages/admin/AdminVenueManagementPage';
 
 function App() {
+  const location = useLocation();
+  const hideFooter = location.pathname === '/login' || location.pathname === '/signup';
+
   return (
-    <Router>
+    <div className="flex flex-col min-h-screen">
       <Navbar />
-      <main>
+      <main className="flex-grow">
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
@@ -58,7 +62,8 @@ function App() {
           </Route>
         </Routes>
       </main>
-    </Router>
+      {!hideFooter && <Footer />}
+    </div>
   );
 }
 

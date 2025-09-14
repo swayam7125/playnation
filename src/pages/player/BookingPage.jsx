@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
+import { useModal } from '../../ModalContext';
 
 const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 const formatTime = (dateString) => new Date(dateString).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -10,6 +11,7 @@ function BookingPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showModal } = useModal();
   const { venue, facility, slot, price } = location.state || {};
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -25,7 +27,7 @@ function BookingPage() {
 
   const handleConfirmBooking = async () => {
     if (!user) {
-      alert("Please log in to make a booking.");
+      showModal({ title: "Login Required", message: "Please log in to make a booking." });
       navigate('/login', { state: { from: location } });
       return;
     }
@@ -56,12 +58,12 @@ function BookingPage() {
       
       if (slotError) throw slotError;
 
-      alert("Booking confirmed successfully!");
+      await showModal({ title: "Booking Confirmed", message: "Your booking has been confirmed successfully!" });
       navigate('/my-bookings');
 
     } catch (err) {
       setError(err.message);
-      alert(`Booking failed: ${err.message}`);
+      showModal({ title: "Booking Failed", message: `Booking failed: ${err.message}` });
     } finally {
       setLoading(false);
     }

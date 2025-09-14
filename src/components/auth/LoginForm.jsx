@@ -42,6 +42,9 @@ function LoginForm() {
     }
   };
 
+  const inputStyles = "w-full py-3 px-4 border border-border-color rounded-lg text-sm bg-card-bg text-dark-text transition duration-300 focus:outline-none focus:border-primary-green focus:ring-2 focus:ring-primary-green/20";
+  const labelStyles = "font-semibold text-sm text-dark-text";
+
   return (
     <form onSubmit={handleLogin} className="flex flex-col">
       {error && (
@@ -51,7 +54,7 @@ function LoginForm() {
       )}
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex flex-col gap-2">
-          <label htmlFor="email" className="font-semibold text-sm text-dark-text">Email Address</label>
+          <label htmlFor="email" className={labelStyles}>Email Address</label>
           <input
             id="email"
             type="email"
@@ -59,11 +62,11 @@ function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="py-3 px-4 border border-border-color rounded-lg text-sm bg-card-bg text-dark-text transition duration-300 focus:outline-none focus:border-primary-green focus:ring-2 focus:ring-primary-green/20"
+            className={inputStyles}
           />
         </div>
         <div className="flex flex-col gap-2">
-          <label htmlFor="password" className="font-semibold text-sm text-dark-text">Password</label>
+          <label htmlFor="password" className={labelStyles}>Password</label>
           <input
             id="password"
             type="password"
@@ -71,7 +74,7 @@ function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="py-3 px-4 border border-border-color rounded-lg text-sm bg-card-bg text-dark-text transition duration-300 focus:outline-none focus:border-primary-green focus:ring-2 focus:ring-primary-green/20"
+            className={inputStyles}
           />
         </div>
       </div>

@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
 import BookingCard from '../../components/bookings/BookingCard';
+import { useModal } from '../../ModalContext';
 
 function MyBookingsPage() {
   const { user } = useAuth();
+  const { showModal } = useModal();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -36,7 +38,14 @@ function MyBookingsPage() {
   }, [user]);
 
   const handleCancelBooking = async (booking) => {
-    if (window.confirm("Are you sure you want to cancel this booking?")) {
+    const isConfirmed = await showModal({
+      title: "Confirm Cancellation",
+      message: "Are you sure you want to cancel this booking?",
+      confirmText: "Yes, Cancel",
+      confirmStyle: "danger"
+    });
+
+    if (isConfirmed) {
       try {
         const { data: updatedBooking, error: bookingError } = await supabase
           .from('bookings')
@@ -58,12 +67,12 @@ function MyBookingsPage() {
 
         if (slotError) throw slotError;
 
-        alert("Booking cancelled successfully.");
+        await showModal({ title: "Success", message: "Booking cancelled successfully." });
         setBookings(currentBookings => 
           currentBookings.map(b => b.booking_id === booking.booking_id ? updatedBooking : b)
         );
       } catch (error) {
-        alert(`Error in cancelling booking: ${error.message}`);
+        showModal({ title: "Error", message: `Error in cancelling booking: ${error.message}` });
       }
     }
   };

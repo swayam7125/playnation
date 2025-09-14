@@ -1,18 +1,30 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
+import { useModal } from '../../ModalContext';
 
 function Navbar() {
   const { user, profile, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { showModal } = useModal();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
+  const handleLogout = async () => {
+    const isConfirmed = await showModal({
+      title: "Confirm Logout",
+      message: "Are you sure you want to log out?",
+      confirmText: "Logout",
+      confirmStyle: "danger"
+    });
+
+    if (isConfirmed) {
+      logout();
+      navigate('/');
+    }
   };
 
-  // Reusable classes for the main navigation links to keep the JSX clean
   const navLinkClasses = "no-underline text-medium-text font-semibold text-sm transition duration-300 relative py-2 after:content-[''] after:absolute after:w-0 after:h-0.5 after:bottom-0 after:left-1/2 after:bg-primary-green after:transition-all after:duration-300 after:-translate-x-1/2 hover:text-primary-green hover:after:w-full";
+  const activeLinkClasses = "text-primary-green after:w-full";
 
   return (
     <nav className="bg-card-bg border-b border-border-color py-4 sticky top-0 z-50 shadow-sm">
@@ -31,25 +43,25 @@ function Navbar() {
             {/* Links for Players and Guests */}
             {profile?.role !== 'venue_owner' && profile?.role !== 'admin' && (
               <>
-                <Link to="/explore" className={navLinkClasses}>Explore</Link>
-                {user && <Link to="/my-bookings" className={navLinkClasses}>My Bookings</Link>}
+                <Link to="/explore" className={`${navLinkClasses} ${location.pathname === '/explore' ? activeLinkClasses : ''}`}>Explore</Link>
+                {user && <Link to="/my-bookings" className={`${navLinkClasses} ${location.pathname === '/my-bookings' ? activeLinkClasses : ''}`}>My Bookings</Link>}
               </>
             )}
 
             {/* Links for Venue Owners */}
             {profile?.role === 'venue_owner' && (
               <>
-                <Link to="/owner/dashboard" className={navLinkClasses}>Dashboard</Link>
-                <Link to="/owner/my-venues" className={navLinkClasses}>My Venues</Link>
-                <Link to="/owner/calendar" className={navLinkClasses}>Bookings</Link>
-                <Link to="/owner/manage-slots" className={navLinkClasses}>Manage Slots</Link>
+                <Link to="/owner/dashboard" className={`${navLinkClasses} ${location.pathname === '/owner/dashboard' ? activeLinkClasses : ''}`}>Dashboard</Link>
+                <Link to="/owner/my-venues" className={`${navLinkClasses} ${location.pathname === '/owner/my-venues' ? activeLinkClasses : ''}`}>My Venues</Link>
+                <Link to="/owner/calendar" className={`${navLinkClasses} ${location.pathname === '/owner/calendar' ? activeLinkClasses : ''}`}>Bookings</Link>
+                <Link to="/owner/manage-slots" className={`${navLinkClasses} ${location.pathname === '/owner/manage-slots' ? activeLinkClasses : ''}`}>Manage Slots</Link>
               </>
             )}
 
             {/* Links for Admins */}
             {profile?.role === 'admin' && (
               <>
-                <Link to="/admin/venues" className={navLinkClasses}>Manage Venues</Link>
+                <Link to="/admin/venues" className={`${navLinkClasses} ${location.pathname === '/admin/venues' ? activeLinkClasses : ''}`}>Manage Venues</Link>
               </>
             )}
           </div>

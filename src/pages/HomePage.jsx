@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { supabase } from '../supabaseClient';
-import heroImage from '../assets/images/hero/hero-img-1.svg';
+import heroImage from '../assets/images/hero/venue-1.svg';
 import { FeatureCard } from '../components/home/FeatureCard/FeatureCard';
 import { CategoryCard } from '../components/home/CategoryCard/CategoryCard';
 import VenueCard from '../components/venues/VenueCard';

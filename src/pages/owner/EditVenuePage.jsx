@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
+import { useModal } from '../../ModalContext';
 import { FaTrash, FaPlusCircle, FaPlus } from 'react-icons/fa';
 
 function EditVenuePage() {
     const { venueId } = useParams();
     const { user } = useAuth();
+    const { showModal } = useModal();
     const navigate = useNavigate();
     const [venue, setVenue] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -53,35 +55,41 @@ function EditVenuePage() {
     const handleDetailsUpdate = async (e) => {
         e.preventDefault();
         const { error } = await supabase.from('venues').update(venueDetails).eq('venue_id', venueId);
-        if (error) { alert(`Update failed: ${error.message}`); } else { alert("Venue details updated successfully!"); }
+        if (error) { await showModal({ title: "Update Failed", message: `Update failed: ${error.message}` }); } else { await showModal({ title: "Success", message: "Venue details updated successfully!" }); }
     };
     
     const handleAddFacility = async (e) => {
         e.preventDefault();
         if (!newFacility.name.trim() || !newFacility.sport_id || !newFacility.capacity || !newFacility.hourly_rate) {
-            alert("Please fill all required facility fields."); return;
+            await showModal({ title: "Required Fields", message: "Please fill all required facility fields." }); return;
         }
         try {
             const { error } = await supabase.from('facilities').insert([{ venue_id: venueId, ...newFacility }]);
             if (error) throw error;
-            alert("Facility added successfully!");
+            await showModal({ title: "Success", message: "Facility added successfully!" });
             setShowAddFacilityForm(false);
             setNewFacility({ name: '', sport_id: '', capacity: '', hourly_rate: '', description: '' });
             fetchVenueData(); // Refresh data
         } catch (error) {
-            alert(`Error adding facility: ${error.message}`);
+            await showModal({ title: "Error", message: `Error adding facility: ${error.message}` });
         }
     };
 
     const handleDeleteFacility = async (facilityId, facilityName) => {
-        if (window.confirm(`Are you sure you want to delete "${facilityName}"? This action cannot be undone.`)) {
+        const isConfirmed = await showModal({
+            title: "Confirm Deletion",
+            message: `Are you sure you want to delete "${facilityName}"? This action cannot be undone.`,
+            confirmText: "Delete",
+            confirmStyle: "danger"
+        });
+        if (isConfirmed) {
             try {
                 const { error } = await supabase.from('facilities').delete().eq('facility_id', facilityId);
                 if (error) throw error;
-                alert("Facility deleted!");
+                await showModal({ title: "Success", message: "Facility deleted!" });
                 fetchVenueData(); // Refresh data
             } catch (error) {
-                alert(`Error deleting facility: ${error.message}`);
+                await showModal({ title: "Error", message: `Error deleting facility: ${error.message}` });
             }
         }
     };

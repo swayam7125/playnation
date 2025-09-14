@@ -1,16 +1,19 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter as Router } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './AuthContext';
-import { ModalProvider } from './ModalContext'; // Import ModalProvider
+import { ModalProvider } from './ModalContext';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <AuthProvider>
-      <ModalProvider> {/* Wrap App with ModalProvider */}
-        <App />
-      </ModalProvider>
-    </AuthProvider>
+    <Router> {/* Router is now at the highest level */}
+      <AuthProvider>
+        <ModalProvider>
+          <App />
+        </ModalProvider>
+      </AuthProvider>
+    </Router>
   </React.StrictMode>
 );
