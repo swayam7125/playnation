@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { FaClock, FaStar, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaClock, FaStar } from 'react-icons/fa';
+import StarRating from '../components/reviews/StarRating'; // <-- IMPORT NEW COMPONENT
 
 const getTodayString = () => {
     const today = new Date();
@@ -16,6 +17,7 @@ function VenuePage() {
   const { venueId } = useParams();
   const navigate = useNavigate();
   const [venue, setVenue] = useState(null);
+  const [reviews, setReviews] = useState([]); // <-- STATE FOR REVIEWS
   const [selectedFacilityId, setSelectedFacilityId] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,25 +25,41 @@ function VenuePage() {
   const [selectedDate, setSelectedDate] = useState(getTodayString());
 
   useEffect(() => {
-    const fetchVenueDetails = async () => {
+    const fetchVenueData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const { data, error } = await supabase.from('venues').select(`*, facilities (*, sports (name), time_slots (*), facility_amenities (*, amenities (name)))`).eq('venue_id', venueId).single();
-        if (error) throw error;
-        setVenue(data);
-        if (data.facilities && data.facilities.length > 0) {
-          setSelectedFacilityId(data.facilities[0].facility_id);
+        // Fetch venue details
+        const { data: venueData, error: venueError } = await supabase
+          .from('venues')
+          .select(`*, facilities (*, sports (name), time_slots (*), facility_amenities (*, amenities (name)))`)
+          .eq('venue_id', venueId)
+          .single();
+        if (venueError) throw venueError;
+        setVenue(venueData);
+        if (venueData.facilities && venueData.facilities.length > 0) {
+          setSelectedFacilityId(venueData.facilities[0].facility_id);
         }
+
+        // Fetch reviews for the venue
+        const { data: reviewData, error: reviewError } = await supabase
+          .from('reviews')
+          .select(`*, users (username, first_name, last_name)`)
+          .eq('venue_id', venueId)
+          .order('created_at', { ascending: false });
+        if (reviewError) throw reviewError;
+        setReviews(reviewData || []);
+
       } catch (err) {
         setError(err.message);
       } finally {
         setLoading(false);
       }
     };
-    fetchVenueDetails();
-  }, [venueId]);
 
+    fetchVenueData();
+  }, [venueId]);
+  
   const selectedFacility = venue?.facilities.find(f => f.facility_id === selectedFacilityId);
 
   const filteredTimeSlots = useMemo(() => {
@@ -56,6 +74,14 @@ function VenuePage() {
       .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
       
   }, [selectedFacility, selectedDate]);
+
+  // Calculate average rating
+  const averageRating = useMemo(() => {
+    if (reviews.length === 0) return 0;
+    const total = reviews.reduce((sum, review) => sum + review.rating, 0);
+    return (total / reviews.length).toFixed(1);
+  }, [reviews]);
+
 
   const handleFacilityChange = (facility) => {
     setSelectedFacilityId(facility.facility_id);
@@ -72,16 +98,7 @@ function VenuePage() {
     navigate('/booking', { state: { venue, facility: selectedFacility, slot: selectedSlot, price: finalPrice } });
   };
   
-  const changeDate = (days) => {
-    const currentDate = new Date(selectedDate);
-    currentDate.setDate(currentDate.getDate() + days);
-    if (currentDate < new Date(getTodayString())) return;
-    setSelectedDate(currentDate.toISOString().split('T')[0]);
-  };
-  
-  const allAmenities = venue?.facilities.flatMap(f => f.facility_amenities?.map(fa => fa.amenities?.name) ?? []).filter(Boolean);
-  const uniqueAmenities = [...new Set(allAmenities)];
-  
+  const uniqueAmenities = [...new Set(venue?.facilities.flatMap(f => f.facility_amenities?.map(fa => fa.amenities?.name) ?? []).filter(Boolean))];
   const displayPrice = selectedSlot?.price_override ?? selectedFacility?.hourly_rate;
 
   if (loading) return <p className="container mx-auto text-center p-12">Loading venue details...</p>;
@@ -89,80 +106,97 @@ function VenuePage() {
   if (!venue) return <p className="container mx-auto text-center p-12">Venue not found.</p>;
 
   return (
-    <div className="container mx-auto px-4 py-12">
-      <div className="border-b border-border-color pb-12 mb-12 relative after:content-[''] after:absolute after:-bottom-px after:left-0 after:w-24 after:h-1 after:bg-primary-green">
-        <h1 className="text-4xl font-extrabold mb-4 text-dark-text">{venue.name}</h1>
-        <p className="text-lg text-light-text">{venue.address}, {venue.city}, {venue.state}</p>
-        <p className="max-w-3xl text-light-text leading-relaxed">{venue.description}</p>
-        <div className="mt-8">
-          <div className="flex flex-wrap gap-3">
-            {uniqueAmenities.map(amenity => (
-              <span key={amenity} className="inline-flex items-center gap-2 bg-light-green-bg text-emerald-800 py-1.5 px-4 rounded-full text-xs font-semibold border border-emerald-200">
-                <FaStar className="text-xs" /> {amenity}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
+    <div className="bg-background">
+      <div className="container mx-auto px-4 py-12">
+        <div className="bg-card-bg p-8 rounded-2xl shadow-lg border border-border-color-light">
+            <div className="venue-header mb-8">
+              <h1 className="text-4xl font-bold text-dark-text mb-2">{venue.name}</h1>
+              {reviews.length > 0 && (
+                <div className="flex items-center gap-2 mb-4">
+                  <StarRating rating={averageRating} />
+                  <span className="font-bold text-dark-text">{averageRating}</span>
+                  <span className="text-medium-text">({reviews.length} reviews)</span>
+                </div>
+              )}
+              <p className="text-lg text-medium-text">{venue.address}, {venue.city}, {venue.state}</p>
+              <p className="text-light-text mt-4 max-w-3xl">{venue.description}</p>
+            </div>
 
-      <div className="flex flex-wrap gap-4 mb-12 pb-8 border-b border-border-color">
-        {venue.facilities.map(facility => (
-          <button
-            key={facility.facility_id}
-            onClick={() => handleFacilityChange(facility)}
-            className={`py-3 px-6 font-sans text-sm font-semibold rounded-lg cursor-pointer transition duration-300 ${selectedFacilityId === facility.facility_id ? 'bg-primary-green text-white shadow-md' : 'bg-hover-bg text-medium-text'}`}
-          >
-            {facility.name} ({facility.sports.name})
-          </button>
-        ))}
-      </div>
+            <div className="facility-tabs flex flex-wrap gap-4 mb-8 border-b border-border-color pb-4">
+              {venue.facilities.map(facility => (
+                <button
+                  key={facility.facility_id}
+                  onClick={() => handleFacilityChange(facility)}
+                  className={`px-5 py-2.5 font-semibold text-sm rounded-full transition duration-300 ${selectedFacilityId === facility.facility_id ? 'bg-primary-green text-white shadow-md' : 'bg-hover-bg text-medium-text hover:bg-border-color-light'}`}
+                >
+                  {facility.name} ({facility.sports.name})
+                </button>
+              ))}
+            </div>
 
-      <div className="mb-12">
-        <h2 className="text-2xl font-bold mb-8 text-dark-text relative after:content-[''] after:absolute after:-bottom-2 after:left-0 after:w-16 after:h-1 after:bg-primary-green after:rounded-sm">Available Time Slots</h2>
-        
-        <div className="flex items-center gap-4 mb-8 max-w-sm">
-          <button onClick={() => changeDate(-1)} disabled={selectedDate <= getTodayString()} className="py-2 px-4 border border-border-color rounded-lg font-semibold text-sm transition duration-300 bg-card-bg text-medium-text shadow-sm hover:bg-hover-bg disabled:opacity-50 disabled:cursor-not-allowed">
-            <FaChevronLeft />
-          </button>
-          <input 
-            type="date" 
-            className="flex-grow py-2 px-3 border border-border-color rounded-lg font-semibold text-center"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            min={getTodayString()}
-          />
-          <button onClick={() => changeDate(1)} className="py-2 px-4 border border-border-color rounded-lg font-semibold text-sm transition duration-300 bg-card-bg text-medium-text shadow-sm hover:bg-hover-bg">
-            <FaChevronRight />
-          </button>
-        </div>
+            <div className="time-slots-section mb-8">
+              <h2 className="text-2xl font-semibold text-dark-text mb-4">Available Time Slots</h2>
+              <div className="max-w-xs mb-6">
+                <input 
+                  type="date" 
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  min={getTodayString()}
+                  className="w-full px-4 py-3 bg-hover-bg border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green"
+                />
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {filteredTimeSlots.length > 0 ? (
+                  filteredTimeSlots.map(slot => (
+                    <button
+                      key={slot.slot_id}
+                      onClick={() => handleSlotSelect(slot)}
+                      className={`p-4 font-semibold rounded-lg transition-all duration-200 border-2 ${selectedSlot?.slot_id === slot.slot_id ? 'bg-primary-green text-white border-primary-green-dark' : 'bg-card-bg text-primary-green border-primary-green/50 hover:border-primary-green'}`}
+                    >
+                      <FaClock className="mx-auto mb-1" />
+                      {formatTime(slot.start_time)}
+                    </button>
+                  ))
+                ) : (
+                  <p className="col-span-full text-medium-text">No available slots for the selected date.</p>
+                )}
+              </div>
+            </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {filteredTimeSlots.length > 0 ? (
-            filteredTimeSlots.map(slot => (
-              <button
-                key={slot.slot_id}
-                onClick={() => handleSlotSelect(slot)}
-                className={`py-5 font-sans text-sm font-semibold rounded-lg cursor-pointer flex items-center justify-center gap-2 transition duration-300 shadow-sm
-                  ${selectedSlot?.slot_id === slot.slot_id 
-                    ? 'bg-primary-green text-white scale-105 shadow-md' 
-                    : 'bg-card-bg text-primary-green border-2 border-primary-green hover:bg-primary-green hover:text-white hover:-translate-y-px hover:shadow-md'}`
-                }
-              >
-                <FaClock />
-                {formatTime(slot.start_time)}
-              </button>
-            ))
-          ) : (
-            <p className="col-span-full">No available slots for the selected date.</p>
-          )}
+            {/* REVIEWS SECTION */}
+            <div className="reviews-section border-t border-border-color pt-8">
+              <h2 className="text-2xl font-semibold text-dark-text mb-6">What Players Are Saying</h2>
+              {reviews.length > 0 ? (
+                <div className="space-y-6">
+                  {reviews.map(review => (
+                    <div key={review.review_id} className="border-b border-border-color-light pb-6">
+                      <div className="flex items-center mb-2">
+                        <StarRating rating={review.rating} />
+                        <span className="ml-4 font-bold text-dark-text">{review.users?.first_name || review.users?.username}</span>
+                      </div>
+                      <p className="text-medium-text">{review.comment}</p>
+                      <p className="text-xs text-light-text mt-2">{new Date(review.created_at).toLocaleDateString()}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-medium-text">Be the first to leave a review for this venue!</p>
+              )}
+            </div>
         </div>
       </div>
       
       {selectedSlot && (
-        <div className="sticky bottom-0 bg-card-bg py-6 px-8 border-t border-border-color shadow-xl flex justify-end -mx-4 -mb-12 rounded-t-xl">
-          <button onClick={handleProceedToBook} className="py-4 px-12 text-lg font-bold rounded-lg bg-primary-green text-white shadow-sm hover:bg-primary-green-dark transition duration-300">
-            Book Now (₹{displayPrice})
-          </button>
+        <div className="sticky bottom-0 bg-card-bg p-6 border-t border-border-color shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+          <div className="container mx-auto flex justify-between items-center">
+            <div>
+                <p className="text-medium-text">Selected Slot:</p>
+                <p className="font-bold text-dark-text">{formatTime(selectedSlot.start_time)} - {formatTime(selectedSlot.end_time)}</p>
+            </div>
+            <button onClick={handleProceedToBook} className="py-3 px-8 rounded-lg font-semibold text-lg bg-primary-green text-white shadow-sm hover:bg-primary-green-dark hover:-translate-y-px transition-all">
+              Book Now (₹{displayPrice})
+            </button>
+          </div>
         </div>
       )}
     </div>
