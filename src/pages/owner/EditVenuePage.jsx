@@ -3,23 +3,33 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
 import { useModal } from '../../ModalContext';
-import { FaTrash, FaPlusCircle, FaPlus } from 'react-icons/fa';
+import { 
+  FaTrash, FaPlus, FaEdit, FaSave, FaTimes, FaMapMarkerAlt, 
+  FaClock, FaPhone, FaEnvelope, FaUpload, FaEye, FaUsers, 
+  FaRupeeSign, FaStar 
+} from 'react-icons/fa';
 
 function EditVenuePage() {
     const { venueId } = useParams();
     const { user } = useAuth();
     const { showModal } = useModal();
     const navigate = useNavigate();
+    
     const [venue, setVenue] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('details');
     const [venueDetails, setVenueDetails] = useState({
         name: '', address: '', city: '', state: '', zip_code: '', description: '', 
-        contact_email: '', contact_phone: '', opening_time: '', closing_time: ''
+        contact_email: '', contact_phone: '', opening_time: '', closing_time: '', image_url: ''
     });
+    
+    const [newImageFile, setNewImageFile] = useState(null);
+    const [imagePreview, setImagePreview] = useState(null);
     const [sports, setSports] = useState([]);
     const [showAddFacilityForm, setShowAddFacilityForm] = useState(false);
-    const [newFacility, setNewFacility] = useState({ name: '', sport_id: '', capacity: '', hourly_rate: '', description: '' });
+    const [newFacility, setNewFacility] = useState({ 
+        name: '', sport_id: '', capacity: '', hourly_rate: '', description: '' 
+    });
 
     const fetchVenueData = async () => {
         setLoading(true);
@@ -27,16 +37,31 @@ function EditVenuePage() {
             const { data: sportsData } = await supabase.from('sports').select('sport_id, name').order('name');
             setSports(sportsData || []);
 
-            const { data: venueData, error } = await supabase.from('venues').select(`*, facilities(*, sports(name), time_slots(count))`).eq('venue_id', venueId).single();
+            const { data: venueData, error } = await supabase
+                .from('venues')
+                .select(`*, facilities(*, sports(name), time_slots(count))`)
+                .eq('venue_id', venueId)
+                .single();
+                
             if (error) throw error;
-            if (venueData.owner_id !== user.id) { navigate('/owner/my-venues'); return; }
+            if (venueData.owner_id !== user.id) { 
+                navigate('/owner/my-venues'); 
+                return; 
+            }
             
             setVenue(venueData);
             setVenueDetails({
-                name: venueData.name || '', address: venueData.address || '', city: venueData.city || '',
-                state: venueData.state || '', zip_code: venueData.zip_code || '', description: venueData.description || '',
-                contact_email: venueData.contact_email || '', contact_phone: venueData.contact_phone || '',
-                opening_time: venueData.opening_time || '', closing_time: venueData.closing_time || '',
+                name: venueData.name || '', 
+                address: venueData.address || '', 
+                city: venueData.city || '',
+                state: venueData.state || '', 
+                zip_code: venueData.zip_code || '', 
+                description: venueData.description || '',
+                contact_email: venueData.contact_email || '', 
+                contact_phone: venueData.contact_phone || '',
+                opening_time: venueData.opening_time || '', 
+                closing_time: venueData.closing_time || '',
+                image_url: venueData.image_url || ''
             });
         } catch (err) {
             console.error("Error fetching data:", err);
@@ -52,16 +77,59 @@ function EditVenuePage() {
     const handleDetailsChange = (e) => setVenueDetails({ ...venueDetails, [e.target.name]: e.target.value });
     const handleNewFacilityChange = (e) => setNewFacility({ ...newFacility, [e.target.name]: e.target.value });
 
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        setNewImageFile(file);
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => setImagePreview(reader.result);
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleDetailsUpdate = async (e) => {
         e.preventDefault();
-        const { error } = await supabase.from('venues').update(venueDetails).eq('venue_id', venueId);
-        if (error) { await showModal({ title: "Update Failed", message: `Update failed: ${error.message}` }); } else { await showModal({ title: "Success", message: "Venue details updated successfully!" }); }
+        setLoading(true);
+        let updatedImageUrl = venueDetails.image_url;
+    
+        try {
+            if (newImageFile) {
+                const imageName = `${user.id}/${Date.now()}-${newImageFile.name}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('venue-images')
+                    .upload(imageName, newImageFile);
+                if (uploadError) throw uploadError;
+
+                updatedImageUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/venue-images/${imageName}`;
+
+                if (venue.image_url) {
+                    const oldImageName = venue.image_url.split('/').pop();
+                    await supabase.storage.from('venue-images').remove([`${user.id}/${oldImageName}`]);
+                }
+            }
+
+            const { error: updateError } = await supabase
+                .from('venues')
+                .update({ ...venueDetails, image_url: updatedImageUrl })
+                .eq('venue_id', venueId);
+            if (updateError) throw updateError;
+
+            await showModal({ title: "Success", message: "Venue details updated successfully!" });
+            fetchVenueData();
+        } catch (err) {
+            await showModal({ title: "Update Failed", message: `Update failed: ${err.message}` });
+        } finally {
+            setLoading(false);
+            setNewImageFile(null);
+            setImagePreview(null);
+        }
     };
     
     const handleAddFacility = async (e) => {
         e.preventDefault();
         if (!newFacility.name.trim() || !newFacility.sport_id || !newFacility.capacity || !newFacility.hourly_rate) {
-            await showModal({ title: "Required Fields", message: "Please fill all required facility fields." }); return;
+            await showModal({ title: "Required Fields", message: "Please fill all required facility fields." }); 
+            return;
         }
         try {
             const { error } = await supabase.from('facilities').insert([{ venue_id: venueId, ...newFacility }]);
@@ -69,7 +137,7 @@ function EditVenuePage() {
             await showModal({ title: "Success", message: "Facility added successfully!" });
             setShowAddFacilityForm(false);
             setNewFacility({ name: '', sport_id: '', capacity: '', hourly_rate: '', description: '' });
-            fetchVenueData(); // Refresh data
+            fetchVenueData();
         } catch (error) {
             await showModal({ title: "Error", message: `Error adding facility: ${error.message}` });
         }
@@ -87,89 +155,405 @@ function EditVenuePage() {
                 const { error } = await supabase.from('facilities').delete().eq('facility_id', facilityId);
                 if (error) throw error;
                 await showModal({ title: "Success", message: "Facility deleted!" });
-                fetchVenueData(); // Refresh data
+                fetchVenueData();
             } catch (error) {
                 await showModal({ title: "Error", message: `Error deleting facility: ${error.message}` });
             }
         }
     };
 
-    const inputStyles = "w-full py-2 px-3 border border-border-color rounded-lg text-sm bg-card-bg text-dark-text transition duration-300 focus:outline-none focus:border-primary-green focus:ring-2 focus:ring-primary-green/20";
-    const labelStyles = "font-semibold text-sm text-dark-text";
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+                <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl">
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-green/20 border-t-primary-green mx-auto mb-4"></div>
+                    <p className="text-slate-600 font-medium">Loading venue...</p>
+                </div>
+            </div>
+        );
+    }
     
-    if (loading) return <p className="container mx-auto text-center p-12">Loading...</p>;
-    if (!venue) return <p className="container mx-auto text-center p-12">Venue not found.</p>;
+    if (!venue) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+                <div className="text-center bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl">
+                    <p className="text-xl text-slate-600">Venue not found</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="container mx-auto px-4 py-12">
-            <h1 className="text-2xl font-bold mb-8 text-dark-text">Edit: {venue.name}</h1>
-            <div className="flex justify-center gap-4 mb-8 border-b border-border-color">
-                <button onClick={() => setActiveTab('details')} className={`py-4 px-6 font-semibold text-base border-b-4 transition duration-300 ${activeTab === 'details' ? 'border-primary-green text-primary-green' : 'border-transparent text-light-text hover:text-dark-text'}`}>Edit Details</button>
-                <button onClick={() => setActiveTab('facilities')} className={`py-4 px-6 font-semibold text-base border-b-4 transition duration-300 ${activeTab === 'facilities' ? 'border-primary-green text-primary-green' : 'border-transparent text-light-text hover:text-dark-text'}`}>Manage Facilities</button>
-            </div>
-
-            {activeTab === 'details' && (
-                <form onSubmit={handleDetailsUpdate} className="max-w-4xl mx-auto bg-card-bg p-8 rounded-xl border border-border-color shadow-lg">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                        <div className="md:col-span-2 flex flex-col gap-2"><label htmlFor="name" className={labelStyles}>Venue Name</label><input id="name" name="name" type="text" value={venueDetails.name} onChange={handleDetailsChange} className={inputStyles} /></div>
-                        <div className="md:col-span-2 flex flex-col gap-2"><label htmlFor="address" className={labelStyles}>Address</label><input id="address" name="address" type="text" value={venueDetails.address} onChange={handleDetailsChange} className={inputStyles} /></div>
-                        <div className="flex flex-col gap-2"><label htmlFor="city" className={labelStyles}>City</label><input id="city" name="city" type="text" value={venueDetails.city} onChange={handleDetailsChange} className={inputStyles} /></div>
-                        <div className="flex flex-col gap-2"><label htmlFor="state" className={labelStyles}>State</label><input id="state" name="state" type="text" value={venueDetails.state} onChange={handleDetailsChange} className={inputStyles} /></div>
-                        <div className="flex flex-col gap-2"><label htmlFor="zip_code" className={labelStyles}>Zip Code</label><input id="zip_code" name="zip_code" type="text" value={venueDetails.zip_code} onChange={handleDetailsChange} className={inputStyles} /></div>
-                        <div className="flex flex-col gap-2"><label htmlFor="contact_email" className={labelStyles}>Contact Email</label><input id="contact_email" name="contact_email" type="email" value={venueDetails.contact_email} onChange={handleDetailsChange} className={inputStyles} /></div>
-                        <div className="flex flex-col gap-2"><label htmlFor="contact_phone" className={labelStyles}>Contact Phone</label><input id="contact_phone" name="contact_phone" type="tel" value={venueDetails.contact_phone} onChange={handleDetailsChange} className={inputStyles} /></div>
-                        <div className="flex flex-col gap-2"><label htmlFor="opening_time" className={labelStyles}>Opening Time</label><input id="opening_time" name="opening_time" type="time" value={venueDetails.opening_time} onChange={handleDetailsChange} className={inputStyles} /></div>
-                        <div className="flex flex-col gap-2"><label htmlFor="closing_time" className={labelStyles}>Closing Time</label><input id="closing_time" name="closing_time" type="time" value={venueDetails.closing_time} onChange={handleDetailsChange} className={inputStyles} /></div>
-                        <div className="md:col-span-2 flex flex-col gap-2"><label htmlFor="description" className={labelStyles}>Description</label><textarea id="description" name="description" rows="4" value={venueDetails.description} onChange={handleDetailsChange} className={inputStyles}></textarea></div>
-                    </div>
-                    <button type="submit" className="w-full mt-6 py-3 rounded-lg font-semibold bg-primary-green text-white shadow-sm hover:bg-primary-green-dark">Save Changes</button>
-                </form>
-            )}
-
-            {activeTab === 'facilities' && (
-                <div className="max-w-6xl mx-auto">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-bold">Manage Facilities</h2>
-                        <button onClick={() => setShowAddFacilityForm(!showAddFacilityForm)} className="py-2 px-5 rounded-lg font-semibold text-sm bg-primary-green text-white shadow-sm hover:bg-primary-green-dark inline-flex items-center gap-2"><FaPlus /> Add New Facility</button>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4">
+            <div className="max-w-6xl mx-auto">
+                {/* Compact Header */}
+                <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-6 mb-6">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+                                Edit Venue
+                            </h1>
+                            <p className="text-slate-600 flex items-center gap-2 mt-1">
+                                <FaMapMarkerAlt className="text-primary-green text-sm" />
+                                {venue.name}
+                            </p>
+                        </div>
+                        <div className={`px-4 py-2 rounded-2xl text-sm font-semibold ${venue.is_approved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {venue.is_approved ? '✓ Approved' : '⏳ Pending'}
+                        </div>
                     </div>
 
-                    {showAddFacilityForm && (
-                        <form onSubmit={handleAddFacility} className="bg-hover-bg p-6 rounded-lg border border-border-color mb-8">
-                            <h3 className="text-lg font-semibold mb-4">Add New Facility</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="flex flex-col gap-2"><label className={labelStyles}>Name *</label><input name="name" type="text" value={newFacility.name} onChange={handleNewFacilityChange} className={inputStyles} required /></div>
-                                <div className="flex flex-col gap-2"><label className={labelStyles}>Sport *</label><select name="sport_id" value={newFacility.sport_id} onChange={handleNewFacilityChange} className={inputStyles} required><option value="">Select</option>{sports.map(s => (<option key={s.sport_id} value={s.sport_id}>{s.name}</option>))}</select></div>
-                                <div className="flex flex-col gap-2"><label className={labelStyles}>Capacity *</label><input name="capacity" type="number" min="1" value={newFacility.capacity} onChange={handleNewFacilityChange} className={inputStyles} required /></div>
-                                <div className="flex flex-col gap-2"><label className={labelStyles}>Rate (₹) *</label><input name="hourly_rate" type="number" min="0" value={newFacility.hourly_rate} onChange={handleNewFacilityChange} className={inputStyles} required /></div>
-                                <div className="md:col-span-2 lg:col-span-4 flex flex-col gap-2"><label className={labelStyles}>Description</label><textarea name="description" rows="2" value={newFacility.description} onChange={handleNewFacilityChange} className={inputStyles} /></div>
+                    {/* Compact Tab Navigation */}
+                    <div className="flex bg-slate-100/50 rounded-2xl p-1 mt-4">
+                        <button 
+                            onClick={() => setActiveTab('details')} 
+                            className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2 ${
+                                activeTab === 'details' 
+                                    ? 'bg-white text-primary-green shadow-md' 
+                                    : 'text-slate-600 hover:text-slate-800'
+                            }`}
+                        >
+                            <FaEdit className="text-xs" /> Details
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('facilities')} 
+                            className={`flex-1 py-2 px-4 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2 ${
+                                activeTab === 'facilities' 
+                                    ? 'bg-white text-primary-green shadow-md' 
+                                    : 'text-slate-600 hover:text-slate-800'
+                            }`}
+                        >
+                            <FaEye className="text-xs" /> Facilities
+                        </button>
+                    </div>
+                </div>
+
+                {/* Details Tab */}
+                {activeTab === 'details' && (
+                    <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 overflow-hidden">
+                        <div className="bg-gradient-to-r from-primary-green via-emerald-500 to-teal-500 p-6">
+                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                <FaEdit /> Venue Details
+                            </h2>
+                        </div>
+
+                        <form onSubmit={handleDetailsUpdate} className="p-6 space-y-6">
+                            {/* Compact Image Section */}
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Venue Image</label>
+                                
+                                {(venueDetails.image_url || imagePreview) && (
+                                    <div className="relative group">
+                                        <img 
+                                            src={imagePreview || venueDetails.image_url} 
+                                            alt="Venue" 
+                                            className="w-full h-40 object-cover rounded-2xl shadow-lg"
+                                        />
+                                        <div className="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <label className="bg-white text-slate-700 px-4 py-2 rounded-xl font-medium cursor-pointer hover:bg-gray-50 transition-colors flex items-center gap-2">
+                                                <FaUpload className="text-sm" /> Change
+                                                <input 
+                                                    type="file" 
+                                                    onChange={handleImageChange} 
+                                                    className="hidden"
+                                                    accept="image/*"
+                                                />
+                                            </label>
+                                        </div>
+                                        {imagePreview && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {setImagePreview(null); setNewImageFile(null);}}
+                                                className="absolute top-3 right-3 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors"
+                                            >
+                                                <FaTimes className="text-xs" />
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                {!venueDetails.image_url && !imagePreview && (
+                                    <div className="relative">
+                                        <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:border-primary-green transition-colors">
+                                            <FaUpload className="mx-auto text-3xl text-slate-400 mb-2" />
+                                            <p className="text-slate-600 font-medium text-sm">Upload venue image</p>
+                                        </div>
+                                        <input 
+                                            type="file" 
+                                            onChange={handleImageChange} 
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            accept="image/*"
+                                        />
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex justify-end gap-4 mt-4">
-                                <button type="button" onClick={() => setShowAddFacilityForm(false)} className="py-2 px-5 rounded-lg font-semibold text-sm bg-card-bg text-medium-text border border-border-color shadow-sm hover:bg-hover-bg">Cancel</button>
-                                <button type="submit" className="py-2 px-5 rounded-lg font-semibold text-sm bg-primary-green text-white shadow-sm hover:bg-primary-green-dark inline-flex items-center gap-2"><FaPlusCircle /> Create Facility</button>
+
+                            {/* Compact Form Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="md:col-span-2">
+                                    <input 
+                                        name="name" 
+                                        type="text" 
+                                        value={venueDetails.name} 
+                                        onChange={handleDetailsChange} 
+                                        className="w-full py-3 px-4 bg-white/50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all"
+                                        placeholder="Venue Name"
+                                    />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                    <input 
+                                        name="address" 
+                                        type="text" 
+                                        value={venueDetails.address} 
+                                        onChange={handleDetailsChange} 
+                                        className="w-full py-3 px-4 bg-white/50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all"
+                                        placeholder="Address"
+                                    />
+                                </div>
+
+                                <input 
+                                    name="city" 
+                                    type="text" 
+                                    value={venueDetails.city} 
+                                    onChange={handleDetailsChange} 
+                                    className="w-full py-3 px-4 bg-white/50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all"
+                                    placeholder="City"
+                                />
+
+                                <input 
+                                    name="state" 
+                                    type="text" 
+                                    value={venueDetails.state} 
+                                    onChange={handleDetailsChange} 
+                                    className="w-full py-3 px-4 bg-white/50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all"
+                                    placeholder="State"
+                                />
+
+                                <div className="relative">
+                                    <FaEnvelope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary-green text-sm" />
+                                    <input 
+                                        name="contact_email" 
+                                        type="email" 
+                                        value={venueDetails.contact_email} 
+                                        onChange={handleDetailsChange} 
+                                        className="w-full py-3 pl-10 pr-4 bg-white/50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all"
+                                        placeholder="Email"
+                                    />
+                                </div>
+
+                                <div className="relative">
+                                    <FaPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary-green text-sm" />
+                                    <input 
+                                        name="contact_phone" 
+                                        type="tel" 
+                                        value={venueDetails.contact_phone} 
+                                        onChange={handleDetailsChange} 
+                                        className="w-full py-3 pl-10 pr-4 bg-white/50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all"
+                                        placeholder="Phone"
+                                    />
+                                </div>
+
+                                <div className="relative">
+                                    <FaClock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary-green text-sm" />
+                                    <input 
+                                        name="opening_time" 
+                                        type="time" 
+                                        value={venueDetails.opening_time} 
+                                        onChange={handleDetailsChange} 
+                                        className="w-full py-3 pl-10 pr-4 bg-white/50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all"
+                                    />
+                                </div>
+
+                                <div className="relative">
+                                    <FaClock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary-green text-sm" />
+                                    <input 
+                                        name="closing_time" 
+                                        type="time" 
+                                        value={venueDetails.closing_time} 
+                                        onChange={handleDetailsChange} 
+                                        className="w-full py-3 pl-10 pr-4 bg-white/50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all"
+                                    />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                    <textarea 
+                                        name="description" 
+                                        rows="3" 
+                                        value={venueDetails.description} 
+                                        onChange={handleDetailsChange} 
+                                        className="w-full py-3 px-4 bg-white/50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all resize-none"
+                                        placeholder="Description"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end">
+                                <button 
+                                    type="submit" 
+                                    disabled={loading}
+                                    className="bg-gradient-to-r from-primary-green to-emerald-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+                                >
+                                    {loading ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FaSave className="text-sm" /> Save Changes
+                                        </>
+                                    )}
+                                </button>
                             </div>
                         </form>
-                    )}
+                    </div>
+                )}
 
-                    <h3 className="text-lg font-semibold mb-4">Existing Facilities</h3>
-                    {venue.facilities.length === 0 ? <p className="text-light-text">No facilities added yet.</p> : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {venue.facilities.map(facility => (
-                                <div key={facility.facility_id} className="bg-card-bg border border-border-color rounded-lg p-4">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h4 className="font-bold text-dark-text">{facility.name}</h4>
-                                        <button onClick={() => handleDeleteFacility(facility.facility_id, facility.name)} className="text-light-text hover:text-red-600 p-1"><FaTrash /></button>
-                                    </div>
-                                    <div className="text-sm text-medium-text space-y-1">
-                                        <p><strong>Sport:</strong> {facility.sports?.name || 'N/A'}</p>
-                                        <p><strong>Capacity:</strong> {facility.capacity} players</p>
-                                        <p><strong>Rate:</strong> ₹{facility.hourly_rate}/hr</p>
-                                    </div>
+                {/* Facilities Tab */}
+                {activeTab === 'facilities' && (
+                    <div className="space-y-6">
+                        {/* Compact Header */}
+                        <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-6">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div>
+                                    <h2 className="text-xl font-bold text-slate-800">Facilities</h2>
+                                    <p className="text-slate-600 text-sm">Manage your venue facilities</p>
                                 </div>
-                            ))}
+                                <button 
+                                    onClick={() => setShowAddFacilityForm(!showAddFacilityForm)} 
+                                    className="bg-gradient-to-r from-primary-green to-emerald-500 text-white px-4 py-2 rounded-xl font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                                >
+                                    <FaPlus className="text-sm" /> Add Facility
+                                </button>
+                            </div>
                         </div>
-                    )}
-                </div>
-            )}
+
+                        {/* Compact Add Form */}
+                        {showAddFacilityForm && (
+                            <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 overflow-hidden">
+                                <div className="bg-gradient-to-r from-emerald-400 to-teal-400 p-4">
+                                    <h3 className="font-bold text-white">Add New Facility</h3>
+                                </div>
+                                
+                                <form onSubmit={handleAddFacility} className="p-6">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                                        <input 
+                                            name="name" 
+                                            type="text" 
+                                            value={newFacility.name} 
+                                            onChange={handleNewFacilityChange} 
+                                            required 
+                                            className="w-full py-2 px-3 bg-white/50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all"
+                                            placeholder="Facility Name"
+                                        />
+                                        
+                                        <select 
+                                            name="sport_id" 
+                                            value={newFacility.sport_id} 
+                                            onChange={handleNewFacilityChange} 
+                                            required 
+                                            className="w-full py-2 px-3 bg-white/50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all"
+                                        >
+                                            <option value="">Select Sport</option>
+                                            {sports.map(s => (
+                                                <option key={s.sport_id} value={s.sport_id}>{s.name}</option>
+                                            ))}
+                                        </select>
+                                        
+                                        <input 
+                                            name="capacity" 
+                                            type="number" 
+                                            min="1" 
+                                            value={newFacility.capacity} 
+                                            onChange={handleNewFacilityChange} 
+                                            required 
+                                            className="w-full py-2 px-3 bg-white/50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all"
+                                            placeholder="Capacity"
+                                        />
+                                        
+                                        <input 
+                                            name="hourly_rate" 
+                                            type="number" 
+                                            min="0" 
+                                            value={newFacility.hourly_rate} 
+                                            onChange={handleNewFacilityChange} 
+                                            required 
+                                            className="w-full py-2 px-3 bg-white/50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all"
+                                            placeholder="Rate (₹/hr)"
+                                        />
+                                    </div>
+                                    
+                                    <div className="flex justify-end gap-3">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setShowAddFacilityForm(false)} 
+                                            className="px-4 py-2 rounded-lg font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button 
+                                            type="submit" 
+                                            className="bg-gradient-to-r from-primary-green to-emerald-500 text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg transition-all flex items-center gap-2"
+                                        >
+                                            <FaPlus className="text-sm" /> Add
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
+
+                        {/* Compact Facilities List */}
+                        <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 overflow-hidden">
+                            <div className="bg-gradient-to-r from-slate-600 to-slate-700 p-4">
+                                <h3 className="font-bold text-white">Facilities ({venue.facilities.length})</h3>
+                            </div>
+
+                            <div className="p-6">
+                                {venue.facilities.length === 0 ? (
+                                    <div className="text-center py-8">
+                                        <div className="text-4xl text-slate-400 mb-2">🏟️</div>
+                                        <p className="text-slate-600 font-medium">No facilities yet</p>
+                                        <p className="text-slate-400 text-sm">Add your first facility</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                        {venue.facilities.map(facility => (
+                                            <div key={facility.facility_id} className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 hover:shadow-md transition-all group">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div className="flex-1">
+                                                        <h4 className="font-bold text-slate-800 mb-1">{facility.name}</h4>
+                                                        <span className="px-2 py-1 bg-primary-green text-white text-xs rounded-full font-medium">
+                                                            {facility.sports?.name || 'N/A'}
+                                                        </span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => handleDeleteFacility(facility.facility_id, facility.name)} 
+                                                        className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-full transition-all opacity-0 group-hover:opacity-100"
+                                                    >
+                                                        <FaTrash className="text-sm" />
+                                                    </button>
+                                                </div>
+                                                
+                                                <div className="space-y-1 text-sm">
+                                                    <div className="flex items-center text-slate-600">
+                                                        <FaUsers className="mr-2 text-primary-green text-xs" />
+                                                        <span>{facility.capacity} players</span>
+                                                    </div>
+                                                    <div className="flex items-center text-slate-600">
+                                                        <FaRupeeSign className="mr-2 text-primary-green text-xs" />
+                                                        <span>₹{facility.hourly_rate}/hour</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
