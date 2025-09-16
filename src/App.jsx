@@ -25,6 +25,7 @@ import ManageSlotsPage from './pages/owner/ManageSlotsPage';
 
 // Admin Pages
 import AdminVenueManagementPage from './pages/admin/AdminVenueManagementPage';
+import AdminUserManagementPage from './pages/admin/AdminUserManagementPage'; // New import
 
 function App() {
   const location = useLocation();
@@ -59,6 +60,7 @@ function App() {
           {/* Admin Protected Routes */}
           <Route element={<AdminProtectedRoute />}>
             <Route path="/admin/venues" element={<AdminVenueManagementPage />} />
+            <Route path="/admin/users" element={<AdminUserManagementPage />} /> {/* New Route */}
           </Route>
         </Routes>
       </main>

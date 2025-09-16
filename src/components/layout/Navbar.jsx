@@ -62,6 +62,7 @@ function Navbar() {
             {profile?.role === 'admin' && (
               <>
                 <Link to="/admin/venues" className={`${navLinkClasses} ${location.pathname === '/admin/venues' ? activeLinkClasses : ''}`}>Manage Venues</Link>
+                <Link to="/admin/users" className={`${navLinkClasses} ${location.pathname === '/admin/users' ? activeLinkClasses : ''}`}>Manage users</Link>
               </>
             )}
           </div>

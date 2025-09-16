@@ -1,3 +1,63 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  /* Background Colors */
+  --background: #f8fafc;
+  --card-bg: #ffffff;
+  --hover-bg: #f1f5f9;
+  
+  /* Text Colors */
+  --dark-text: #1e293b;
+  --medium-text: #475569;
+  --light-text: #64748b;
+  
+  /* Border Colors */
+  --border-color: #e2e8f0;
+  --border-color-light: #f1f5f9;
+  
+  /* Primary Colors */
+  --primary-green: #10b981;
+  --primary-green-dark: #059669;
+  --light-green-bg: #d1fae5;
+  --primary-green-light: #a7f3d0;
+}
+
+.bg-background { background-color: var(--background); }
+.bg-card-bg { background-color: var(--card-bg); }
+.bg-hover-bg { background-color: var(--hover-bg); }
+.bg-light-green-bg { background-color: var(--light-green-bg); }
+
+.text-dark-text { color: var(--dark-text); }
+.text-medium-text { color: var(--medium-text); }
+.text-light-text { color: var(--light-text); }
+
+.border-border-color { border-color: var(--border-color); }
+.border-border-color-light { border-color: var(--border-color-light); }
+
+.bg-primary-green { background-color: var(--primary-green); }
+.bg-primary-green-dark { background-color: var(--primary-green-dark); }
+.text-primary-green { color: var(--primary-green); }
+.text-primary-green-dark { color: var(--primary-green-dark); }
+
+/* Hover effects for cards */
+.hover\:border-primary-green\/20:hover {
+  border-color: rgb(16 185 129 / 0.2);
+}
+
+/* Focus ring for inputs */
+.focus\:ring-primary-green:focus {
+  --tw-ring-color: var(--primary-green);
+}
+
+/* Animation for loading spinner */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
