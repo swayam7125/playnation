@@ -19,7 +19,7 @@ function ExplorePage() {
           .from('sports')
           .select('*');
         if (sportsError) throw sportsError;
-        setSports(sportsData);
+        setSports(sportsData || []);
       } catch (err) {
         console.error("Error fetching sports:", err.message);
       } finally {
@@ -29,27 +29,24 @@ function ExplorePage() {
     fetchSports();
   }, []);
 
-  // Enhanced filtering and sorting logic
   const filteredAndSortedVenues = React.useMemo(() => {
-    let filtered = venues;
+    let filtered = [...venues];
 
-    // Filter by sport
     if (selectedSport !== 'all') {
       filtered = filtered.filter(venue => 
         venue.facilities?.some(facility => facility.sport_id === selectedSport)
       );
     }
 
-    // Filter by search term
     if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(venue =>
-        venue.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        venue.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        venue.description?.toLowerCase().includes(searchTerm.toLowerCase())
+        (venue.name || '').toLowerCase().includes(lowerSearchTerm) ||
+        (venue.address || '').toLowerCase().includes(lowerSearchTerm) ||
+        (venue.description || '').toLowerCase().includes(lowerSearchTerm)
       );
     }
 
-    // Sort venues
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'name':
@@ -86,7 +83,7 @@ function ExplorePage() {
           <h1 className="text-3xl md:text-4xl font-bold mb-3">
             Explore Amazing Venues
           </h1>
-          <p className="text-lg text-primary-green-light mb-6 max-w-2xl mx-auto">
+          <p className="text-lg text-green-200 mb-6 max-w-2xl mx-auto">
             Discover the perfect sports venues in your area. Filter by sport, location, and more to find your ideal playing ground.
           </p>
           
@@ -153,8 +150,8 @@ function ExplorePage() {
                   className="px-4 py-2 border border-border-color rounded-lg text-dark-text bg-card-bg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
                 >
                   <option value="name">Name</option>
-                  <option value="rating">Rating</option>
-                  <option value="price">Price</option>
+                  <option value="rating" disabled>Rating</option>
+                  <option value="price" disabled>Price</option>
                 </select>
               </div>
 

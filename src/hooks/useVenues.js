@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
+import { useState, useEffect } from "react";
+import { supabase } from "../supabaseClient";
 
 const useVenues = (options = {}) => {
   const [venues, setVenues] = useState([]);
@@ -13,19 +13,21 @@ const useVenues = (options = {}) => {
 
       try {
         let query = supabase
-          .from('venues')
-          .select(`
+          .from("venues")
+          .select(
+            `
             *,
             facilities (
               *,
-              sports (name),
+              sports (sport_id, name),
               facility_amenities (
                 amenities (name)
               )
             )
-          `)
-          .eq('is_approved', true)
-          .order('created_at', { ascending: false });
+          `
+          )
+          .eq("is_approved", true)
+          .order("created_at", { ascending: false });
 
         if (options.limit) {
           query = query.limit(options.limit);
@@ -37,7 +39,7 @@ const useVenues = (options = {}) => {
           throw fetchError;
         }
 
-        setVenues(data);
+        setVenues(data || []);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -46,7 +48,7 @@ const useVenues = (options = {}) => {
     };
 
     fetchVenues();
-  }, [options.limit]); // Re-run effect if options.limit changes
+  }, [options.limit]);
 
   return { venues, loading, error };
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
 import BookingCard from '../../components/bookings/BookingCard';
+import ReviewForm from '../../components/reviews/ReviewForm';
 import { useModal } from '../../ModalContext';
 
 function MyBookingsPage() {
@@ -11,6 +12,8 @@ function MyBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('upcoming');
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedBookingForReview, setSelectedBookingForReview] = useState(null);
 
   const fetchBookings = async () => {
     if (!user) {
@@ -21,11 +24,11 @@ function MyBookingsPage() {
     try {
       const { data, error } = await supabase
         .from('bookings')
-        .select(`*, facilities (*, sports (name), venues (name))`)
+        .select(`*, facilities (*, sports (name), venues (*))`)
         .eq('user_id', user.id)
         .order('start_time', { ascending: false });
       if (error) throw error;
-      setBookings(data);
+      setBookings(data || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -51,11 +54,11 @@ function MyBookingsPage() {
           .from('bookings')
           .update({ 
             status: 'cancelled', 
-            payment_status: 'refunded',
+            payment_status: 'refunded', // This assumes immediate refund. Adjust if you have a manual process.
             cancelled_by: user.id
           })
           .eq('booking_id', booking.booking_id)
-          .select()
+          .select('*, facilities (*, sports (name), venues (*))') // Re-fetch the expanded data
           .single();
         
         if (bookingError) throw bookingError;
@@ -77,6 +80,11 @@ function MyBookingsPage() {
     }
   };
 
+  const handleOpenReviewModal = (booking) => {
+    setSelectedBookingForReview(booking);
+    setShowReviewModal(true);
+  };
+
   const now = new Date();
   const upcomingBookings = bookings.filter(b => new Date(b.start_time) >= now && b.status === 'confirmed');
   const pastBookings = bookings.filter(b => new Date(b.start_time) < now || b.status !== 'confirmed');
@@ -86,42 +94,57 @@ function MyBookingsPage() {
   if (!user) return <p className="container mx-auto text-center p-12">Please log in to see your bookings.</p>;
 
   return (
-    <div className="container mx-auto px-4 py-12">
-      <h1 className="text-center text-3xl font-bold mb-8 text-dark-text">My Bookings</h1>
-      <div className="flex justify-center gap-4 mb-12 border-b border-border-color">
-        <button 
-          onClick={() => setActiveTab('upcoming')} 
-          className={`py-4 px-6 font-semibold text-base border-b-4 transition duration-300 ${activeTab === 'upcoming' ? 'border-primary-green text-primary-green' : 'border-transparent text-light-text hover:text-dark-text'}`}
-        >
-          Upcoming
-        </button>
-        <button 
-          onClick={() => setActiveTab('past')} 
-          className={`py-4 px-6 font-semibold text-base border-b-4 transition duration-300 ${activeTab === 'past' ? 'border-primary-green text-primary-green' : 'border-transparent text-light-text hover:text-dark-text'}`}
-        >
-          History
-        </button>
+    <>
+      <div className="container mx-auto px-4 py-12">
+        <h1 className="text-center text-3xl font-bold mb-8 text-dark-text">My Bookings</h1>
+        <div className="flex justify-center gap-4 mb-12 border-b border-border-color">
+          <button 
+            onClick={() => setActiveTab('upcoming')} 
+            className={`py-4 px-6 font-semibold text-base border-b-4 transition duration-300 ${activeTab === 'upcoming' ? 'border-primary-green text-primary-green' : 'border-transparent text-light-text hover:text-dark-text'}`}
+          >
+            Upcoming
+          </button>
+          <button 
+            onClick={() => setActiveTab('past')} 
+            className={`py-4 px-6 font-semibold text-base border-b-4 transition duration-300 ${activeTab === 'past' ? 'border-primary-green text-primary-green' : 'border-transparent text-light-text hover:text-dark-text'}`}
+          >
+            History
+          </button>
+        </div>
+        <div className="max-w-3xl mx-auto grid gap-8">
+          {activeTab === 'upcoming' && (
+            upcomingBookings.length > 0
+              ? upcomingBookings.map(booking => (
+                  <BookingCard 
+                    key={booking.booking_id} 
+                    booking={booking} 
+                    isUpcoming={true} 
+                    onCancel={() => handleCancelBooking(booking)} 
+                  />
+                ))
+              : <p className="text-center text-light-text">You have no upcoming bookings.</p>
+          )}
+          {activeTab === 'past' && (
+            pastBookings.length > 0
+              ? pastBookings.map(booking => (
+                  <BookingCard 
+                    key={booking.booking_id} 
+                    booking={booking}
+                    onLeaveReview={() => handleOpenReviewModal(booking)}
+                  />
+                ))
+              : <p className="text-center text-light-text">You have no past bookings.</p>
+          )}
+        </div>
       </div>
-      <div className="max-w-3xl mx-auto grid gap-8">
-        {activeTab === 'upcoming' && (
-          upcomingBookings.length > 0
-            ? upcomingBookings.map(booking => (
-                <BookingCard 
-                  key={booking.booking_id} 
-                  booking={booking} 
-                  isUpcoming={true} 
-                  onCancel={() => handleCancelBooking(booking)} 
-                />
-              ))
-            : <p className="text-center text-light-text">You have no upcoming bookings.</p>
-        )}
-        {activeTab === 'past' && (
-          pastBookings.length > 0
-            ? pastBookings.map(booking => <BookingCard key={booking.booking_id} booking={booking} />)
-            : <p className="text-center text-light-text">You have no past bookings.</p>
-        )}
-      </div>
-    </div>
+      {showReviewModal && selectedBookingForReview && (
+        <ReviewForm 
+          booking={selectedBookingForReview} 
+          onClose={() => setShowReviewModal(false)}
+          onReviewSubmitted={fetchBookings}
+        />
+      )}
+    </>
   );
 }
 

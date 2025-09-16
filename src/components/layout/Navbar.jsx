@@ -1,7 +1,7 @@
-import React from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../AuthContext';
-import { useModal } from '../../ModalContext';
+import React from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../../AuthContext";
+import { useModal } from "../../ModalContext";
 
 function Navbar() {
   const { user, profile, logout } = useAuth();
@@ -14,16 +14,17 @@ function Navbar() {
       title: "Confirm Logout",
       message: "Are you sure you want to log out?",
       confirmText: "Logout",
-      confirmStyle: "danger"
+      confirmStyle: "danger",
     });
 
     if (isConfirmed) {
       logout();
-      navigate('/');
+      navigate("/");
     }
   };
 
-  const navLinkClasses = "no-underline text-medium-text font-semibold text-sm transition duration-300 relative py-2 after:content-[''] after:absolute after:w-0 after:h-0.5 after:bottom-0 after:left-1/2 after:bg-primary-green after:transition-all after:duration-300 after:-translate-x-1/2 hover:text-primary-green hover:after:w-full";
+  const navLinkClasses =
+    "no-underline text-medium-text font-semibold text-sm transition duration-300 relative py-2 after:content-[''] after:absolute after:w-0 after:h-0.5 after:bottom-0 after:left-1/2 after:bg-primary-green after:transition-all after:duration-300 after:-translate-x-1/2 hover:text-primary-green hover:after:w-full";
   const activeLinkClasses = "text-primary-green after:w-full";
 
   return (
@@ -31,38 +32,145 @@ function Navbar() {
       <div className="container mx-auto px-4 flex justify-between items-center">
         <div className="flex items-center gap-10">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-4 no-underline transition duration-300 hover:scale-105">
+          <Link
+            to="/"
+            className="flex items-center gap-4 no-underline transition duration-300 hover:scale-105"
+          >
             <div className="bg-primary-green text-white font-extrabold text-base h-9 w-9 grid place-content-center rounded-lg shadow-md">
               PN
             </div>
-            <span className="font-extrabold text-xl text-dark-text">PlayNation</span>
+            <span className="font-extrabold text-xl text-dark-text">
+              PlayNation
+            </span>
           </Link>
 
-          {/* Main Navigation Links - Hidden on mobile */}
+          {/* Main Navigation Links */}
           <div className="hidden md:flex items-center gap-10">
             {/* Links for Players and Guests */}
-            {profile?.role !== 'venue_owner' && profile?.role !== 'admin' && (
+            {profile?.role !== "venue_owner" && profile?.role !== "admin" && (
               <>
-                <Link to="/explore" className={`${navLinkClasses} ${location.pathname === '/explore' ? activeLinkClasses : ''}`}>Explore</Link>
-                {user && <Link to="/my-bookings" className={`${navLinkClasses} ${location.pathname === '/my-bookings' ? activeLinkClasses : ''}`}>My Bookings</Link>}
+                <Link
+                  to="/explore"
+                  className={`${navLinkClasses} ${location.pathname === "/explore" ? activeLinkClasses : ""
+                    }`}
+                >
+                  Explore
+                </Link>
+                {user && (
+                  <Link
+                    to="/my-bookings"
+                    className={`${navLinkClasses} ${location.pathname === "/my-bookings"
+                        ? activeLinkClasses
+                        : ""
+                      }`}
+                  >
+                    My Bookings
+                  </Link>
+                )}
+                {user && (
+                  <Link
+                    to="/profile"
+                    className={`${navLinkClasses} ${location.pathname === "/profile" ? activeLinkClasses : ""
+                      }`}
+                  >
+                    My Profile
+                  </Link>
+                )}
               </>
             )}
 
             {/* Links for Venue Owners */}
-            {profile?.role === 'venue_owner' && (
+            {profile?.role === "venue_owner" && (
               <>
-                <Link to="/owner/dashboard" className={`${navLinkClasses} ${location.pathname === '/owner/dashboard' ? activeLinkClasses : ''}`}>Dashboard</Link>
-                <Link to="/owner/my-venues" className={`${navLinkClasses} ${location.pathname === '/owner/my-venues' ? activeLinkClasses : ''}`}>My Venues</Link>
-                <Link to="/owner/calendar" className={`${navLinkClasses} ${location.pathname === '/owner/calendar' ? activeLinkClasses : ''}`}>Bookings</Link>
-                <Link to="/owner/manage-slots" className={`${navLinkClasses} ${location.pathname === '/owner/manage-slots' ? activeLinkClasses : ''}`}>Manage Slots</Link>
+                <Link
+                  to="/owner/dashboard"
+                  className={`${navLinkClasses} ${location.pathname === "/owner/dashboard"
+                      ? activeLinkClasses
+                      : ""
+                    }`}
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/owner/my-venues"
+                  className={`${navLinkClasses} ${location.pathname === "/owner/my-venues"
+                      ? activeLinkClasses
+                      : ""
+                    }`}
+                >
+                  My Venues
+                </Link>
+                <Link
+                  to="/owner/calendar"
+                  className={`${navLinkClasses} ${location.pathname === "/owner/calendar"
+                      ? activeLinkClasses
+                      : ""
+                    }`}
+                >
+                  Bookings
+                </Link>
+                <Link
+                  to="/owner/manage-slots"
+                  className={`${navLinkClasses} ${location.pathname === "/owner/manage-slots"
+                      ? activeLinkClasses
+                      : ""
+                    }`}
+                >
+                  Manage Slots
+                </Link>
+                {user && (
+                  <Link
+                    to="/profile"
+                    className={`${navLinkClasses} ${location.pathname === "/profile" ? activeLinkClasses : ""
+                      }`}
+                  >
+                    My Profile
+                  </Link>
+                )}
               </>
             )}
 
             {/* Links for Admins */}
-            {profile?.role === 'admin' && (
+            {profile?.role === "admin" && (
               <>
                 <Link to="/admin/venues" className={`${navLinkClasses} ${location.pathname === '/admin/venues' ? activeLinkClasses : ''}`}>Manage Venues</Link>
                 <Link to="/admin/users" className={`${navLinkClasses} ${location.pathname === '/admin/users' ? activeLinkClasses : ''}`}>Manage users</Link>
+                <Link
+                  to="/admin/venues"
+                  className={`${navLinkClasses} ${location.pathname === "/admin/venues"
+                      ? activeLinkClasses
+                      : ""
+                    }`}
+                >
+                  Manage Venues
+                </Link>
+                <Link
+                  to="/admin/players"
+                  className={`${navLinkClasses} ${location.pathname === "/admin/players"
+                      ? activeLinkClasses
+                      : ""
+                    }`}
+                >
+                  Manage Players
+                </Link>
+                <Link
+                  to="/admin/bookings"
+                  className={`${navLinkClasses} ${location.pathname === "/admin/bookings"
+                      ? activeLinkClasses
+                      : ""
+                    }`}
+                >
+                  Manage Bookings
+                </Link>
+                {user && (
+                  <Link
+                    to="/profile"
+                    className={`${navLinkClasses} ${location.pathname === "/profile" ? activeLinkClasses : ""
+                      }`}
+                  >
+                    My Profile
+                  </Link>
+                )}
               </>
             )}
           </div>
@@ -73,16 +181,29 @@ function Navbar() {
           {user ? (
             <>
               <span className="hidden sm:inline font-semibold text-medium-text text-sm">
-                Hi, {profile?.username || 'User'}
+                Hi, {profile?.username || "User"}
               </span>
-              <button onClick={handleLogout} className="bg-transparent border-none font-sans text-sm font-semibold text-medium-text cursor-pointer py-2 px-4 rounded-md transition duration-300 hover:bg-hover-bg hover:text-primary-green">
+              <button
+                onClick={handleLogout}
+                className="bg-transparent border-none font-sans text-sm font-semibold text-medium-text cursor-pointer py-2 px-4 rounded-md transition duration-300 hover:bg-hover-bg hover:text-primary-green"
+              >
                 Logout
               </button>
             </>
           ) : (
             <>
-              <Link to="/login" className="py-2 px-5 rounded-lg font-semibold text-sm transition duration-300 no-underline bg-card-bg text-medium-text border border-border-color shadow-sm hover:bg-hover-bg hover:border-primary-green hover:text-primary-green hover:-translate-y-px hover:shadow-md">Login</Link>
-              <Link to="/signup" className="py-2 px-5 rounded-lg font-semibold text-sm transition duration-300 no-underline bg-primary-green text-white shadow-sm hover:bg-primary-green-dark hover:-translate-y-px hover:shadow-md">Sign up</Link>
+              <Link
+                to="/login"
+                className="py-2 px-5 rounded-lg font-semibold text-sm transition duration-300 no-underline bg-card-bg text-medium-text border border-border-color shadow-sm hover:bg-hover-bg hover:border-primary-green hover:text-primary-green hover:-translate-y-px hover:shadow-md"
+              >
+                Login
+              </Link>
+              <Link
+                to="/signup"
+                className="py-2 px-5 rounded-lg font-semibold text-sm transition duration-300 no-underline bg-primary-green text-white shadow-sm hover:bg-primary-green-dark hover:-translate-y-px hover:shadow-md"
+              >
+                Sign up
+              </Link>
             </>
           )}
         </div>
