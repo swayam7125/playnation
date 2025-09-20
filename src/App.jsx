@@ -75,6 +75,7 @@ function App() {
             />
             <Route path="/admin/players" element={<AdminPlayersPage />} />
             <Route path="/admin/bookings" element={<AdminBookingsPage />} />
+            <Route path="/admin/users" element={<AdminUserManagementPage />} />
             <Route path="/admin/notify" element={<AdminNotifyPage />} />
           </Route>
         </Routes>

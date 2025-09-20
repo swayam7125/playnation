@@ -138,7 +138,7 @@ function Navbar() {
               </>
             )}
 
-            {/* Links for Admins */}
+            {/* Links for Admins: Consolidated and corrected */}
             {profile?.role === "admin" && (
               <>
                 <Link
@@ -172,14 +172,14 @@ function Navbar() {
                   Manage Venues
                 </Link>
                 <Link
-                  to="/admin/players"
+                  to="/admin/users"
                   className={`${navLinkClasses} ${
-                    location.pathname === "/admin/players"
+                    location.pathname === "/admin/users"
                       ? activeLinkClasses
                       : ""
                   }`}
                 >
-                  Manage Players
+                  Manage Users
                 </Link>
                 <Link
                   to="/admin/bookings"

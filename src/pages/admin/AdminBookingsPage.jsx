@@ -73,8 +73,15 @@ function AdminBookingsPage() {
         try {
             const { data, error } = await supabase
                 .from('bookings')
-                .select(`*, users(*), facilities(*, venues(*))`)
-                .order('created_at', { ascending: false });
+                // FIX: Use the specific foreign key constraint name to resolve ambiguity.
+                // Syntax: alias:foreign_key_constraint_name(fields)
+                .select(`
+                    *, 
+                    users:bookings_user_id_fkey(username, email), 
+                    facilities(*, venues(*))
+                `)
+                // FIX 2 (re-applied): Use 'booking_date' instead of 'created_at'
+                .order('booking_date', { ascending: false }); 
             
             if (error) throw error;
             setBookings(data || []);
