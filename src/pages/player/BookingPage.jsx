@@ -3,11 +3,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
 import { useModal } from "../../ModalContext";
-import React, { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "../../supabaseClient";
-import { useAuth } from "../../AuthContext";
-import { useModal } from "../../ModalContext";
 
 const formatDate = (dateString) =>
   new Date(dateString).toLocaleDateString("en-US", {
@@ -31,13 +26,6 @@ function BookingPage() {
   const { venue, facility, slot, price } = location.state || {};
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { showModal } = useModal();
-  const { venue, facility, slot, price } = location.state || {};
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
   if (!venue || !facility || !slot || price === undefined) {
     React.useEffect(() => {
@@ -52,7 +40,6 @@ function BookingPage() {
     return null;
   }
 
-  const totalAmount = price;
   const totalAmount = price;
 
   const handleConfirmBooking = async () => {
