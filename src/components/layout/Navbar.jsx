@@ -51,18 +51,20 @@ function Navbar() {
               <>
                 <Link
                   to="/explore"
-                  className={`${navLinkClasses} ${location.pathname === "/explore" ? activeLinkClasses : ""
-                    }`}
+                  className={`${navLinkClasses} ${
+                    location.pathname === "/explore" ? activeLinkClasses : ""
+                  }`}
                 >
                   Explore
                 </Link>
                 {user && (
                   <Link
                     to="/my-bookings"
-                    className={`${navLinkClasses} ${location.pathname === "/my-bookings"
+                    className={`${navLinkClasses} ${
+                      location.pathname === "/my-bookings"
                         ? activeLinkClasses
                         : ""
-                      }`}
+                    }`}
                   >
                     My Bookings
                   </Link>
@@ -70,8 +72,9 @@ function Navbar() {
                 {user && (
                   <Link
                     to="/profile"
-                    className={`${navLinkClasses} ${location.pathname === "/profile" ? activeLinkClasses : ""
-                      }`}
+                    className={`${navLinkClasses} ${
+                      location.pathname === "/profile" ? activeLinkClasses : ""
+                    }`}
                   >
                     My Profile
                   </Link>
@@ -84,45 +87,50 @@ function Navbar() {
               <>
                 <Link
                   to="/owner/dashboard"
-                  className={`${navLinkClasses} ${location.pathname === "/owner/dashboard"
+                  className={`${navLinkClasses} ${
+                    location.pathname === "/owner/dashboard"
                       ? activeLinkClasses
                       : ""
-                    }`}
+                  }`}
                 >
                   Dashboard
                 </Link>
                 <Link
                   to="/owner/my-venues"
-                  className={`${navLinkClasses} ${location.pathname === "/owner/my-venues"
+                  className={`${navLinkClasses} ${
+                    location.pathname === "/owner/my-venues"
                       ? activeLinkClasses
                       : ""
-                    }`}
+                  }`}
                 >
                   My Venues
                 </Link>
                 <Link
                   to="/owner/calendar"
-                  className={`${navLinkClasses} ${location.pathname === "/owner/calendar"
+                  className={`${navLinkClasses} ${
+                    location.pathname === "/owner/calendar"
                       ? activeLinkClasses
                       : ""
-                    }`}
+                  }`}
                 >
                   Bookings
                 </Link>
                 <Link
                   to="/owner/manage-slots"
-                  className={`${navLinkClasses} ${location.pathname === "/owner/manage-slots"
+                  className={`${navLinkClasses} ${
+                    location.pathname === "/owner/manage-slots"
                       ? activeLinkClasses
                       : ""
-                    }`}
+                  }`}
                 >
                   Manage Slots
                 </Link>
                 {user && (
                   <Link
                     to="/profile"
-                    className={`${navLinkClasses} ${location.pathname === "/profile" ? activeLinkClasses : ""
-                      }`}
+                    className={`${navLinkClasses} ${
+                      location.pathname === "/profile" ? activeLinkClasses : ""
+                    }`}
                   >
                     My Profile
                   </Link>
@@ -133,40 +141,73 @@ function Navbar() {
             {/* Links for Admins */}
             {profile?.role === "admin" && (
               <>
-                <Link to="/admin/venues" className={`${navLinkClasses} ${location.pathname === '/admin/venues' ? activeLinkClasses : ''}`}>Manage Venues</Link>
-                <Link to="/admin/users" className={`${navLinkClasses} ${location.pathname === '/admin/users' ? activeLinkClasses : ''}`}>Manage users</Link>
                 <Link
                   to="/admin/venues"
-                  className={`${navLinkClasses} ${location.pathname === "/admin/venues"
+                  className={`${navLinkClasses} ${
+                    location.pathname === "/admin/venues"
                       ? activeLinkClasses
                       : ""
-                    }`}
+                  }`}
+                >
+                  Manage Venues
+                </Link>
+                <Link
+                  to="/admin/users"
+                  className={`${navLinkClasses} ${
+                    location.pathname === "/admin/users"
+                      ? activeLinkClasses
+                      : ""
+                  }`}
+                >
+                  Manage users
+                </Link>
+                <Link
+                  to="/admin/venues"
+                  className={`${navLinkClasses} ${
+                    location.pathname === "/admin/venues"
+                      ? activeLinkClasses
+                      : ""
+                  }`}
                 >
                   Manage Venues
                 </Link>
                 <Link
                   to="/admin/players"
-                  className={`${navLinkClasses} ${location.pathname === "/admin/players"
+                  className={`${navLinkClasses} ${
+                    location.pathname === "/admin/players"
                       ? activeLinkClasses
                       : ""
-                    }`}
+                  }`}
                 >
                   Manage Players
                 </Link>
                 <Link
                   to="/admin/bookings"
-                  className={`${navLinkClasses} ${location.pathname === "/admin/bookings"
+                  className={`${navLinkClasses} ${
+                    location.pathname === "/admin/bookings"
                       ? activeLinkClasses
                       : ""
-                    }`}
+                  }`}
                 >
                   Manage Bookings
                 </Link>
+                <Link
+                  to="/admin/notify"
+                  className={`${navLinkClasses} ${
+                    location.pathname === "/admin/notify"
+                      ? activeLinkClasses
+                      : ""
+                  }`}
+                >
+                  Notify Players
+                </Link>
+
                 {user && (
                   <Link
                     to="/profile"
-                    className={`${navLinkClasses} ${location.pathname === "/profile" ? activeLinkClasses : ""
-                      }`}
+                    className={`${navLinkClasses} ${
+                      location.pathname === "/profile" ? activeLinkClasses : ""
+                    }`}
                   >
                     My Profile
                   </Link>
