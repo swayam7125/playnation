@@ -50,32 +50,31 @@ function MyBookingsPage() {
 
     if (isConfirmed) {
       try {
-        const { data: updatedBooking, error: bookingError } = await supabase
-          .from('bookings')
-          .update({ 
-            status: 'cancelled', 
-            payment_status: 'refunded', // This assumes immediate refund. Adjust if you have a manual process.
-            cancelled_by: user.id
-          })
-          .eq('booking_id', booking.booking_id)
-          .select('*, facilities (*, sports (name), venues (*))') // Re-fetch the expanded data
-          .single();
+        // --- START OF ATOMIC SOLUTION ---
+        // 1. Call the PostgreSQL RPC function to perform the cancellation transaction.
+        const { error: rpcError } = await supabase.rpc('cancel_booking_transaction', {
+          p_booking_id: booking.booking_id,
+          p_user_id: user.id
+        });
+
+        if (rpcError) throw rpcError;
+        // --- END OF ATOMIC SOLUTION ---
+
+        // 2. Success Notification and Refresh
+        await showModal({ 
+            title: "Success", 
+            message: "Booking cancelled successfully. The slot is now available." 
+        });
         
-        if (bookingError) throw bookingError;
-
-        const { error: slotError } = await supabase
-          .from('time_slots')
-          .update({ is_available: true })
-          .eq('slot_id', booking.slot_id);
-
-        if (slotError) throw slotError;
-
-        await showModal({ title: "Success", message: "Booking cancelled successfully." });
-        setBookings(currentBookings => 
-          currentBookings.map(b => b.booking_id === booking.booking_id ? updatedBooking : b)
-        );
+        // Re-fetch all bookings to guarantee component state is consistent with the database.
+        fetchBookings();
+        
       } catch (error) {
-        showModal({ title: "Error", message: `Error in cancelling booking: ${error.message}` });
+        // Handle error message from the database function
+        showModal({ 
+            title: "Cancellation Failed", 
+            message: `Error: ${error.message}. Please check your booking status.` 
+        });
       }
     }
   };

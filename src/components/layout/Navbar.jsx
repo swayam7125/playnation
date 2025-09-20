@@ -130,11 +130,9 @@ function Navbar() {
               </>
             )}
 
-            {/* Links for Admins */}
+            {/* Links for Admins: Consolidated and corrected */}
             {profile?.role === "admin" && (
               <>
-                <Link to="/admin/venues" className={`${navLinkClasses} ${location.pathname === '/admin/venues' ? activeLinkClasses : ''}`}>Manage Venues</Link>
-                <Link to="/admin/users" className={`${navLinkClasses} ${location.pathname === '/admin/users' ? activeLinkClasses : ''}`}>Manage users</Link>
                 <Link
                   to="/admin/venues"
                   className={`${navLinkClasses} ${location.pathname === "/admin/venues"
@@ -145,13 +143,13 @@ function Navbar() {
                   Manage Venues
                 </Link>
                 <Link
-                  to="/admin/players"
-                  className={`${navLinkClasses} ${location.pathname === "/admin/players"
+                  to="/admin/users"
+                  className={`${navLinkClasses} ${location.pathname === "/admin/users"
                       ? activeLinkClasses
                       : ""
                     }`}
                 >
-                  Manage Players
+                  Manage Users
                 </Link>
                 <Link
                   to="/admin/bookings"

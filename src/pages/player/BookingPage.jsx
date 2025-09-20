@@ -1,111 +1,357 @@
-import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabaseClient';
-import { useAuth } from '../../AuthContext';
-import { useModal } from '../../ModalContext';
+import React, { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { supabase } from "../../supabaseClient";
+import { useAuth } from "../../AuthContext";
+import { useModal } from "../../ModalContext";
 
-const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-const formatTime = (dateString) => new Date(dateString).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+const formatDate = (dateString) =>
+  new Date(dateString).toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+const formatTime = (dateString) =>
+  new Date(dateString).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 
 function BookingPage() {
-    const location = useLocation();
-    const navigate = useNavigate();
-    const { user, profile } = useAuth(); // Get the user's profile for pre-filling data
-    const { showModal } = useModal();
-    const { venue, facility, slot, price } = location.state || {};
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { showModal } = useModal();
+  const { venue, facility, slot, price } = location.state || {};
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-    if (!venue || !facility || !slot || price === undefined) {
-        React.useEffect(() => { navigate('/explore'); }, [navigate]);
-        return null;
+  if (!venue || !facility || !slot || price === undefined) {
+    React.useEffect(() => {
+      navigate("/explore");
+    }, [navigate]);
+    return null;
+  }
+
+  const totalAmount = price;
+
+  const handleConfirmBooking = async () => {
+    if (!user) {
+      showModal({
+        title: "Login Required",
+        message: "Please log in to complete your booking.",
+      });
+      navigate("/login", { state: { from: location } });
+      return;
     }
 
-    const totalAmount = price;
+    setLoading(true);
+    setError(null);
+    try {
+      // 1. ATOMIC CHECK & RESERVE: Attempt to mark the slot as unavailable.
+      // This is the CRITICAL STEP: it only succeeds if 'is_available' is TRUE, 
+      // preventing concurrent bookings (race conditions).
+      const { data: slotUpdateData, error: slotError } = await supabase
+        .from("time_slots")
+        .update({ is_available: false })
+        .eq("slot_id", slot.slot_id)
+        .eq("is_available", true) // <-- Concurrency Lock check
+        .select();
 
-    const handlePayment = async () => {
-        if (!user) {
-            showModal({ title: "Login Required", message: "Please log in to make a booking." });
-            navigate('/login', { state: { from: location } });
-            return;
-        }
+      if (slotError) {
+        throw slotError;
+      }
+      
+      // If slotUpdateData is null or empty, another user beat us to the lock.
+      if (!slotUpdateData || slotUpdateData.length === 0) {
+        throw new Error("This slot has just been taken by another user. Please choose a different time slot.");
+      }
 
-        setLoading(true);
-        setError(null);
+      // 2. CREATE BOOKING: If the lock was successful, insert the booking.
+      const { data: bookingData, error: bookingError } = await supabase
+        .from("bookings")
+        .insert({
+          user_id: user.id,
+          facility_id: facility.facility_id,
+          slot_id: slot.slot_id,
+          booking_date: new Date(),
+          start_time: slot.start_time,
+          end_time: slot.end_time,
+          total_amount: totalAmount,
+          status: "confirmed",
+          payment_status: "paid",
+        })
+        .select()
+        .single();
 
-        try {
-            // Step 1: Call our Edge Function to create a Razorpay order
-            const { data: order, error: orderError } = await supabase.functions.invoke('create-order', {
-                body: { slot_id: slot.slot_id },
-            });
+      if (bookingError) {
+        // IMPORTANT ROLLBACK: If booking fails after reserving the slot, free the slot immediately.
+        await supabase.from("time_slots").update({ is_available: true }).eq("slot_id", slot.slot_id);
+        throw bookingError;
+      }
 
-            if (orderError) throw new Error(orderError.message);
-            
-            // Step 2: Configure Razorpay Checkout options
-            const options = {
-                key: import.meta.env.VITE_RAZORPAY_KEY_ID, // Your public Razorpay Key ID
-                amount: order.amount,
-                currency: order.currency,
-                name: "Play Nation Booking",
-                description: `Booking for ${facility.name} at ${venue.name}`,
-                order_id: order.id,
-                handler: async function (response) {
-                    // This function is called on successful payment.
-                    // The actual booking confirmation happens in the webhook for security.
-                    await showModal({ title: "Payment Successful!", message: "Your payment was successful. We are confirming your booking." });
-                    navigate('/my-bookings');
-                },
-                prefill: {
-                    name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
-                    email: user.email,
-                    contact: profile.phone_number || '',
-                },
-                theme: {
-                    color: '#10b981', // Matches your primary green
-                },
-                notes: {
-                    booking_details: `Slot ID: ${slot.slot_id}, User ID: ${user.id}`
-                }
-            };
+      // 3. SUCCESS NOTIFICATION AND REDIRECTION
+      await showModal({
+        title: "Success!",
+        message: `Your slot at ${venue.name} has been successfully reserved.`,
+        confirmText: "Go to My Bookings",
+        onConfirm: true, // Resolves the promise
+      });
 
-            // Step 3: Open the Razorpay payment window
-            const rzp = new window.Razorpay(options);
-            rzp.open();
+      // Navigate after the modal is closed/confirmed
+      navigate("/my-bookings"); 
+      
+    } catch (err) {
+      // Handle the generic error case, including the concurrency error
+      setError(err.message);
+      showModal({
+        title: "Booking Failed",
+        message: `An error occurred: ${err.message}`,
+        confirmText: "Close",
+        confirmStyle: "danger",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            rzp.on('payment.failed', function (response) {
-                showModal({ title: "Payment Failed", message: `Your payment failed. Please try again. Reason: ${response.error.description}` });
-            });
-
-        } catch (err) {
-            setError(err.message);
-            showModal({ title: "Payment Failed", message: `An error occurred while initializing payment: ${err.message}` });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="container mx-auto px-4 py-12">
-            <h1 className="text-center text-3xl font-bold mb-8 text-dark-text">Confirm Your Booking</h1>
-            {error && <p className="text-center text-red-600 mb-4">Error: {error}</p>}
-
-            <div className="max-w-lg mx-auto bg-card-bg p-8 rounded-xl border border-border-color shadow-lg">
-                <h3 className="text-2xl font-bold text-dark-text mb-2">{venue.name}</h3>
-                <p className="text-medium-text mb-6"><strong>Facility:</strong> {facility.name} ({facility.sports.name})</p>
-                <div className="space-y-4 text-medium-text border-t border-b border-border-color py-6">
-                    <p><strong>Date:</strong> {formatDate(slot.start_time)}</p>
-                    <p><strong>Time:</strong> {formatTime(slot.start_time)} - {formatTime(slot.end_time)}</p>
-                </div>
-                <div className="flex justify-between items-center text-xl font-bold text-dark-text mt-6">
-                    <span>Total Amount</span>
-                    <span>₹{totalAmount}</span>
-                </div>
-                <button onClick={handlePayment} className="w-full mt-8 py-4 px-6 rounded-lg font-semibold text-lg transition duration-300 bg-primary-green text-white shadow-sm hover:bg-primary-green-dark hover:-translate-y-px hover:shadow-md disabled:bg-gray-400" disabled={loading}>
-                    {loading ? 'Initializing Payment...' : 'Proceed to Pay'}
-                </button>
-            </div>
+  return (
+    <div className="min-h-screen bg-background py-8 px-4">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-dark-text mb-2">
+            Confirm Your Booking
+          </h1>
+          <p className="text-light-text">
+            Review your booking details and complete your reservation
+          </p>
         </div>
-    );
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg
+                  className="h-5 w-5 text-red-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-800">Error: {error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Main Booking Card */}
+        <div className="bg-card-bg rounded-xl shadow-lg border border-border-color overflow-hidden">
+          {/* Venue Header */}
+          <div className="bg-primary-green text-white p-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full transform translate-x-16 -translate-y-16"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-5 rounded-full transform -translate-x-12 translate-y-12"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">{venue.name}</h2>
+                  <p className="text-primary-green-light mt-1">
+                    {facility.sports.name} • {facility.name}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="bg-white bg-opacity-15 backdrop-blur-sm rounded-lg px-4 py-3 border border-white border-opacity-20">
+                    <div className="text-sm text-primary-green-light">
+                      Total
+                    </div>
+                    <div className="text-2xl font-bold">₹{totalAmount}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Booking Details */}
+          <div className="p-6 space-y-6">
+            {/* Date & Time Section */}
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="bg-light-green-bg rounded-lg p-4 border border-primary-green-light border-opacity-30">
+                <div className="flex items-center mb-2">
+                  <svg
+                    className="h-5 w-5 text-primary-green mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <span className="text-sm font-medium text-primary-green">
+                    Date
+                  </span>
+                </div>
+                <p className="text-dark-text font-semibold">
+                  {formatDate(slot.start_time)}
+                </p>
+              </div>
+
+              <div className="bg-light-green-bg rounded-lg p-4 border border-primary-green-light border-opacity-30">
+                <div className="flex items-center mb-2">
+                  <svg
+                    className="h-5 w-5 text-primary-green mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span className="text-sm font-medium text-primary-green">
+                    Time
+                  </span>
+                </div >
+                <p className="text-dark-text font-semibold">
+                  {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
+                </p>
+              </div >
+            </div >
+
+            {/* Facility Details */}
+            <div className="border-t border-border-color-light pt-6">
+              <h3 className="text-lg font-semibold text-dark-text mb-4">
+                Facility Details
+              </h3>
+              <div className="grid gap-4">
+                <div className="flex justify-between items-center py-3 px-4 bg-hover-bg rounded-lg">
+                  <span className="text-medium-text">Facility</span>
+                  <span className="font-semibold text-dark-text">
+                    {facility.name}
+                  </span>
+                </div >
+                <div className="flex justify-between items-center py-3 px-4 bg-hover-bg rounded-lg">
+                  <span className="text-medium-text">Sport</span>
+                  <span className="font-semibold text-dark-text">
+                    {facility.sports.name}
+                  </span >
+                </div >
+                <div className="flex justify-between items-center py-3 px-4 bg-hover-bg rounded-lg">
+                  <span className="text-medium-text">Venue</span>
+                  <span className="font-semibold text-dark-text">
+                    {venue.name}
+                  </span >
+                </div >
+              </div >
+            </div >
+
+            {/* Payment Summary */}
+            <div className="border-t border-border-color-light pt-6">
+              <h3 className="text-lg font-semibold text-dark-text mb-4">
+                Payment Summary
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-medium-text">Booking Fee</span>
+                  <span className="text-dark-text">₹{totalAmount}</span>
+                </div >
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-medium-text">Platform Fee</span>
+                  <span className="text-dark-text">₹0</span>
+                </div >
+                <div className="border-t border-border-color-light pt-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold text-dark-text">
+                      Total Amount
+                    </span >
+                    <span className="text-xl font-bold text-primary-green">
+                      ₹{totalAmount}
+                    </span >
+                  </div >
+                </div >
+              </div >
+            </div >
+          </div >
+
+          {/* Action Buttons */}
+          <div className="p-6 bg-hover-bg border-t border-border-color-light">
+            <div className="flex gap-4">
+              <button
+                onClick={() => navigate(-1)}
+                className="flex-1 px-6 py-3 border-2 border-border-color text-medium-text font-semibold rounded-lg hover:bg-card-bg hover:border-primary-green-light transition-all duration-200"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleConfirmBooking}
+                disabled={loading}
+                className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-all duration-200 relative overflow-hidden ${
+                  loading
+                    ? "bg-gray-400 cursor-not-allowed text-white"
+                    : "bg-primary-green text-white hover:bg-primary-green-dark shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                }`}
+              >
+                {!loading && (
+                  <div className="absolute inset-0 bg-white opacity-0 hover:opacity-10 transition-opacity duration-200"></div>
+                )}
+                <div className="relative z-10">
+                  {loading ? (
+                    <div className="flex items-center justify-center">
+                      <svg
+                        className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Processing...
+                    </div>
+                  ) : (
+                    "Proceed to Pay"
+                  )}
+                </div >
+              </button>
+            </div >
+          </div >
+        </div >
+
+        {/* Security Notice */}
+        <div className="mt-6 text-center">
+          <p className="text-sm text-light-text">
+            🔒 Your payment information is secure and encrypted
+          </p>
+        </div >
+      </div >
+    </div >
+  );
 }
 
 export default BookingPage;

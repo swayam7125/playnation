@@ -51,6 +51,7 @@ const KpiCard = ({ icon, title, value, growth, subtitle, trend }) => (
   </div>
 );
 
+// Defined default structure matching RPC output
 const initialStats = {
   todays_revenue: 0, monthly_revenue: 0, total_revenue: 0, todays_bookings: 0,
   upcoming_bookings: 0, most_popular_sport: "N/A", mom_revenue_growth: 0,
@@ -68,17 +69,24 @@ function OwnerDashboardPage() {
       if (!user) { setLoading(false); return; }
       setLoading(true);
       try {
+        // Keeping days calculation for potential future database filtering via RPC argument
         const days = timeframe === "7days" ? 7 : timeframe === "90days" ? 90 : 30;
-        const { data, error } = await supabase.rpc('get_owner_dashboard_statistics', { days_to_track: days });
+        
+        // RPC Call: Faster server-side data aggregation
+        const { data: dashboardData, error } = await supabase.rpc('get_owner_dashboard_statistics', { days_to_track: days });
+        
         if (error) throw error;
+        if (!dashboardData) throw new Error("No data received from dashboard function.");
+
+        // Streamlined state setting using the spread operator and defensive defaults for arrays
         setStats({
-          todays_revenue: data.todays_revenue || 0, monthly_revenue: data.monthly_revenue || 0,
-          total_revenue: data.total_revenue || 0, todays_bookings: data.todays_bookings || 0,
-          upcoming_bookings: data.upcoming_bookings || 0, most_popular_sport: data.most_popular_sport || "N/A",
-          mom_revenue_growth: data.mom_revenue_growth || 0, revenue_by_facility: data.revenue_by_facility || [],
-          peak_booking_hours: data.peak_booking_hours || [], revenue_trend: data.revenue_trend || [],
-          sport_distribution: data.sport_distribution || [],
+          ...dashboardData,
+          revenue_by_facility: dashboardData.revenue_by_facility || [],
+          peak_booking_hours: dashboardData.peak_booking_hours || [],
+          revenue_trend: dashboardData.revenue_trend || [],
+          sport_distribution: dashboardData.sport_distribution || [],
         });
+
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
         setStats(initialStats);
@@ -87,7 +95,7 @@ function OwnerDashboardPage() {
       }
     };
     fetchDashboardStats();
-  }, [user, timeframe]);
+  }, [user, timeframe]); // Dependency on timeframe kept to re-fetch if filter changes
 
   if (loading) return (
     <div className="min-h-screen bg-gradient-to-br from-background via-white to-light-green-bg/30 flex items-center justify-center">
@@ -97,7 +105,7 @@ function OwnerDashboardPage() {
           <div className="absolute inset-0 rounded-full border-4 border-primary-green/10"></div>
         </div>
         <p className="text-medium-text font-medium">Loading Dashboard...</p>
-        <p className="text-light-text text-sm">Fetching your latest metrics</p>
+        <p className="text-sm text-light-text">Fetching your latest metrics</p>
       </div>
     </div>
   );
