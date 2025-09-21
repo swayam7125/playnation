@@ -4,7 +4,7 @@ import { useAuth } from '../AuthContext';
 import { supabase } from '../supabaseClient';
 import heroImage from '../assets/images/hero/venue-1.svg';
 import { FeatureCard } from '../components/home/FeatureCard/FeatureCard';
-import { CategoryCard } from '../components/home/CategoryCard/CategoryCard';
+import CategoryCard from '../components/home/CategoryCard/CategoryCard';
 import VenueCard from '../components/venues/VenueCard';
 import { categories } from '../constants/categories';
 
@@ -89,8 +89,9 @@ export default function HomePage() {
             {categories.map(category => (
               <CategoryCard 
                 key={category.id}
-                imgSrc={category.image} 
-                name={category.name}
+                // FIX 2: Pass the entire category object as the 'category' prop.
+                // This resolves the "Cannot read properties of undefined (reading 'icon_url')" error.
+                category={category}
               />
             ))}
           </div>

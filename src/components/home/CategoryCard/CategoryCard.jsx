@@ -1,13 +1,18 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
-function CategoryCard({ category }) {
+// Use a default export again to match the corrected import in HomePage.jsx
+export default function CategoryCard({ category }) { // Changed to default export for consistency
   const navigate = useNavigate();
 
   // This function will navigate to the explore page with the sport ID as a URL parameter
   const handleCategoryClick = () => {
-    navigate(`/explore?sportId=${category.sport_id}`);
+    navigate(`/explore?sportId=${category?.sport_id}`);
   };
+
+  if (!category) {
+    return null;
+  }
 
   return (
     <div
@@ -15,9 +20,8 @@ function CategoryCard({ category }) {
       onClick={handleCategoryClick}
     >
       <div className="w-16 h-16 rounded-lg bg-light-green-bg flex items-center justify-center">
-        {/* Use the dynamic icon URL from the database */}
         <img
-          src={category.icon_url || "https://via.placeholder.com/40"}
+          src={category.image || "https://via.placeholder.com/40"}
           alt={`${category.name} icon`}
           className="w-8 h-8 object-contain"
         />
@@ -28,5 +32,3 @@ function CategoryCard({ category }) {
     </div>
   );
 }
-
-export default CategoryCard;
