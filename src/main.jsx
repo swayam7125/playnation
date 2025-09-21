@@ -18,8 +18,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <Router>
       <AuthProvider>
         <ModalProvider>
-          {" "}
-          {/* <-- THE FIX IS HERE */}
           <App />
         </ModalProvider>
       </AuthProvider>
