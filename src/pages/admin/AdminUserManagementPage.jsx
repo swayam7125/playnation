@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useModal } from '../../ModalContext';
 import { FaUserCircle, FaUsers, FaUserCog, FaUserShield, FaSearch, FaFilter, FaEnvelope, FaCalendarAlt, FaEdit, FaTrash, FaBan, FaCheck, FaExclamationTriangle } from 'react-icons/fa';
@@ -190,14 +190,24 @@ function AdminUserManagementPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const { showModal } = useModal();
 
-    const fetchAllUsers = async () => {
+    // MODIFIED: Centralized fetch logic with server-side search filtering
+    const fetchUsers = useCallback(async (currentSearchTerm) => {
         setLoading(true);
         setError(null);
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('users')
                 .select('*')
                 .order('registration_date', { ascending: false });
+            
+            // Apply server-side search filtering
+            if (currentSearchTerm) {
+                const searchPattern = `%${currentSearchTerm.toLowerCase()}%`;
+                // Use filters with `or` to search across multiple fields
+                query = query.or(`username.ilike.${searchPattern},email.ilike.${searchPattern},role.ilike.${searchPattern},status.ilike.${searchPattern}`);
+            }
+
+            const { data, error } = await query;
             
             if (error) throw error;
             setUsers(data || []);
@@ -207,11 +217,19 @@ function AdminUserManagementPage() {
         } finally {
             setLoading(false);
         }
-    };
-
-    useEffect(() => {
-        fetchAllUsers();
     }, []);
+
+    // UPDATED: Debounce search term changes and trigger fetch on component mount/search change
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            fetchUsers(searchTerm);
+        }, 300);
+
+        return () => clearTimeout(timeout);
+    }, [searchTerm, fetchUsers]);
+
+
+    const refetch = () => fetchUsers(searchTerm); // Helper function to re-fetch with current search term
 
     const handleRoleChange = async (userId, newRole) => {
         const confirmed = await showModal({
@@ -241,7 +259,7 @@ function AdminUserManagementPage() {
                     message: "User role updated successfully!"
                 });
 
-                fetchAllUsers();
+                refetch(); // UPDATED: Use refetch
             } catch (err) {
                 showModal({
                     title: "Error",
@@ -280,7 +298,7 @@ function AdminUserManagementPage() {
                     message: `User ${action}d successfully!`
                 });
 
-                fetchAllUsers();
+                refetch(); // UPDATED: Use refetch
             } catch (err) {
                 showModal({
                     title: "Error",
@@ -318,7 +336,7 @@ function AdminUserManagementPage() {
                     message: "User deleted successfully!"
                 });
 
-                fetchAllUsers();
+                refetch(); // UPDATED: Use refetch
             } catch (err) {
                 showModal({
                     title: "Error",
@@ -328,19 +346,14 @@ function AdminUserManagementPage() {
         }
     };
 
-    const filterUsers = (userList) => {
-        if (!searchTerm) return userList;
-        const lowerCaseSearchTerm = searchTerm.toLowerCase();
-        return userList.filter(user => 
-            `${user.username || ''} ${user.email} ${user.role}`.toLowerCase().includes(lowerCaseSearchTerm)
-        );
-    };
+    // REMOVED: The expensive client-side `filterUsers` logic.
 
-    const allUsers = filterUsers(users);
-    const players = filterUsers(users.filter(u => u.role === 'player'));
-    const venueOwners = filterUsers(users.filter(u => u.role === 'venue_owner'));
-    const admins = filterUsers(users.filter(u => u.role === 'admin'));
-    const suspendedUsers = filterUsers(users.filter(u => u.status === 'suspended'));
+    // Calculate all lists from the server-searched `users` state
+    const allUsers = users;
+    const players = users.filter(u => u.role === 'player');
+    const venueOwners = users.filter(u => u.role === 'venue_owner');
+    const admins = users.filter(u => u.role === 'admin');
+    const suspendedUsers = users.filter(u => u.status === 'suspended');
 
     const currentUsers = {
         all: allUsers,
@@ -351,6 +364,7 @@ function AdminUserManagementPage() {
     }[activeTab] || [];
 
     const statsData = [
+        // Note: The total counts now reflect the filtered list, but are based on the server result
         { title: "Total Users", count: allUsers.length, icon: FaUsers, color: "bg-blue-500", bgColor: "bg-white" },
         { title: "Players", count: players.length, icon: FaUserCircle, color: "bg-blue-500", bgColor: "bg-white" },
         { title: "Venue Owners", count: venueOwners.length, icon: FaUserCog, color: "bg-green-500", bgColor: "bg-white" },
@@ -383,7 +397,7 @@ function AdminUserManagementPage() {
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">Something went wrong</h2>
                 <p className="text-red-600 mb-4">{error}</p>
                 <button 
-                    onClick={fetchAllUsers}
+                    onClick={() => fetchUsers('')}
                     className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-xl transition-colors duration-200"
                 >
                     Try Again
