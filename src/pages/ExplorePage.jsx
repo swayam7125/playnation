@@ -4,13 +4,19 @@ import VenueCard from '../components/venues/VenueCard';
 import useVenues from '../hooks/useVenues';
 
 function ExplorePage() {
-  const { venues, loading, error } = useVenues();
   const [sports, setSports] = useState([]);
   const [selectedSport, setSelectedSport] = useState('all');
   const [sportsLoading, setSportsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [viewMode, setViewMode] = useState('grid');
+
+  // --- MODIFIED: Pass filter states to the custom hook for server-side execution ---
+  const { venues, loading, error } = useVenues({
+    selectedSport: selectedSport,
+    searchTerm: searchTerm,
+    sortBy: sortBy,
+  });
 
   useEffect(() => {
     const fetchSports = async () => {
@@ -29,40 +35,9 @@ function ExplorePage() {
     fetchSports();
   }, []);
 
-  const filteredAndSortedVenues = React.useMemo(() => {
-    let filtered = [...venues];
-
-    if (selectedSport !== 'all') {
-      filtered = filtered.filter(venue => 
-        venue.facilities?.some(facility => facility.sport_id === selectedSport)
-      );
-    }
-
-    if (searchTerm) {
-      const lowerSearchTerm = searchTerm.toLowerCase();
-      filtered = filtered.filter(venue =>
-        (venue.name || '').toLowerCase().includes(lowerSearchTerm) ||
-        (venue.address || '').toLowerCase().includes(lowerSearchTerm) ||
-        (venue.description || '').toLowerCase().includes(lowerSearchTerm)
-      );
-    }
-
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'name':
-          return (a.name || '').localeCompare(b.name || '');
-        case 'rating':
-          return (b.rating || 0) - (a.rating || 0);
-        case 'price':
-          return (a.price_per_hour || 0) - (b.price_per_hour || 0);
-        default:
-          return 0;
-      }
-    });
-
-    return filtered;
-  }, [venues, selectedSport, searchTerm, sortBy]);
-
+  // --- MODIFIED: Use the venues returned by the hook directly, as they are already filtered and sorted ---
+  const filteredAndSortedVenues = venues;
+  
   const clearFilters = () => {
     setSelectedSport('all');
     setSearchTerm('');
@@ -72,7 +47,7 @@ function ExplorePage() {
   const activeFiltersCount = [
     selectedSport !== 'all',
     searchTerm.length > 0,
-    sortBy !== 'name'
+    // We only count the filters that apply constraints on the server/client
   ].filter(Boolean).length;
 
   return (

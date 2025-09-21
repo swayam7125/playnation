@@ -13,10 +13,23 @@ function OwnerVenueCard({ venue }) {
     ? { label: 'Restricted', className: 'bg-red-100 text-red-800 border-red-200' }
     : { label: 'Pending', className: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
 
+  // --- NEW: Function to apply transformations for owner card ---
+  const getImageUrl = () => {
+    if (!venue.image_url) return placeholderImage;
+    let url = venue.image_url;
+
+    if (url.includes('supabase.co')) {
+        const transformParams = '?width=350&height=208&resize=cover'; // Optimized size for owner card
+        url = url.includes('?') ? url + '&' + transformParams.substring(1) : url + transformParams;
+    }
+    return url;
+  };
+  // -------------------------------------------------------------
+
   return (
     <div className="bg-card-bg border border-border-color rounded-xl overflow-hidden transition duration-300 shadow-sm">
       <img
-        src={venue.image_url || placeholderImage}
+        src={getImageUrl()} // --- MODIFIED: Use the optimized URL ---
         alt={venue.name}
         className="w-full h-52 object-cover bg-border-color-light"
       />

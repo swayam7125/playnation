@@ -2,20 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaSearch, FaFilter, FaBuilding, FaUser, FaMapMarkerAlt, FaClock, FaEye } from 'react-icons/fa';
 import { useModal } from '../../ModalContext';
-
-const StatsCard = ({ title, count, icon: Icon, color, bgColor }) => (
-    <div className={`${bgColor} rounded-2xl p-6 border border-border-color-light shadow-sm hover:shadow-md transition-all duration-300`}>
-        <div className="flex items-center justify-between">
-            <div>
-                <p className="text-sm font-medium text-medium-text mb-1">{title}</p>
-                <p className="text-3xl font-bold text-dark-text">{count}</p>
-            </div>
-            <div className={`${color} p-3 rounded-xl`}>
-                <Icon className="text-xl text-white" />
-            </div>
-        </div>
-    </div>
-);
+import StatsCard from '../../components/common/StatsCard';
 
 const VenueCard = ({ venue, onApprove, onDecline }) => {
     const isApproved = venue.is_approved;

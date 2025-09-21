@@ -831,8 +831,8 @@ CREATE TABLE public.venues (
     opening_time time without time zone,
     closing_time time without time zone,
     is_approved boolean DEFAULT false,
-    created_at timestamp without time zone,
-    updated_at timestamp without time zone,
+    created_at timestamp with time zone,
+    updated_at timestamp with time zone,
     image_url text,
     rejection_reason text
 );
@@ -1007,6 +1007,55 @@ $$;
 
 
 ALTER FUNCTION public.get_owner_dashboard_statistics(days_to_track integer) OWNER TO postgres;
+
+--
+-- Name: get_owner_venues_details(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_owner_venues_details() RETURNS json
+    LANGUAGE sql SECURITY DEFINER
+    AS $$
+  SELECT json_agg(
+    json_build_object(
+      'venue_id', v.venue_id,
+      'name', v.name,
+      'address', v.address,
+      'city', v.city,
+      'image_url', v.image_url,
+      'is_approved', v.is_approved,
+      'rejection_reason', v.rejection_reason,
+      'created_at', v.created_at,
+      'facilities', (
+        SELECT json_agg(
+          json_build_object(
+            'facility_id', f.facility_id,
+            'name', f.name,
+            'hourly_rate', f.hourly_rate,
+            'sports', json_build_object('name', s.name),
+            'facility_amenities', (
+              SELECT json_agg(
+                json_build_object('amenities', json_build_object('name', a.name))
+              )
+              FROM public.facility_amenities fa
+              JOIN public.amenities a ON fa.amenity_id = a.amenity_id
+              WHERE fa.facility_id = f.facility_id
+            )
+          )
+          ORDER BY f.name ASC
+        )
+        FROM public.facilities f
+        LEFT JOIN public.sports s ON f.sport_id = s.sport_id
+        WHERE f.venue_id = v.venue_id
+      )
+    )
+    ORDER BY v.created_at DESC
+  )
+  FROM public.venues v
+  WHERE v.owner_id = auth.uid();
+$$;
+
+
+ALTER FUNCTION public.get_owner_venues_details() OWNER TO postgres;
 
 --
 -- Name: get_public_profiles_for_owner(uuid[]); Type: FUNCTION; Schema: public; Owner: postgres
@@ -2990,9 +3039,9 @@ CREATE TABLE public.bookings (
     user_id uuid,
     facility_id uuid,
     slot_id uuid,
-    booking_date timestamp without time zone,
-    start_time timestamp without time zone NOT NULL,
-    end_time timestamp without time zone NOT NULL,
+    booking_date timestamp with time zone,
+    start_time timestamp with time zone NOT NULL,
+    end_time timestamp with time zone NOT NULL,
     total_amount numeric(10,2) NOT NULL,
     status text DEFAULT 'pending'::text,
     payment_status text DEFAULT 'pending'::text,
@@ -3017,7 +3066,7 @@ CREATE TABLE public.credit_transactions (
     transaction_type text,
     booking_id uuid,
     description text,
-    transaction_date timestamp without time zone,
+    transaction_date timestamp with time zone,
     CONSTRAINT credit_transactions_transaction_type_check CHECK ((transaction_type = ANY (ARRAY['deposit'::text, 'booking_payment'::text, 'refund'::text, 'admin_adjustment'::text])))
 );
 
@@ -3069,7 +3118,10 @@ CREATE TABLE public.offers (
     is_active boolean DEFAULT true,
     valid_from timestamp with time zone DEFAULT now(),
     valid_until timestamp with time zone,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    is_global boolean DEFAULT false,
+    background_image_url text,
+    offer_code character varying(50)
 );
 
 
@@ -3088,7 +3140,7 @@ CREATE TABLE public.payments (
     currency character varying(10) DEFAULT 'INR'::character varying,
     status text DEFAULT 'created'::text,
     payment_method character varying(50),
-    transaction_date timestamp without time zone,
+    transaction_date timestamp with time zone,
     CONSTRAINT payments_status_check CHECK ((status = ANY (ARRAY['created'::text, 'authorized'::text, 'captured'::text, 'refunded'::text, 'failed'::text])))
 );
 
@@ -3106,7 +3158,7 @@ CREATE TABLE public.points_transactions (
     transaction_type text,
     booking_id uuid,
     description text,
-    transaction_date timestamp without time zone,
+    transaction_date timestamp with time zone,
     CONSTRAINT points_transactions_transaction_type_check CHECK ((transaction_type = ANY (ARRAY['earned'::text, 'redeemed'::text, 'expired'::text, 'admin_adjustment'::text])))
 );
 
@@ -3123,7 +3175,8 @@ CREATE TABLE public.reviews (
     venue_id uuid,
     rating integer NOT NULL,
     comment text,
-    created_at timestamp without time zone
+    created_at timestamp with time zone,
+    booking_id uuid
 );
 
 
@@ -3149,8 +3202,8 @@ ALTER TABLE public.sports OWNER TO postgres;
 CREATE TABLE public.time_slots (
     slot_id uuid DEFAULT gen_random_uuid() NOT NULL,
     facility_id uuid,
-    start_time timestamp without time zone NOT NULL,
-    end_time timestamp without time zone NOT NULL,
+    start_time timestamp with time zone NOT NULL,
+    end_time timestamp with time zone NOT NULL,
     is_available boolean DEFAULT true,
     price_override numeric(10,2),
     block_reason text
@@ -3173,12 +3226,11 @@ CREATE TABLE public.users (
     role text DEFAULT 'player'::text,
     credit_balance numeric(10,2) DEFAULT 0.00 NOT NULL,
     points_balance numeric(10,2) DEFAULT 0.00 NOT NULL,
-    registration_date timestamp without time zone,
-    last_login timestamp without time zone,
-    is_active boolean DEFAULT true,
+    registration_date timestamp with time zone,
+    last_login timestamp with time zone,
     status character varying(20) DEFAULT 'active'::character varying,
-    CONSTRAINT check_user_status CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'suspended'::character varying])::text[]))),
-    CONSTRAINT users_role_check CHECK ((role = ANY (ARRAY['player'::text, 'venue_owner'::text, 'admin'::text])))
+    CONSTRAINT users_role_check CHECK ((role = ANY (ARRAY['player'::text, 'venue_owner'::text, 'admin'::text]))),
+    CONSTRAINT users_status_check CHECK (((status)::text = ANY ((ARRAY['player'::character varying, 'venue_owner'::character varying, 'admin'::character varying, 'active'::character varying, 'suspended'::character varying])::text[])))
 );
 
 
@@ -3985,6 +4037,60 @@ COPY auth.audit_log_entries (instance_id, id, payload, created_at, ip_address) F
 00000000-0000-0000-0000-000000000000	0e2d6bc1-555b-4716-a581-36bc00c4bbf9	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-20 16:57:57.610893+00	
 00000000-0000-0000-0000-000000000000	6a11bf95-0898-4f0d-a804-6c3e96669ca3	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-20 17:01:37.091774+00	
 00000000-0000-0000-0000-000000000000	9f31284a-9c6f-490e-a0e1-ef23e8e6e68c	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-20 17:01:42.929994+00	
+00000000-0000-0000-0000-000000000000	978a23d7-4b98-4271-8bbe-375c65e27f6a	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-20 17:58:39.422823+00	
+00000000-0000-0000-0000-000000000000	318023f8-e3f5-4c30-94da-210dcb56eefd	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-20 17:58:43.28631+00	
+00000000-0000-0000-0000-000000000000	511d0562-d9c0-412b-8b4e-83dcdc41225c	{"action":"token_refreshed","actor_id":"541b69e6-5c6e-4ad7-8764-7aa01c435021","actor_username":"tony@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-20 19:27:59.995548+00	
+00000000-0000-0000-0000-000000000000	00ab43cb-e605-4672-bcb0-ecbabd28b4fd	{"action":"token_revoked","actor_id":"541b69e6-5c6e-4ad7-8764-7aa01c435021","actor_username":"tony@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-20 19:28:00.023933+00	
+00000000-0000-0000-0000-000000000000	6990b30f-68e8-43e1-a0d8-429f7780803b	{"action":"token_refreshed","actor_id":"541b69e6-5c6e-4ad7-8764-7aa01c435021","actor_username":"tony@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-20 20:40:05.370965+00	
+00000000-0000-0000-0000-000000000000	8dbc8a7b-ce72-44b8-a981-d5026e0a2cef	{"action":"token_revoked","actor_id":"541b69e6-5c6e-4ad7-8764-7aa01c435021","actor_username":"tony@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-20 20:40:05.390472+00	
+00000000-0000-0000-0000-000000000000	0a83ce88-0c8f-4e07-bedc-6f69a45a1165	{"action":"token_refreshed","actor_id":"541b69e6-5c6e-4ad7-8764-7aa01c435021","actor_username":"tony@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-20 21:25:14.427567+00	
+00000000-0000-0000-0000-000000000000	346d4f65-467b-4eec-a5d5-cb1ab72ff0e3	{"action":"token_revoked","actor_id":"541b69e6-5c6e-4ad7-8764-7aa01c435021","actor_username":"tony@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-20 21:25:14.444584+00	
+00000000-0000-0000-0000-000000000000	6c605072-db0a-4540-927d-39ba06796241	{"action":"token_refreshed","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"token"}	2025-09-21 06:26:41.693375+00	
+00000000-0000-0000-0000-000000000000	350344c5-d042-4b90-b416-931248740cba	{"action":"token_revoked","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"token"}	2025-09-21 06:26:41.722738+00	
+00000000-0000-0000-0000-000000000000	9847917a-5f29-42c3-92d9-57d096389b82	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 06:26:58.659463+00	
+00000000-0000-0000-0000-000000000000	8e22c343-2cad-4926-b1b2-1ba182d53955	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 06:27:01.518216+00	
+00000000-0000-0000-0000-000000000000	1934acc9-d46a-4647-9efe-96d54d7d324e	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 06:27:03.944573+00	
+00000000-0000-0000-0000-000000000000	77c24ed5-6d45-45a1-a4b0-7cbe935aa6a3	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 06:27:08.511624+00	
+00000000-0000-0000-0000-000000000000	a4a2ade2-fefd-41cd-b673-3d70d227f337	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 06:33:41.269134+00	
+00000000-0000-0000-0000-000000000000	c1999649-c989-4f25-aa25-fd54375e04f4	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 06:34:39.85172+00	
+00000000-0000-0000-0000-000000000000	3e1a3c0c-aad1-474f-ba4b-e1890c0e9134	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 06:34:45.809346+00	
+00000000-0000-0000-0000-000000000000	c0b624f7-8d7b-4e91-8d83-2825ee5849ab	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 06:35:37.696886+00	
+00000000-0000-0000-0000-000000000000	cda728b2-e7e9-496c-960e-b57e84d77840	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 06:52:47.592095+00	
+00000000-0000-0000-0000-000000000000	08e10944-c79f-4a4d-b644-957e8b07a811	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 07:03:03.124754+00	
+00000000-0000-0000-0000-000000000000	fa623211-238a-48f8-9101-b0392b66c2a1	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 07:03:28.843043+00	
+00000000-0000-0000-0000-000000000000	03087ec5-10ef-45bc-99ec-d2b0dc1ed812	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 07:03:34.151008+00	
+00000000-0000-0000-0000-000000000000	05d4c5a0-9d14-4da4-9823-a1bc314f4bcd	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 07:04:58.087489+00	
+00000000-0000-0000-0000-000000000000	65f895d2-2617-4d73-b5b3-def02d1167e7	{"action":"token_refreshed","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-21 08:09:29.477106+00	
+00000000-0000-0000-0000-000000000000	c5b31e85-02a3-4d41-a389-2c1f6703575d	{"action":"token_revoked","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-21 08:09:29.500409+00	
+00000000-0000-0000-0000-000000000000	fa7bcea0-9b95-4df5-907f-85bc1ddd43f0	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 08:09:40.02924+00	
+00000000-0000-0000-0000-000000000000	c0dcbabf-5e56-4ad6-a0f1-0815e20d720b	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 08:10:07.740011+00	
+00000000-0000-0000-0000-000000000000	f5e12714-8aed-41f8-9cec-caa14d92e799	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 08:10:28.538711+00	
+00000000-0000-0000-0000-000000000000	768bdfd5-72d3-493e-b1f7-c904a00205d1	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 08:10:36.234235+00	
+00000000-0000-0000-0000-000000000000	6a40be5d-d851-4571-8ede-0b6adc00d060	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 08:46:58.847236+00	
+00000000-0000-0000-0000-000000000000	fa13598b-079a-42f9-bf0c-1b652ed54e67	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 08:47:06.042499+00	
+00000000-0000-0000-0000-000000000000	5e52d732-51eb-456c-ae02-b3fe387a3396	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 08:50:20.739179+00	
+00000000-0000-0000-0000-000000000000	b578ef7a-8f6d-47f9-b183-b6fc2ef8d547	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 08:50:27.327565+00	
+00000000-0000-0000-0000-000000000000	e3b5dc4c-486d-47a0-8338-e43f1df177d1	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 09:23:47.827618+00	
+00000000-0000-0000-0000-000000000000	e4491303-7f7c-47b0-b93d-543393dc9ea5	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 09:24:24.052096+00	
+00000000-0000-0000-0000-000000000000	6c7a42b6-83b6-4490-8008-c5f2c4849f72	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 09:24:33.768084+00	
+00000000-0000-0000-0000-000000000000	83e083c1-66e7-4c8f-b05a-396d14033196	{"action":"token_refreshed","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"token"}	2025-09-21 10:41:10.139912+00	
+00000000-0000-0000-0000-000000000000	393ea487-020c-4e5e-bc33-54947fe17a07	{"action":"token_revoked","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"token"}	2025-09-21 10:41:10.165689+00	
+00000000-0000-0000-0000-000000000000	09494789-6c68-4bd7-a26d-58d151184b47	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 11:12:08.958168+00	
+00000000-0000-0000-0000-000000000000	cc36f975-6083-41d4-b50c-cc5b87810a55	{"action":"token_refreshed","actor_id":"541b69e6-5c6e-4ad7-8764-7aa01c435021","actor_username":"tony@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-21 11:14:37.968639+00	
+00000000-0000-0000-0000-000000000000	4330e13f-fc8f-41d5-8b0e-be449fb726d0	{"action":"token_revoked","actor_id":"541b69e6-5c6e-4ad7-8764-7aa01c435021","actor_username":"tony@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-21 11:14:37.985495+00	
+00000000-0000-0000-0000-000000000000	fa0db37a-980e-4d64-b93d-d24b7502a987	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 11:19:21.423142+00	
+00000000-0000-0000-0000-000000000000	008555ac-9836-40a1-9b3a-d29980bbf6a5	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 11:23:14.016672+00	
+00000000-0000-0000-0000-000000000000	65733270-b50e-4124-9d2d-955977460733	{"action":"token_refreshed","actor_id":"541b69e6-5c6e-4ad7-8764-7aa01c435021","actor_username":"tony@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-21 11:56:13.650121+00	
+00000000-0000-0000-0000-000000000000	3aea1879-397d-48f3-8207-840700f94677	{"action":"token_revoked","actor_id":"541b69e6-5c6e-4ad7-8764-7aa01c435021","actor_username":"tony@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-21 11:56:13.659706+00	
+00000000-0000-0000-0000-000000000000	e2b8a39c-39d3-4340-8eee-a655772421bc	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 12:18:16.297681+00	
+00000000-0000-0000-0000-000000000000	3d3dd636-f631-4318-9058-9b95f84377ec	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 12:32:42.477679+00	
+00000000-0000-0000-0000-000000000000	39f8f850-314c-4f25-9a2e-b63bc34efb79	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 12:32:48.396607+00	
+00000000-0000-0000-0000-000000000000	7430ba39-c33a-45c4-a8f9-2f3fa4dd481c	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 12:33:43.582496+00	
+00000000-0000-0000-0000-000000000000	dcd13576-6f30-47a5-9816-2eafbb6b1a27	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 12:33:50.025573+00	
+00000000-0000-0000-0000-000000000000	62f01023-e9f6-4811-8925-35e5ef929a09	{"action":"token_refreshed","actor_id":"541b69e6-5c6e-4ad7-8764-7aa01c435021","actor_username":"tony@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-21 12:40:56.55828+00	
+00000000-0000-0000-0000-000000000000	d74704cb-e77e-4a81-bd77-80fab272d300	{"action":"token_revoked","actor_id":"541b69e6-5c6e-4ad7-8764-7aa01c435021","actor_username":"tony@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-21 12:40:56.561355+00	
+00000000-0000-0000-0000-000000000000	4b38ea31-60c4-4b5d-b711-d7e1bb85e3d7	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-21 13:24:47.194878+00	
+00000000-0000-0000-0000-000000000000	54b4c35d-e01e-4d1d-afe8-639e75ed0519	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-21 13:24:52.235366+00	
 \.
 
 
@@ -4023,9 +4129,9 @@ COPY auth.instances (id, uuid, raw_base_config, created_at, updated_at) FROM std
 --
 
 COPY auth.mfa_amr_claims (session_id, created_at, updated_at, authentication_method, id) FROM stdin;
+4e5f7094-63c2-4c0d-a805-9ce666046d1b	2025-09-21 13:24:52.277804+00	2025-09-21 13:24:52.277804+00	password	a7797f32-0227-41dd-8d2a-eb9910c50866
 9205aadd-1bd4-4471-a343-e2b4f9343e3c	2025-09-15 23:03:03.288254+00	2025-09-15 23:03:03.288254+00	password	859ef315-dda0-49d8-873b-487c1d9e693a
 16099a6e-c93d-4543-b604-a253ebd3e9c8	2025-09-16 20:28:50.02615+00	2025-09-16 20:28:50.02615+00	password	7f792787-707c-4aad-982f-d436e86cd5bf
-55e2f697-b19c-4d47-8920-c3385274f566	2025-09-20 17:01:42.95658+00	2025-09-20 17:01:42.95658+00	password	75900943-b452-42c1-8a43-264f5c4a8d74
 \.
 
 
@@ -4066,9 +4172,15 @@ COPY auth.one_time_tokens (id, user_id, token_type, token_hash, relates_to, crea
 --
 
 COPY auth.refresh_tokens (instance_id, id, token, user_id, revoked, created_at, updated_at, parent, session_id) FROM stdin;
-00000000-0000-0000-0000-000000000000	273	pvw2vdzfv2rd	541b69e6-5c6e-4ad7-8764-7aa01c435021	f	2025-09-16 20:28:49.980271+00	2025-09-16 20:28:49.980271+00	\N	16099a6e-c93d-4543-b604-a253ebd3e9c8
-00000000-0000-0000-0000-000000000000	287	wc77y67yyyio	c90139a0-2de3-4237-89b8-032367f73a37	f	2025-09-20 17:01:42.945108+00	2025-09-20 17:01:42.945108+00	\N	55e2f697-b19c-4d47-8920-c3385274f566
-00000000-0000-0000-0000-000000000000	262	q4ngkusfpmae	541b69e6-5c6e-4ad7-8764-7aa01c435021	f	2025-09-15 23:03:03.271128+00	2025-09-15 23:03:03.271128+00	\N	9205aadd-1bd4-4471-a343-e2b4f9343e3c
+00000000-0000-0000-0000-000000000000	273	pvw2vdzfv2rd	541b69e6-5c6e-4ad7-8764-7aa01c435021	t	2025-09-16 20:28:49.980271+00	2025-09-20 19:28:00.025438+00	\N	16099a6e-c93d-4543-b604-a253ebd3e9c8
+00000000-0000-0000-0000-000000000000	289	3y446hm3vvce	541b69e6-5c6e-4ad7-8764-7aa01c435021	t	2025-09-20 19:28:00.046421+00	2025-09-20 20:40:05.39373+00	pvw2vdzfv2rd	16099a6e-c93d-4543-b604-a253ebd3e9c8
+00000000-0000-0000-0000-000000000000	262	q4ngkusfpmae	541b69e6-5c6e-4ad7-8764-7aa01c435021	t	2025-09-15 23:03:03.271128+00	2025-09-20 21:25:14.445195+00	\N	9205aadd-1bd4-4471-a343-e2b4f9343e3c
+00000000-0000-0000-0000-000000000000	290	mhj6yea4bdm3	541b69e6-5c6e-4ad7-8764-7aa01c435021	t	2025-09-20 20:40:05.411193+00	2025-09-21 11:14:37.992561+00	3y446hm3vvce	16099a6e-c93d-4543-b604-a253ebd3e9c8
+00000000-0000-0000-0000-000000000000	291	irfkntcocaxk	541b69e6-5c6e-4ad7-8764-7aa01c435021	t	2025-09-20 21:25:14.459217+00	2025-09-21 11:56:13.662592+00	q4ngkusfpmae	9205aadd-1bd4-4471-a343-e2b4f9343e3c
+00000000-0000-0000-0000-000000000000	310	gjccxvfna7mj	541b69e6-5c6e-4ad7-8764-7aa01c435021	f	2025-09-21 11:56:13.670251+00	2025-09-21 11:56:13.670251+00	irfkntcocaxk	9205aadd-1bd4-4471-a343-e2b4f9343e3c
+00000000-0000-0000-0000-000000000000	308	azxrk3oxgvwt	541b69e6-5c6e-4ad7-8764-7aa01c435021	t	2025-09-21 11:14:38.004187+00	2025-09-21 12:40:56.562663+00	mhj6yea4bdm3	16099a6e-c93d-4543-b604-a253ebd3e9c8
+00000000-0000-0000-0000-000000000000	314	v5qudpvecrab	541b69e6-5c6e-4ad7-8764-7aa01c435021	f	2025-09-21 12:40:56.564662+00	2025-09-21 12:40:56.564662+00	azxrk3oxgvwt	16099a6e-c93d-4543-b604-a253ebd3e9c8
+00000000-0000-0000-0000-000000000000	315	fwg6mtbzbcad	e86f726e-9210-47ca-8dc7-c84d46cc55e2	f	2025-09-21 13:24:52.251256+00	2025-09-21 13:24:52.251256+00	\N	4e5f7094-63c2-4c0d-a805-9ce666046d1b
 \.
 
 
@@ -4164,9 +4276,9 @@ COPY auth.schema_migrations (version) FROM stdin;
 --
 
 COPY auth.sessions (id, user_id, created_at, updated_at, factor_id, aal, not_after, refreshed_at, user_agent, ip, tag) FROM stdin;
-55e2f697-b19c-4d47-8920-c3385274f566	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-20 17:01:42.939122+00	2025-09-20 17:01:42.939122+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0	49.36.91.106	\N
-9205aadd-1bd4-4471-a343-e2b4f9343e3c	541b69e6-5c6e-4ad7-8764-7aa01c435021	2025-09-15 23:03:03.262991+00	2025-09-15 23:03:03.262991+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0	152.59.37.187	\N
-16099a6e-c93d-4543-b604-a253ebd3e9c8	541b69e6-5c6e-4ad7-8764-7aa01c435021	2025-09-16 20:28:49.953355+00	2025-09-16 20:28:49.953355+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0	152.59.36.118	\N
+16099a6e-c93d-4543-b604-a253ebd3e9c8	541b69e6-5c6e-4ad7-8764-7aa01c435021	2025-09-16 20:28:49.953355+00	2025-09-21 12:40:56.56849+00	\N	aal1	\N	2025-09-21 12:40:56.568414	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0	49.43.32.89	\N
+4e5f7094-63c2-4c0d-a805-9ce666046d1b	e86f726e-9210-47ca-8dc7-c84d46cc55e2	2025-09-21 13:24:52.243275+00	2025-09-21 13:24:52.243275+00	\N	aal1	\N	\N	Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36 Edg/140.0.0.0	49.36.91.166	\N
+9205aadd-1bd4-4471-a343-e2b4f9343e3c	541b69e6-5c6e-4ad7-8764-7aa01c435021	2025-09-15 23:03:03.262991+00	2025-09-21 11:56:13.687409+00	\N	aal1	\N	2025-09-21 11:56:13.687323	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0	49.43.32.89	\N
 \.
 
 
@@ -4191,11 +4303,11 @@ COPY auth.sso_providers (id, resource_id, created_at, updated_at, disabled) FROM
 --
 
 COPY auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, invited_at, confirmation_token, confirmation_sent_at, recovery_token, recovery_sent_at, email_change_token_new, email_change, email_change_sent_at, last_sign_in_at, raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at, phone, phone_confirmed_at, phone_change, phone_change_token, phone_change_sent_at, email_change_token_current, email_change_confirm_status, banned_until, reauthentication_token, reauthentication_sent_at, is_sso_user, deleted_at, is_anonymous) FROM stdin;
-00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-09-20 17:01:42.938344+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-09-20 17:01:42.954481+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	073c625c-eb02-45e8-9c67-50acbdc72cd6	authenticated	authenticated	harsh@gmail.com	$2a$10$4KK/J4ROUoG4YacY/9oQluMayEemAbAWOSoXzXwIOg53cosk3zCLm	2025-08-10 08:14:37.525903+00	\N		\N		\N			\N	2025-08-26 16:40:18.651511+00	{"provider": "email", "providers": ["email"]}	{"sub": "073c625c-eb02-45e8-9c67-50acbdc72cd6", "email": "harsh@gmail.com", "last_name": "shah", "first_name": "harsh", "email_verified": true, "phone_verified": false}	\N	2025-08-10 08:14:37.499555+00	2025-08-26 16:40:18.653707+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	541b69e6-5c6e-4ad7-8764-7aa01c435021	authenticated	authenticated	tony@gmail.com	$2a$10$D3cuPIvLg3OVQT9vm7cH4eWn2ugrH3maLfmNj7jEXdGDEKFvzUiqe	2025-09-14 08:58:39.726361+00	\N		\N		\N			\N	2025-09-16 20:28:49.953266+00	{"provider": "email", "providers": ["email"]}	{"sub": "541b69e6-5c6e-4ad7-8764-7aa01c435021", "role": "player", "email": "tony@gmail.com", "username": "ironman", "last_name": "stark", "first_name": "tony", "phone_number": "8624753159", "email_verified": true, "phone_verified": false}	\N	2025-09-14 08:58:39.635641+00	2025-09-16 20:28:50.013231+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	e86f726e-9210-47ca-8dc7-c84d46cc55e2	authenticated	authenticated	admin@playnation.com	$2a$10$Odpx/MPYwsSsCf4Uiywd1OgDxHtZ8IXE7531egy3pILZ0da.1sAMu	2025-08-10 08:50:46.562958+00	\N		\N		\N			\N	2025-09-20 15:39:28.587015+00	{"provider": "email", "providers": ["email"]}	{"email_verified": true}	\N	2025-08-10 08:50:46.541627+00	2025-09-20 15:39:28.593588+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$5OQTogzTdkUQwaRy2whPiuCSeaewK04JQwRzGPlqEiB6mljixeMyq	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-09-20 16:57:57.617108+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-09-20 16:57:57.624678+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$5OQTogzTdkUQwaRy2whPiuCSeaewK04JQwRzGPlqEiB6mljixeMyq	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-09-21 12:32:48.408327+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-09-21 12:32:48.438618+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-09-21 12:33:50.026759+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-09-21 12:33:50.032249+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	541b69e6-5c6e-4ad7-8764-7aa01c435021	authenticated	authenticated	tony@gmail.com	$2a$10$D3cuPIvLg3OVQT9vm7cH4eWn2ugrH3maLfmNj7jEXdGDEKFvzUiqe	2025-09-14 08:58:39.726361+00	\N		\N		\N			\N	2025-09-16 20:28:49.953266+00	{"provider": "email", "providers": ["email"]}	{"sub": "541b69e6-5c6e-4ad7-8764-7aa01c435021", "role": "player", "email": "tony@gmail.com", "username": "ironman", "last_name": "stark", "first_name": "tony", "phone_number": "8624753159", "email_verified": true, "phone_verified": false}	\N	2025-09-14 08:58:39.635641+00	2025-09-21 12:40:56.566415+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	e86f726e-9210-47ca-8dc7-c84d46cc55e2	authenticated	authenticated	admin@playnation.com	$2a$10$Odpx/MPYwsSsCf4Uiywd1OgDxHtZ8IXE7531egy3pILZ0da.1sAMu	2025-08-10 08:50:46.562958+00	\N		\N		\N			\N	2025-09-21 13:24:52.242546+00	{"provider": "email", "providers": ["email"]}	{"email_verified": true}	\N	2025-08-10 08:50:46.541627+00	2025-09-21 13:24:52.275276+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	7ef72ca4-3e98-4324-9bef-abcb5b40252e	authenticated	authenticated	het@gmail.com	$2a$10$LVfhJb8ZSyyafNyv1/csx.3pqiJs7XGStWnW0D0ZkxGbyZGHjsOkq	2025-08-22 07:28:04.473533+00	\N		\N		\N			\N	2025-08-22 07:28:04.486778+00	{"provider": "email", "providers": ["email"]}	{"sub": "7ef72ca4-3e98-4324-9bef-abcb5b40252e", "email": "het@gmail.com", "email_verified": true, "phone_verified": false}	\N	2025-08-22 07:28:04.350922+00	2025-08-22 07:28:04.524049+00	\N	\N			\N		0	\N		\N	f	\N	f
 \.
 
@@ -4223,27 +4335,32 @@ COPY public.amenities (amenity_id, name) FROM stdin;
 --
 
 COPY public.bookings (booking_id, user_id, facility_id, slot_id, booking_date, start_time, end_time, total_amount, status, payment_status, cancellation_reason, cancelled_by, has_been_reviewed) FROM stdin;
-0ca591e8-9fb0-4057-b240-b62b6af015fd	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	23d5c51a-24e9-4ff4-b6fd-02c55a6ab5f6	2025-08-21 17:32:02.769	2025-08-22 07:00:00	2025-08-22 08:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-68b0541e-e90a-43d8-a483-dfd364a4f649	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	23d5c51a-24e9-4ff4-b6fd-02c55a6ab5f6	2025-08-21 17:38:05.281	2025-08-22 07:00:00	2025-08-22 08:00:00	1200.00	confirmed	paid	\N	\N	f
-14fbf7a5-3fb2-427c-a640-5336474cb3c3	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	7e0778c0-1638-4e0e-9aa7-c5e89fd0e39b	2025-08-21 17:39:47.433	2025-08-22 08:00:00	2025-08-22 09:00:00	1500.00	confirmed	paid	\N	\N	f
-e1040e9d-71e5-4e5a-b1e5-e589f7535108	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	58746a32-e0c9-4e53-8708-0c2b5a09db9c	2025-09-20 16:12:57.043	2025-09-21 07:00:00	2025-09-21 08:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-f037d151-9a1f-4bba-a434-13fe714c351f	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	58746a32-e0c9-4e53-8708-0c2b5a09db9c	2025-09-20 16:19:05.339	2025-09-21 07:00:00	2025-09-21 08:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-4dd90a04-5b9b-4daf-9909-5635a61d7072	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	360bbeb1-6b6f-49ba-9436-61a2d9a96778	2025-08-22 07:31:54.861	2025-08-22 14:00:00	2025-08-22 15:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-5f8cb269-8d2f-4d76-97e5-41feca4955a8	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	0ef67817-04a4-4861-b847-78269cb355b3	2025-08-30 17:20:18.4	2025-08-31 21:00:00	2025-08-31 22:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-0184fba9-dc42-49c7-860a-1b99c7763271	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	30cac499-d599-4fe6-bdb1-474ed7492a49	2025-08-30 16:52:32.86	2025-08-31 20:00:00	2025-08-31 21:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-60928462-7898-453a-af1a-ec3d774775e1	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	b985a711-c06a-461e-b068-a2f41ba09796	2025-08-30 17:42:43.242	2025-08-31 19:00:00	2025-08-31 20:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-bfa03c69-1451-4095-95b9-0900d9e60976	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	85c88b87-6846-4040-959b-7a53ae13f1d6	2025-09-01 16:09:34.226	2025-09-02 09:00:00	2025-09-02 10:00:00	1200.00	confirmed	paid	\N	\N	f
-fb696e95-edf8-4bff-8b7c-6b53ed88f045	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	f4aada3a-870d-4819-874c-5cff847e5900	2025-09-07 06:59:53.391	2025-09-07 20:00:00	2025-09-07 21:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-fa5a881d-cd9c-4c58-8027-9c50e26afa4b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	b90c824b-73c5-4e77-a930-3ec19a5367c8	2025-09-07 12:57:23.72	2025-09-07 19:00:00	2025-09-07 20:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-f26d8960-7f34-44a8-b314-9b2def449024	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	14e8a2eb-fbbd-46f6-98a3-2c547ad0178b	2025-09-16 09:25:46.389	2025-09-16 16:00:00	2025-09-16 17:00:00	1200.00	confirmed	paid	\N	\N	f
-82bd8c04-9cbb-4e2c-b1b0-afc6d8e4b929	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	3588ca97-6e46-4528-96e2-9fd64d5ce51e	2025-09-20 16:13:41.585	2025-09-21 08:00:00	2025-09-21 09:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-e9b90301-1646-44a6-818d-71f6fd4f806d	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	3588ca97-6e46-4528-96e2-9fd64d5ce51e	2025-09-20 16:13:28.877	2025-09-21 08:00:00	2025-09-21 09:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-d489178a-5756-4541-ad06-4aed0b8a3c31	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	3588ca97-6e46-4528-96e2-9fd64d5ce51e	2025-09-20 16:13:35.576	2025-09-21 08:00:00	2025-09-21 09:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-a234e269-1c75-4ad8-a1a0-ca9fb09cb857	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	58746a32-e0c9-4e53-8708-0c2b5a09db9c	2025-09-20 16:13:05.212	2025-09-21 07:00:00	2025-09-21 08:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-8d9209bf-53d0-4589-b680-cf8395014288	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	3588ca97-6e46-4528-96e2-9fd64d5ce51e	2025-09-20 16:23:59.23	2025-09-21 08:00:00	2025-09-21 09:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-4d431bb2-aa94-4cb1-a613-954763d24ed9	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	3588ca97-6e46-4528-96e2-9fd64d5ce51e	2025-09-20 16:24:12.765	2025-09-21 08:00:00	2025-09-21 09:00:00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-8161d4b7-49a0-4951-a0ab-ea4f3c756d4b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	3588ca97-6e46-4528-96e2-9fd64d5ce51e	2025-09-20 16:26:59.662	2025-09-21 08:00:00	2025-09-21 09:00:00	1200.00	cancelled	refunded	Cancelled by user	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
-570349e0-a655-4bd5-bee3-9ff19d9b6a49	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	58746a32-e0c9-4e53-8708-0c2b5a09db9c	2025-09-20 16:21:21.941	2025-09-21 07:00:00	2025-09-21 08:00:00	1200.00	cancelled	refunded	Cancelled by user	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+0ca591e8-9fb0-4057-b240-b62b6af015fd	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	23d5c51a-24e9-4ff4-b6fd-02c55a6ab5f6	2025-08-21 17:32:02.769+00	2025-08-22 07:00:00+00	2025-08-22 08:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+68b0541e-e90a-43d8-a483-dfd364a4f649	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	23d5c51a-24e9-4ff4-b6fd-02c55a6ab5f6	2025-08-21 17:38:05.281+00	2025-08-22 07:00:00+00	2025-08-22 08:00:00+00	1200.00	confirmed	paid	\N	\N	f
+14fbf7a5-3fb2-427c-a640-5336474cb3c3	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	7e0778c0-1638-4e0e-9aa7-c5e89fd0e39b	2025-08-21 17:39:47.433+00	2025-08-22 08:00:00+00	2025-08-22 09:00:00+00	1500.00	confirmed	paid	\N	\N	f
+e1040e9d-71e5-4e5a-b1e5-e589f7535108	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	58746a32-e0c9-4e53-8708-0c2b5a09db9c	2025-09-20 16:12:57.043+00	2025-09-21 07:00:00+00	2025-09-21 08:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+f037d151-9a1f-4bba-a434-13fe714c351f	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	58746a32-e0c9-4e53-8708-0c2b5a09db9c	2025-09-20 16:19:05.339+00	2025-09-21 07:00:00+00	2025-09-21 08:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+4dd90a04-5b9b-4daf-9909-5635a61d7072	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	360bbeb1-6b6f-49ba-9436-61a2d9a96778	2025-08-22 07:31:54.861+00	2025-08-22 14:00:00+00	2025-08-22 15:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+5f8cb269-8d2f-4d76-97e5-41feca4955a8	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	0ef67817-04a4-4861-b847-78269cb355b3	2025-08-30 17:20:18.4+00	2025-08-31 21:00:00+00	2025-08-31 22:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+0184fba9-dc42-49c7-860a-1b99c7763271	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	30cac499-d599-4fe6-bdb1-474ed7492a49	2025-08-30 16:52:32.86+00	2025-08-31 20:00:00+00	2025-08-31 21:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+60928462-7898-453a-af1a-ec3d774775e1	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	b985a711-c06a-461e-b068-a2f41ba09796	2025-08-30 17:42:43.242+00	2025-08-31 19:00:00+00	2025-08-31 20:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+bfa03c69-1451-4095-95b9-0900d9e60976	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	85c88b87-6846-4040-959b-7a53ae13f1d6	2025-09-01 16:09:34.226+00	2025-09-02 09:00:00+00	2025-09-02 10:00:00+00	1200.00	confirmed	paid	\N	\N	f
+fb696e95-edf8-4bff-8b7c-6b53ed88f045	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	f4aada3a-870d-4819-874c-5cff847e5900	2025-09-07 06:59:53.391+00	2025-09-07 20:00:00+00	2025-09-07 21:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+fa5a881d-cd9c-4c58-8027-9c50e26afa4b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	b90c824b-73c5-4e77-a930-3ec19a5367c8	2025-09-07 12:57:23.72+00	2025-09-07 19:00:00+00	2025-09-07 20:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+f26d8960-7f34-44a8-b314-9b2def449024	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	14e8a2eb-fbbd-46f6-98a3-2c547ad0178b	2025-09-16 09:25:46.389+00	2025-09-16 16:00:00+00	2025-09-16 17:00:00+00	1200.00	confirmed	paid	\N	\N	f
+82bd8c04-9cbb-4e2c-b1b0-afc6d8e4b929	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	3588ca97-6e46-4528-96e2-9fd64d5ce51e	2025-09-20 16:13:41.585+00	2025-09-21 08:00:00+00	2025-09-21 09:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+e9b90301-1646-44a6-818d-71f6fd4f806d	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	3588ca97-6e46-4528-96e2-9fd64d5ce51e	2025-09-20 16:13:28.877+00	2025-09-21 08:00:00+00	2025-09-21 09:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+d489178a-5756-4541-ad06-4aed0b8a3c31	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	3588ca97-6e46-4528-96e2-9fd64d5ce51e	2025-09-20 16:13:35.576+00	2025-09-21 08:00:00+00	2025-09-21 09:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+a234e269-1c75-4ad8-a1a0-ca9fb09cb857	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	58746a32-e0c9-4e53-8708-0c2b5a09db9c	2025-09-20 16:13:05.212+00	2025-09-21 07:00:00+00	2025-09-21 08:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+8d9209bf-53d0-4589-b680-cf8395014288	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	3588ca97-6e46-4528-96e2-9fd64d5ce51e	2025-09-20 16:23:59.23+00	2025-09-21 08:00:00+00	2025-09-21 09:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+4d431bb2-aa94-4cb1-a613-954763d24ed9	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	3588ca97-6e46-4528-96e2-9fd64d5ce51e	2025-09-20 16:24:12.765+00	2025-09-21 08:00:00+00	2025-09-21 09:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+8161d4b7-49a0-4951-a0ab-ea4f3c756d4b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	3588ca97-6e46-4528-96e2-9fd64d5ce51e	2025-09-20 16:26:59.662+00	2025-09-21 08:00:00+00	2025-09-21 09:00:00+00	1200.00	cancelled	refunded	Cancelled by user	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+570349e0-a655-4bd5-bee3-9ff19d9b6a49	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	58746a32-e0c9-4e53-8708-0c2b5a09db9c	2025-09-20 16:21:21.941+00	2025-09-21 07:00:00+00	2025-09-21 08:00:00+00	1200.00	cancelled	refunded	Cancelled by user	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+ed061e46-3edb-4941-b215-be9b45a479f8	541b69e6-5c6e-4ad7-8764-7aa01c435021	f3f3f3f3-3333-41d4-a7f6-000000000003	58746a32-e0c9-4e53-8708-0c2b5a09db9c	2025-09-20 19:33:59.522+00	2025-09-21 07:00:00+00	2025-09-21 08:00:00+00	1200.00	confirmed	paid	\N	\N	f
+34fb1d49-1c6d-4ba5-8a6f-b9602d324178	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	d9c45fd6-9df4-4c34-8a01-8454911ba9fe	2025-09-21 07:03:10.014+00	2025-09-21 13:00:00+00	2025-09-21 14:00:00+00	1200.00	confirmed	paid	\N	\N	f
+6e0e4105-107f-450d-876a-ca75621b4f8e	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	2c2fbdfa-b918-46bb-9513-12d988bce16c	2025-09-21 08:10:06.051+00	2025-09-21 14:00:00+00	2025-09-21 15:00:00+00	1200.00	confirmed	paid	\N	\N	f
+0d1f4f30-514e-4989-b857-4c9989b55ae3	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	85ce0808-7d5b-460b-ae84-7142b369c90c	2025-09-21 09:23:50.485+00	2025-09-21 15:00:00+00	2025-09-21 16:00:00+00	1200.00	confirmed	paid	\N	\N	f
+486c0c83-7056-42b6-9c13-7881a6f5c010	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	8d52b683-62e1-41d6-be6f-8caa046dc602	2025-09-21 12:33:23.055+00	2025-09-21 16:00:00+00	2025-09-21 17:00:00+00	1200.00	confirmed	paid	\N	\N	f
 \.
 
 
@@ -4322,8 +4439,13 @@ b4dbc735-39a7-4a45-9f83-5f6069bb64ff	660e8400-e29b-41d4-a716-446655440008	2025-0
 -- Data for Name: offers; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.offers (offer_id, venue_id, title, description, discount_percentage, is_active, valid_from, valid_until, created_at) FROM stdin;
-8b6d4e0d-7b6d-47f0-8d78-b7159a928c78	b2b2b2b2-2222-41d4-a7f6-000000000002	First 100 players can avail this offer.\n\n	First 100 players can avail this offer.\n\nGet flat 60% off**\n\ncode : FIRST100	60.00	t	2025-09-17 18:30:00+00	2025-09-20 18:30:00+00	2025-09-16 21:10:36.208454+00
+COPY public.offers (offer_id, venue_id, title, description, discount_percentage, is_active, valid_from, valid_until, created_at, is_global, background_image_url, offer_code) FROM stdin;
+b2530565-9e74-4ed9-b387-2497cfc86a65	a1a1a1a1-1111-41d4-a7f6-000000000001	Weekday Special	Get 20% off on all bookings from Monday to Friday.	20.00	t	2025-09-21 11:30:54.361517+00	2025-12-31 23:59:59+00	2025-09-21 11:30:54.361517+00	f	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/sign/offer-backgrounds/default-offer-bg.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85Y2RhMjljNy1hZWQ4LTQwNWItOTM4NC1mOWI1ZjE0OTRjOTYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJvZmZlci1iYWNrZ3JvdW5kcy9kZWZhdWx0LW9mZmVyLWJnLnBuZyIsImlhdCI6MTc1ODQ1OTczMywiZXhwIjoxNzg5OTk1NzMzfQ.q_GPfQRmnX92g_TUf8QgY46T5oJOEU0NiigYTfeDBks	\N
+0218fb6e-5a0d-4c33-b356-ada75f17b86f	b2b2b2b2-2222-41d4-a7f6-000000000002	Weekend Bonanza	Flat 15% off on weekend slots.	15.00	t	2025-09-21 11:30:54.361517+00	2025-12-31 23:59:59+00	2025-09-21 11:30:54.361517+00	f	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/sign/offer-backgrounds/default-offer-bg.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85Y2RhMjljNy1hZWQ4LTQwNWItOTM4NC1mOWI1ZjE0OTRjOTYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJvZmZlci1iYWNrZ3JvdW5kcy9kZWZhdWx0LW9mZmVyLWJnLnBuZyIsImlhdCI6MTc1ODQ1OTczMywiZXhwIjoxNzg5OTk1NzMzfQ.q_GPfQRmnX92g_TUf8QgY46T5oJOEU0NiigYTfeDBks	\N
+2805217b-538a-47ad-a3c9-962151c43986	\N	New User Offer	Get 25% off on your first booking!	25.00	t	2025-09-21 11:30:54.361517+00	\N	2025-09-21 11:30:54.361517+00	t	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/sign/offer-backgrounds/default-offer-bg.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85Y2RhMjljNy1hZWQ4LTQwNWItOTM4NC1mOWI1ZjE0OTRjOTYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJvZmZlci1iYWNrZ3JvdW5kcy9kZWZhdWx0LW9mZmVyLWJnLnBuZyIsImlhdCI6MTc1ODQ1OTczMywiZXhwIjoxNzg5OTk1NzMzfQ.q_GPfQRmnX92g_TUf8QgY46T5oJOEU0NiigYTfeDBks	FIRST25
+34c5c5c7-a498-45b5-87b5-80a15d3c9cd0	\N	Summer Sale	Enjoy a 30% discount on all pool and snooker bookings this summer.	30.00	t	2025-09-21 11:30:54.361517+00	2026-08-31 23:59:59+00	2025-09-21 11:30:54.361517+00	t	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/sign/offer-backgrounds/default-offer-bg.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85Y2RhMjljNy1hZWQ4LTQwNWItOTM4NC1mOWI1ZjE0OTRjOTYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJvZmZlci1iYWNrZ3JvdW5kcy9kZWZhdWx0LW9mZmVyLWJnLnBuZyIsImlhdCI6MTc1ODQ1OTczMywiZXhwIjoxNzg5OTk1NzMzfQ.q_GPfQRmnX92g_TUf8QgY46T5oJOEU0NiigYTfeDBks	SUMMER30
+97519342-f72a-476c-a29e-6d04e38b5c1d	\N	Monsoon Madness	Get 10% off on all indoor games during rainy days.	10.00	t	2025-09-21 11:55:09.738862+00	\N	2025-09-21 11:55:09.738862+00	t	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/sign/offer-backgrounds/default-offer-bg.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85Y2RhMjljNy1hZWQ4LTQwNWItOTM4NC1mOWI1ZjE0OTRjOTYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJvZmZlci1iYWNrZ3JvdW5kcy9kZWZhdWx0LW9mZmVyLWJnLnBuZyIsImlhdCI6MTc1ODQ1OTczMywiZXhwIjoxNzg5OTk1NzMzfQ.q_GPfQRmnX92g_TUf8QgY46T5oJOEU0NiigYTfeDBks	\N
+bd390967-4fc1-4a75-baf3-8e00635137d4	a1a1a1a1-1111-41d4-a7f6-000000000001	Cricket Practice Pack	Book 5 net sessions and get one free.	20.00	t	2025-09-21 11:55:09.738862+00	\N	2025-09-21 11:55:09.738862+00	f	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/sign/offer-backgrounds/default-offer-bg.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85Y2RhMjljNy1hZWQ4LTQwNWItOTM4NC1mOWI1ZjE0OTRjOTYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJvZmZlci1iYWNrZ3JvdW5kcy9kZWZhdWx0LW9mZmVyLWJnLnBuZyIsImlhdCI6MTc1ODQ1OTczMywiZXhwIjoxNzg5OTk1NzMzfQ.q_GPfQRmnX92g_TUf8QgY46T5oJOEU0NiigYTfeDBks	\N
 \.
 
 
@@ -4347,8 +4469,8 @@ COPY public.points_transactions (transaction_id, user_id, points_amount, transac
 -- Data for Name: reviews; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.reviews (review_id, user_id, venue_id, rating, comment, created_at) FROM stdin;
-11cec7f7-e650-4a8f-b811-3217492680c6	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	b2b2b2b2-2222-41d4-a7f6-000000000002	5	Amazing turf quality and great service!	2025-08-09 10:10:50.930041
+COPY public.reviews (review_id, user_id, venue_id, rating, comment, created_at, booking_id) FROM stdin;
+11cec7f7-e650-4a8f-b811-3217492680c6	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	b2b2b2b2-2222-41d4-a7f6-000000000002	5	Amazing turf quality and great service!	2025-08-09 10:10:50.930041+00	\N
 \.
 
 
@@ -4373,129 +4495,129 @@ COPY public.sports (sport_id, name, description) FROM stdin;
 --
 
 COPY public.time_slots (slot_id, facility_id, start_time, end_time, is_available, price_override, block_reason) FROM stdin;
-aec6054e-09aa-4751-9c93-39f48cfe3aa6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 09:00:00	2025-08-22 10:00:00	t	\N	\N
-b0de0758-df02-4303-bb57-b20a3a9958ed	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 10:00:00	2025-08-22 11:00:00	t	\N	\N
-9034c754-d68b-43a9-99a4-295c0e777a5f	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 11:00:00	2025-08-22 12:00:00	t	\N	\N
-b26cf90d-1978-4ada-bf30-4d518913ad7e	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 12:00:00	2025-08-22 13:00:00	t	\N	\N
-f3e9c7b6-73b1-42bf-bf18-a65b835f5525	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 13:00:00	2025-08-22 14:00:00	t	\N	\N
-0dae761b-96fa-4674-8e2b-b3925317b763	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 15:00:00	2025-08-22 16:00:00	t	\N	\N
-274cef70-6277-426b-aa2c-854af38d0f10	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 16:00:00	2025-08-22 17:00:00	t	\N	\N
-1dbc3420-a1db-4a74-98e2-3ebe47bedff6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 17:00:00	2025-08-22 18:00:00	t	\N	\N
-d5173b17-de63-454d-9a8a-f908e2374494	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 18:00:00	2025-08-22 19:00:00	t	\N	\N
-3aa1d686-9b5e-45a4-8348-4f4bce1b3844	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 19:00:00	2025-08-22 20:00:00	t	\N	\N
-6fd741be-8210-4a2f-9db4-fd08e16022cf	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 20:00:00	2025-08-22 21:00:00	t	\N	\N
-b40c682c-342c-4b0a-818a-8168ddf47d6b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 21:00:00	2025-08-22 22:00:00	t	\N	\N
-7b760e76-88f8-4092-8f73-8c63215a3260	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 09:00:00	2025-08-22 10:00:00	t	\N	\N
-5bbbc392-b9c6-4d4e-8dd1-a0b926c3d483	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 15:00:00	2025-08-22 16:00:00	t	\N	\N
-b85a56b6-2a4e-4549-8149-f88f8c7e4813	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 10:00:00	2025-08-22 11:00:00	t	\N	\N
-0083b130-dcaa-45e2-9a7b-fae5a11ed6cd	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 16:00:00	2025-08-22 17:00:00	t	\N	\N
-ec5bed40-8a8d-491a-80e0-33371036a068	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 17:00:00	2025-08-22 18:00:00	t	\N	\N
-8a8a05dd-e70b-412a-b11a-0d10fee74c04	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 11:00:00	2025-08-22 12:00:00	t	\N	\N
-5dddcc0e-ba6c-4fd1-bcfb-096bb7934c4c	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 12:00:00	2025-08-22 13:00:00	t	\N	\N
-d8212a18-86ab-4d60-9850-7c029833e6ad	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 18:00:00	2025-08-22 19:00:00	t	\N	\N
-6d84d852-1170-4442-9e7e-34ff6668b8e5	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 13:00:00	2025-08-22 14:00:00	t	\N	\N
-d6fc5c2b-8d14-478b-ac68-3fabecfcdf74	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 19:00:00	2025-08-22 20:00:00	t	\N	\N
-7e0eab00-5b94-473a-8b8e-21b6ba113a3b	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 14:00:00	2025-08-22 15:00:00	t	\N	\N
-7d5c22bc-c4ba-4a99-ace1-2a5d074e6713	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 20:00:00	2025-08-22 21:00:00	t	\N	\N
-14e8a2eb-fbbd-46f6-98a3-2c547ad0178b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 16:00:00	2025-09-16 17:00:00	f	\N	\N
-f4aada3a-870d-4819-874c-5cff847e5900	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 20:00:00	2025-09-07 21:00:00	t	\N	\N
-23d5c51a-24e9-4ff4-b6fd-02c55a6ab5f6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 07:00:00	2025-08-22 08:00:00	f	\N	\N
-b90c824b-73c5-4e77-a930-3ec19a5367c8	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 19:00:00	2025-09-07 20:00:00	t	\N	\N
-7e0778c0-1638-4e0e-9aa7-c5e89fd0e39b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 08:00:00	2025-08-22 09:00:00	f	1500.00	\N
-23a041cc-513d-4a57-a67f-0cf2d74fca17	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 07:00:00	2025-09-15 08:00:00	t	\N	\N
-50f21368-162b-48aa-985f-18b92d5e1647	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 08:00:00	2025-09-15 09:00:00	t	\N	\N
-360bbeb1-6b6f-49ba-9436-61a2d9a96778	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 14:00:00	2025-08-22 15:00:00	t	\N	\N
-df765f42-0d3d-46cf-8b73-c72c6cc8a792	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 21:00:00	2025-08-26 22:00:00	t	\N	\N
-55b2d4bd-5956-4b35-909a-49b51533b376	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 19:00:00	2025-08-26 20:00:00	t	\N	\N
-24a48625-6084-42de-b80a-d9fce79232d1	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 20:00:00	2025-08-26 21:00:00	t	\N	\N
-18b3f711-6896-4c75-bbf0-1130b7f0cb15	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 18:00:00	2025-08-26 19:00:00	t	\N	\N
-e9eb4310-28e0-4670-bba7-0057a4ef8354	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 17:00:00	2025-08-26 18:00:00	t	\N	\N
-95940143-be8c-4e60-af94-46a6a7e53104	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 16:00:00	2025-08-26 17:00:00	t	\N	\N
-bd295077-9db8-4c29-ba07-0f7bc4b705e8	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 15:00:00	2025-08-26 16:00:00	t	\N	\N
-59c97dd8-3123-4af1-9bf5-e6a6b1a7b865	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 07:00:00	2025-08-31 08:00:00	t	\N	\N
-1ba26669-1adc-4045-93ef-4decea9a1320	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 08:00:00	2025-08-31 09:00:00	t	\N	\N
-0067a365-21fe-48f8-9925-7ea7dea50e66	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 09:00:00	2025-08-31 10:00:00	t	\N	\N
-f40f0021-ccc9-4f47-bdc2-33f47755701d	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 10:00:00	2025-08-31 11:00:00	t	\N	\N
-0e9ed3d8-173e-46fa-a19b-f93b0ea913a3	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 11:00:00	2025-08-31 12:00:00	t	\N	\N
-d458f9e4-1399-4d3b-8c2f-a0f2b22a939c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 16:00:00	2025-08-31 17:00:00	t	\N	\N
-a9feefc8-d390-4c6d-9821-07742e334172	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 17:00:00	2025-08-31 18:00:00	t	\N	\N
-de2eb3cb-4a0c-4225-b002-0227a826fb90	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 18:00:00	2025-08-31 19:00:00	t	\N	\N
-83cd2a5a-f85d-4de7-9b7c-a245953129ff	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 09:00:00	2025-09-15 10:00:00	t	\N	\N
-9877a8a0-eecc-401f-83ff-b499574e6c62	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 10:00:00	2025-09-15 11:00:00	t	\N	\N
-38591c8f-df96-43e3-aecb-3239d87c7fe6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 11:00:00	2025-09-15 12:00:00	t	\N	\N
-0ef67817-04a4-4861-b847-78269cb355b3	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 21:00:00	2025-08-31 22:00:00	t	\N	\N
-30cac499-d599-4fe6-bdb1-474ed7492a49	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 20:00:00	2025-08-31 21:00:00	t	\N	\N
-b985a711-c06a-461e-b068-a2f41ba09796	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 19:00:00	2025-08-31 20:00:00	t	\N	\N
-bb53dea0-f370-4c75-98e4-a1a1580c4bb7	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 07:00:00	2025-09-02 08:00:00	t	\N	\N
-8a44d0c3-f2c4-4b12-8d64-f515bf6e37a7	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 08:00:00	2025-09-02 09:00:00	t	\N	\N
-566da959-4a4a-428b-bdb2-7becfe2b564f	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 13:00:00	2025-09-02 14:00:00	t	\N	\N
-e64c2567-b3c4-41ab-b7de-d3417c1b547c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 14:00:00	2025-09-02 15:00:00	t	\N	\N
-ceb005e4-ccaa-4548-950c-ee15aabb9860	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 20:00:00	2025-09-02 21:00:00	t	\N	\N
-db61b907-72a4-4e22-9d1c-d036954de2b9	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 10:00:00	2025-09-02 11:00:00	t	\N	\N
-f5b0f005-5255-4d67-bb21-386b6d655d9f	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 15:00:00	2025-09-02 16:00:00	t	\N	\N
-7ae9d453-b687-4090-be73-f4700cddf0ee	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 11:00:00	2025-09-02 12:00:00	t	\N	\N
-85c88b87-6846-4040-959b-7a53ae13f1d6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 09:00:00	2025-09-02 10:00:00	f	\N	\N
-e2cdfda1-7e13-4bf4-83d6-aee86910d166	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 13:00:00	2025-09-07 14:00:00	t	\N	\N
-7b3e2b4d-a757-4a1b-8f15-fe26cac11b1a	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 14:00:00	2025-09-07 15:00:00	t	\N	\N
-c0b9eb7b-2cf2-4b03-a224-7d7b3fd4ff3d	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 16:00:00	2025-09-07 17:00:00	t	\N	\N
-3501477a-da70-4e87-82a5-3a57f110b583	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 21:00:00	2025-09-07 22:00:00	t	\N	\N
-134a2602-7841-48f8-a779-f7c2d722bcd0	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 17:00:00	2025-09-07 18:00:00	t	\N	\N
-0510d0ae-3217-4a55-b4c4-ebd33a553b3e	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 18:00:00	2025-09-07 19:00:00	t	\N	\N
-c41643cc-0254-48f3-903a-dee8b07a89f5	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 15:00:00	2025-09-07 16:00:00	t	1500.00	\N
-9059bb70-7cec-414d-bfd3-83abf8f197be	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-17 21:00:00	2025-09-17 22:00:00	t	\N	\N
-5a716b61-8159-47eb-bff5-d53f01e3c4b6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 12:00:00	2025-09-15 13:00:00	t	\N	\N
-5ab7838f-c7f6-40aa-9966-5fbd6e51bc0c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 13:00:00	2025-09-15 14:00:00	t	\N	\N
-a8807362-deda-42b0-a497-cc233da5a449	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 14:00:00	2025-09-15 15:00:00	t	\N	\N
-e706a08a-9149-4d7d-b102-b7aa09dabd8d	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 15:00:00	2025-09-15 16:00:00	t	\N	\N
-466c1db6-5c27-4f18-8fdf-6c9996304fcc	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 16:00:00	2025-09-15 17:00:00	t	\N	\N
-65370777-a7c5-4eae-a58e-b8423952bbdd	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 17:00:00	2025-09-15 18:00:00	t	\N	\N
-6d3a2f51-3206-4a9f-9d84-5c311f35f0f9	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 18:00:00	2025-09-15 19:00:00	t	\N	\N
-4ce7987e-a4f0-48be-bdee-cee4700cfc81	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 19:00:00	2025-09-15 20:00:00	t	\N	\N
-0720ea59-d8fd-4176-86df-891ae710ac08	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 20:00:00	2025-09-15 21:00:00	t	\N	\N
-fe8146bc-c4e3-4b12-8af2-9e426f60a382	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 21:00:00	2025-09-15 22:00:00	t	\N	\N
-c86b5fc4-9d27-458a-8922-29bf9bf03cde	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 07:00:00	2025-09-16 08:00:00	t	\N	\N
-b8884d83-404d-4cab-95f9-1fe48453c932	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 08:00:00	2025-09-16 09:00:00	t	\N	\N
-20f72657-af6e-4750-813a-9680a55bf4b5	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 09:00:00	2025-09-16 10:00:00	t	\N	\N
-0daeaf15-a7e8-409c-85f3-1c1e04016a4b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 10:00:00	2025-09-16 11:00:00	t	\N	\N
-3303ff57-2597-4702-86bf-6e7ae6a327b8	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 11:00:00	2025-09-16 12:00:00	t	\N	\N
-fa7036a5-20da-4c69-af78-9c42c6283c3b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 12:00:00	2025-09-16 13:00:00	t	\N	\N
-8935c2fb-dce6-4b47-ac59-cc0df8a313ed	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 13:00:00	2025-09-16 14:00:00	t	\N	\N
-e89cc581-5aa8-4779-9cd6-104f1c83264c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 14:00:00	2025-09-16 15:00:00	t	\N	\N
-ad53d8d4-a031-4da8-a638-f9f1c02936b0	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 15:00:00	2025-09-16 16:00:00	t	\N	\N
-59c6dea3-b6ea-4d56-af6e-b12131bcecd3	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 17:00:00	2025-09-16 18:00:00	t	\N	\N
-de372fea-47a6-4ca3-bfa0-47224c39593b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 18:00:00	2025-09-16 19:00:00	t	\N	\N
-0582c820-62df-4bd2-8f24-675168c9bcd0	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 19:00:00	2025-09-16 20:00:00	t	\N	\N
-a986469b-7e2a-498a-8c82-62f1b4550719	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 20:00:00	2025-09-16 21:00:00	t	\N	\N
-2e6b8097-0a67-48e5-aca2-40dc724ea172	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 21:00:00	2025-09-16 22:00:00	t	\N	\N
-55de9004-699d-4fad-8f55-469da6062605	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-17 20:00:00	2025-09-17 21:00:00	t	\N	\N
-d002cfcd-f95d-4a38-b2b3-cd6cf2f8f7b3	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 09:00:00	2025-09-21 10:00:00	t	\N	\N
-51ea7f0c-c0ac-4961-bc4f-3e6ab5ca375b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 10:00:00	2025-09-21 11:00:00	t	\N	\N
-1f4eeab4-c219-458b-a63c-d18e570ecf89	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 11:00:00	2025-09-21 12:00:00	t	\N	\N
-44ed6611-220e-4e24-a185-e5b4a06a11b8	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 12:00:00	2025-09-21 13:00:00	t	\N	\N
-d9c45fd6-9df4-4c34-8a01-8454911ba9fe	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 13:00:00	2025-09-21 14:00:00	t	\N	\N
-2c2fbdfa-b918-46bb-9513-12d988bce16c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 14:00:00	2025-09-21 15:00:00	t	\N	\N
-85ce0808-7d5b-460b-ae84-7142b369c90c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 15:00:00	2025-09-21 16:00:00	t	\N	\N
-8d52b683-62e1-41d6-be6f-8caa046dc602	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 16:00:00	2025-09-21 17:00:00	t	\N	\N
-b681dd78-44fe-4590-9e5f-d7c4e370bcc7	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 17:00:00	2025-09-21 18:00:00	t	\N	\N
-e1bd11d3-e70f-46bb-9bf8-dcb65f64af5f	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 18:00:00	2025-09-21 19:00:00	t	\N	\N
-8b7c9fe2-850b-4264-ac3a-de003f9b6c2f	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 19:00:00	2025-09-21 20:00:00	t	\N	\N
-36b702fb-5604-41e7-b2ef-62eb9e85c9d9	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 20:00:00	2025-09-21 21:00:00	t	\N	\N
-708924c0-0dde-44fb-b4eb-076a3e74823e	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 21:00:00	2025-09-21 22:00:00	t	\N	\N
-3588ca97-6e46-4528-96e2-9fd64d5ce51e	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 08:00:00	2025-09-21 09:00:00	t	\N	\N
-58746a32-e0c9-4e53-8708-0c2b5a09db9c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 07:00:00	2025-09-21 08:00:00	t	\N	\N
-e54feb5d-03f3-4040-ae70-d14fc46a9dd2	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 09:00:00	2025-09-20 10:00:00	t	\N	\N
-40d60d76-d627-44f1-b350-a3252d2aa760	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 10:00:00	2025-09-20 11:00:00	t	\N	\N
-10a64e94-4954-44a8-9674-1293cf0fbec5	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 11:00:00	2025-09-20 12:00:00	t	\N	\N
-59eed597-049a-4ef8-873d-cc815fa087ee	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 12:00:00	2025-09-20 13:00:00	t	\N	\N
-6744f778-1a9c-41ea-9714-8ef2c8e72564	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 13:00:00	2025-09-20 14:00:00	t	\N	\N
-8e119b96-18f5-4127-a88f-cf3f350f215e	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 14:00:00	2025-09-20 15:00:00	t	\N	\N
-9eb30c17-431a-4562-9b7b-f97946636a7e	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 15:00:00	2025-09-20 16:00:00	t	\N	\N
-a43f0a81-d51d-4596-a862-b8f46d60a6a4	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 16:00:00	2025-09-20 17:00:00	t	\N	\N
-494813dd-fe23-4c18-ae26-90381ad7d20f	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 17:00:00	2025-09-20 18:00:00	t	\N	\N
-06d18454-cd5f-4362-8244-39eef00de840	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 18:00:00	2025-09-20 19:00:00	t	\N	\N
-c1f3b5ec-b1c1-4cd8-93e6-f425da605510	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 19:00:00	2025-09-20 20:00:00	t	\N	\N
-f269f611-c0af-4c0d-9658-a1dd337a3c7a	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 20:00:00	2025-09-20 21:00:00	t	\N	\N
-ae077f0d-d20b-4eb1-9b24-a9a335fc88b6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 21:00:00	2025-09-20 22:00:00	t	\N	\N
+aec6054e-09aa-4751-9c93-39f48cfe3aa6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 09:00:00+00	2025-08-22 10:00:00+00	t	\N	\N
+b0de0758-df02-4303-bb57-b20a3a9958ed	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 10:00:00+00	2025-08-22 11:00:00+00	t	\N	\N
+9034c754-d68b-43a9-99a4-295c0e777a5f	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 11:00:00+00	2025-08-22 12:00:00+00	t	\N	\N
+b26cf90d-1978-4ada-bf30-4d518913ad7e	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 12:00:00+00	2025-08-22 13:00:00+00	t	\N	\N
+f3e9c7b6-73b1-42bf-bf18-a65b835f5525	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 13:00:00+00	2025-08-22 14:00:00+00	t	\N	\N
+0dae761b-96fa-4674-8e2b-b3925317b763	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 15:00:00+00	2025-08-22 16:00:00+00	t	\N	\N
+274cef70-6277-426b-aa2c-854af38d0f10	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 16:00:00+00	2025-08-22 17:00:00+00	t	\N	\N
+1dbc3420-a1db-4a74-98e2-3ebe47bedff6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 17:00:00+00	2025-08-22 18:00:00+00	t	\N	\N
+d5173b17-de63-454d-9a8a-f908e2374494	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 18:00:00+00	2025-08-22 19:00:00+00	t	\N	\N
+3aa1d686-9b5e-45a4-8348-4f4bce1b3844	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 19:00:00+00	2025-08-22 20:00:00+00	t	\N	\N
+6fd741be-8210-4a2f-9db4-fd08e16022cf	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 20:00:00+00	2025-08-22 21:00:00+00	t	\N	\N
+b40c682c-342c-4b0a-818a-8168ddf47d6b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 21:00:00+00	2025-08-22 22:00:00+00	t	\N	\N
+7b760e76-88f8-4092-8f73-8c63215a3260	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 09:00:00+00	2025-08-22 10:00:00+00	t	\N	\N
+5bbbc392-b9c6-4d4e-8dd1-a0b926c3d483	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 15:00:00+00	2025-08-22 16:00:00+00	t	\N	\N
+b85a56b6-2a4e-4549-8149-f88f8c7e4813	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 10:00:00+00	2025-08-22 11:00:00+00	t	\N	\N
+0083b130-dcaa-45e2-9a7b-fae5a11ed6cd	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 16:00:00+00	2025-08-22 17:00:00+00	t	\N	\N
+ec5bed40-8a8d-491a-80e0-33371036a068	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 17:00:00+00	2025-08-22 18:00:00+00	t	\N	\N
+8a8a05dd-e70b-412a-b11a-0d10fee74c04	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 11:00:00+00	2025-08-22 12:00:00+00	t	\N	\N
+5dddcc0e-ba6c-4fd1-bcfb-096bb7934c4c	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 12:00:00+00	2025-08-22 13:00:00+00	t	\N	\N
+d8212a18-86ab-4d60-9850-7c029833e6ad	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 18:00:00+00	2025-08-22 19:00:00+00	t	\N	\N
+6d84d852-1170-4442-9e7e-34ff6668b8e5	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 13:00:00+00	2025-08-22 14:00:00+00	t	\N	\N
+d6fc5c2b-8d14-478b-ac68-3fabecfcdf74	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 19:00:00+00	2025-08-22 20:00:00+00	t	\N	\N
+7e0eab00-5b94-473a-8b8e-21b6ba113a3b	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 14:00:00+00	2025-08-22 15:00:00+00	t	\N	\N
+7d5c22bc-c4ba-4a99-ace1-2a5d074e6713	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-22 20:00:00+00	2025-08-22 21:00:00+00	t	\N	\N
+14e8a2eb-fbbd-46f6-98a3-2c547ad0178b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 16:00:00+00	2025-09-16 17:00:00+00	f	\N	\N
+f4aada3a-870d-4819-874c-5cff847e5900	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 20:00:00+00	2025-09-07 21:00:00+00	t	\N	\N
+23d5c51a-24e9-4ff4-b6fd-02c55a6ab5f6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 07:00:00+00	2025-08-22 08:00:00+00	f	\N	\N
+b90c824b-73c5-4e77-a930-3ec19a5367c8	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 19:00:00+00	2025-09-07 20:00:00+00	t	\N	\N
+7e0778c0-1638-4e0e-9aa7-c5e89fd0e39b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 08:00:00+00	2025-08-22 09:00:00+00	f	1500.00	\N
+23a041cc-513d-4a57-a67f-0cf2d74fca17	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 07:00:00+00	2025-09-15 08:00:00+00	t	\N	\N
+50f21368-162b-48aa-985f-18b92d5e1647	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 08:00:00+00	2025-09-15 09:00:00+00	t	\N	\N
+360bbeb1-6b6f-49ba-9436-61a2d9a96778	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-22 14:00:00+00	2025-08-22 15:00:00+00	t	\N	\N
+df765f42-0d3d-46cf-8b73-c72c6cc8a792	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 21:00:00+00	2025-08-26 22:00:00+00	t	\N	\N
+55b2d4bd-5956-4b35-909a-49b51533b376	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 19:00:00+00	2025-08-26 20:00:00+00	t	\N	\N
+24a48625-6084-42de-b80a-d9fce79232d1	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 20:00:00+00	2025-08-26 21:00:00+00	t	\N	\N
+18b3f711-6896-4c75-bbf0-1130b7f0cb15	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 18:00:00+00	2025-08-26 19:00:00+00	t	\N	\N
+e9eb4310-28e0-4670-bba7-0057a4ef8354	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 17:00:00+00	2025-08-26 18:00:00+00	t	\N	\N
+95940143-be8c-4e60-af94-46a6a7e53104	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 16:00:00+00	2025-08-26 17:00:00+00	t	\N	\N
+bd295077-9db8-4c29-ba07-0f7bc4b705e8	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-08-26 15:00:00+00	2025-08-26 16:00:00+00	t	\N	\N
+59c97dd8-3123-4af1-9bf5-e6a6b1a7b865	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 07:00:00+00	2025-08-31 08:00:00+00	t	\N	\N
+1ba26669-1adc-4045-93ef-4decea9a1320	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 08:00:00+00	2025-08-31 09:00:00+00	t	\N	\N
+0067a365-21fe-48f8-9925-7ea7dea50e66	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 09:00:00+00	2025-08-31 10:00:00+00	t	\N	\N
+f40f0021-ccc9-4f47-bdc2-33f47755701d	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 10:00:00+00	2025-08-31 11:00:00+00	t	\N	\N
+0e9ed3d8-173e-46fa-a19b-f93b0ea913a3	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 11:00:00+00	2025-08-31 12:00:00+00	t	\N	\N
+d458f9e4-1399-4d3b-8c2f-a0f2b22a939c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 16:00:00+00	2025-08-31 17:00:00+00	t	\N	\N
+a9feefc8-d390-4c6d-9821-07742e334172	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 17:00:00+00	2025-08-31 18:00:00+00	t	\N	\N
+de2eb3cb-4a0c-4225-b002-0227a826fb90	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 18:00:00+00	2025-08-31 19:00:00+00	t	\N	\N
+83cd2a5a-f85d-4de7-9b7c-a245953129ff	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 09:00:00+00	2025-09-15 10:00:00+00	t	\N	\N
+9877a8a0-eecc-401f-83ff-b499574e6c62	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 10:00:00+00	2025-09-15 11:00:00+00	t	\N	\N
+38591c8f-df96-43e3-aecb-3239d87c7fe6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 11:00:00+00	2025-09-15 12:00:00+00	t	\N	\N
+0ef67817-04a4-4861-b847-78269cb355b3	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 21:00:00+00	2025-08-31 22:00:00+00	t	\N	\N
+30cac499-d599-4fe6-bdb1-474ed7492a49	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 20:00:00+00	2025-08-31 21:00:00+00	t	\N	\N
+b985a711-c06a-461e-b068-a2f41ba09796	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-08-31 19:00:00+00	2025-08-31 20:00:00+00	t	\N	\N
+bb53dea0-f370-4c75-98e4-a1a1580c4bb7	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 07:00:00+00	2025-09-02 08:00:00+00	t	\N	\N
+8a44d0c3-f2c4-4b12-8d64-f515bf6e37a7	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 08:00:00+00	2025-09-02 09:00:00+00	t	\N	\N
+566da959-4a4a-428b-bdb2-7becfe2b564f	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 13:00:00+00	2025-09-02 14:00:00+00	t	\N	\N
+e64c2567-b3c4-41ab-b7de-d3417c1b547c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 14:00:00+00	2025-09-02 15:00:00+00	t	\N	\N
+ceb005e4-ccaa-4548-950c-ee15aabb9860	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 20:00:00+00	2025-09-02 21:00:00+00	t	\N	\N
+db61b907-72a4-4e22-9d1c-d036954de2b9	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 10:00:00+00	2025-09-02 11:00:00+00	t	\N	\N
+f5b0f005-5255-4d67-bb21-386b6d655d9f	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 15:00:00+00	2025-09-02 16:00:00+00	t	\N	\N
+7ae9d453-b687-4090-be73-f4700cddf0ee	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 11:00:00+00	2025-09-02 12:00:00+00	t	\N	\N
+85c88b87-6846-4040-959b-7a53ae13f1d6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-02 09:00:00+00	2025-09-02 10:00:00+00	f	\N	\N
+e2cdfda1-7e13-4bf4-83d6-aee86910d166	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 13:00:00+00	2025-09-07 14:00:00+00	t	\N	\N
+7b3e2b4d-a757-4a1b-8f15-fe26cac11b1a	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 14:00:00+00	2025-09-07 15:00:00+00	t	\N	\N
+c0b9eb7b-2cf2-4b03-a224-7d7b3fd4ff3d	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 16:00:00+00	2025-09-07 17:00:00+00	t	\N	\N
+3501477a-da70-4e87-82a5-3a57f110b583	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 21:00:00+00	2025-09-07 22:00:00+00	t	\N	\N
+134a2602-7841-48f8-a779-f7c2d722bcd0	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 17:00:00+00	2025-09-07 18:00:00+00	t	\N	\N
+0510d0ae-3217-4a55-b4c4-ebd33a553b3e	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 18:00:00+00	2025-09-07 19:00:00+00	t	\N	\N
+c41643cc-0254-48f3-903a-dee8b07a89f5	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-07 15:00:00+00	2025-09-07 16:00:00+00	t	1500.00	\N
+9059bb70-7cec-414d-bfd3-83abf8f197be	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-17 21:00:00+00	2025-09-17 22:00:00+00	t	\N	\N
+5a716b61-8159-47eb-bff5-d53f01e3c4b6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 12:00:00+00	2025-09-15 13:00:00+00	t	\N	\N
+5ab7838f-c7f6-40aa-9966-5fbd6e51bc0c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 13:00:00+00	2025-09-15 14:00:00+00	t	\N	\N
+a8807362-deda-42b0-a497-cc233da5a449	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 14:00:00+00	2025-09-15 15:00:00+00	t	\N	\N
+e706a08a-9149-4d7d-b102-b7aa09dabd8d	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 15:00:00+00	2025-09-15 16:00:00+00	t	\N	\N
+466c1db6-5c27-4f18-8fdf-6c9996304fcc	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 16:00:00+00	2025-09-15 17:00:00+00	t	\N	\N
+65370777-a7c5-4eae-a58e-b8423952bbdd	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 17:00:00+00	2025-09-15 18:00:00+00	t	\N	\N
+6d3a2f51-3206-4a9f-9d84-5c311f35f0f9	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 18:00:00+00	2025-09-15 19:00:00+00	t	\N	\N
+4ce7987e-a4f0-48be-bdee-cee4700cfc81	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 19:00:00+00	2025-09-15 20:00:00+00	t	\N	\N
+0720ea59-d8fd-4176-86df-891ae710ac08	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 20:00:00+00	2025-09-15 21:00:00+00	t	\N	\N
+fe8146bc-c4e3-4b12-8af2-9e426f60a382	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-15 21:00:00+00	2025-09-15 22:00:00+00	t	\N	\N
+c86b5fc4-9d27-458a-8922-29bf9bf03cde	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 07:00:00+00	2025-09-16 08:00:00+00	t	\N	\N
+b8884d83-404d-4cab-95f9-1fe48453c932	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 08:00:00+00	2025-09-16 09:00:00+00	t	\N	\N
+20f72657-af6e-4750-813a-9680a55bf4b5	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 09:00:00+00	2025-09-16 10:00:00+00	t	\N	\N
+0daeaf15-a7e8-409c-85f3-1c1e04016a4b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 10:00:00+00	2025-09-16 11:00:00+00	t	\N	\N
+3303ff57-2597-4702-86bf-6e7ae6a327b8	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 11:00:00+00	2025-09-16 12:00:00+00	t	\N	\N
+fa7036a5-20da-4c69-af78-9c42c6283c3b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 12:00:00+00	2025-09-16 13:00:00+00	t	\N	\N
+8935c2fb-dce6-4b47-ac59-cc0df8a313ed	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 13:00:00+00	2025-09-16 14:00:00+00	t	\N	\N
+e89cc581-5aa8-4779-9cd6-104f1c83264c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 14:00:00+00	2025-09-16 15:00:00+00	t	\N	\N
+ad53d8d4-a031-4da8-a638-f9f1c02936b0	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 15:00:00+00	2025-09-16 16:00:00+00	t	\N	\N
+59c6dea3-b6ea-4d56-af6e-b12131bcecd3	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 17:00:00+00	2025-09-16 18:00:00+00	t	\N	\N
+de372fea-47a6-4ca3-bfa0-47224c39593b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 18:00:00+00	2025-09-16 19:00:00+00	t	\N	\N
+0582c820-62df-4bd2-8f24-675168c9bcd0	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 19:00:00+00	2025-09-16 20:00:00+00	t	\N	\N
+a986469b-7e2a-498a-8c82-62f1b4550719	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 20:00:00+00	2025-09-16 21:00:00+00	t	\N	\N
+2e6b8097-0a67-48e5-aca2-40dc724ea172	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-16 21:00:00+00	2025-09-16 22:00:00+00	t	\N	\N
+55de9004-699d-4fad-8f55-469da6062605	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-17 20:00:00+00	2025-09-17 21:00:00+00	t	\N	\N
+d002cfcd-f95d-4a38-b2b3-cd6cf2f8f7b3	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 09:00:00+00	2025-09-21 10:00:00+00	t	\N	\N
+51ea7f0c-c0ac-4961-bc4f-3e6ab5ca375b	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 10:00:00+00	2025-09-21 11:00:00+00	t	\N	\N
+1f4eeab4-c219-458b-a63c-d18e570ecf89	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 11:00:00+00	2025-09-21 12:00:00+00	t	\N	\N
+44ed6611-220e-4e24-a185-e5b4a06a11b8	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 12:00:00+00	2025-09-21 13:00:00+00	t	\N	\N
+b681dd78-44fe-4590-9e5f-d7c4e370bcc7	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 17:00:00+00	2025-09-21 18:00:00+00	t	\N	\N
+e1bd11d3-e70f-46bb-9bf8-dcb65f64af5f	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 18:00:00+00	2025-09-21 19:00:00+00	t	\N	\N
+8b7c9fe2-850b-4264-ac3a-de003f9b6c2f	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 19:00:00+00	2025-09-21 20:00:00+00	t	\N	\N
+36b702fb-5604-41e7-b2ef-62eb9e85c9d9	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 20:00:00+00	2025-09-21 21:00:00+00	t	\N	\N
+708924c0-0dde-44fb-b4eb-076a3e74823e	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 21:00:00+00	2025-09-21 22:00:00+00	t	\N	\N
+3588ca97-6e46-4528-96e2-9fd64d5ce51e	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 08:00:00+00	2025-09-21 09:00:00+00	t	\N	\N
+e54feb5d-03f3-4040-ae70-d14fc46a9dd2	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 09:00:00+00	2025-09-20 10:00:00+00	t	\N	\N
+40d60d76-d627-44f1-b350-a3252d2aa760	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 10:00:00+00	2025-09-20 11:00:00+00	t	\N	\N
+10a64e94-4954-44a8-9674-1293cf0fbec5	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 11:00:00+00	2025-09-20 12:00:00+00	t	\N	\N
+59eed597-049a-4ef8-873d-cc815fa087ee	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 12:00:00+00	2025-09-20 13:00:00+00	t	\N	\N
+6744f778-1a9c-41ea-9714-8ef2c8e72564	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 13:00:00+00	2025-09-20 14:00:00+00	t	\N	\N
+8e119b96-18f5-4127-a88f-cf3f350f215e	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 14:00:00+00	2025-09-20 15:00:00+00	t	\N	\N
+9eb30c17-431a-4562-9b7b-f97946636a7e	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 15:00:00+00	2025-09-20 16:00:00+00	t	\N	\N
+a43f0a81-d51d-4596-a862-b8f46d60a6a4	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 16:00:00+00	2025-09-20 17:00:00+00	t	\N	\N
+494813dd-fe23-4c18-ae26-90381ad7d20f	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 17:00:00+00	2025-09-20 18:00:00+00	t	\N	\N
+06d18454-cd5f-4362-8244-39eef00de840	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 18:00:00+00	2025-09-20 19:00:00+00	t	\N	\N
+c1f3b5ec-b1c1-4cd8-93e6-f425da605510	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 19:00:00+00	2025-09-20 20:00:00+00	t	\N	\N
+f269f611-c0af-4c0d-9658-a1dd337a3c7a	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 20:00:00+00	2025-09-20 21:00:00+00	t	\N	\N
+ae077f0d-d20b-4eb1-9b24-a9a335fc88b6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-20 21:00:00+00	2025-09-20 22:00:00+00	t	\N	\N
+58746a32-e0c9-4e53-8708-0c2b5a09db9c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 07:00:00+00	2025-09-21 08:00:00+00	f	\N	\N
+d9c45fd6-9df4-4c34-8a01-8454911ba9fe	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 13:00:00+00	2025-09-21 14:00:00+00	f	\N	\N
+2c2fbdfa-b918-46bb-9513-12d988bce16c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 14:00:00+00	2025-09-21 15:00:00+00	f	\N	\N
+85ce0808-7d5b-460b-ae84-7142b369c90c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 15:00:00+00	2025-09-21 16:00:00+00	f	\N	\N
+8d52b683-62e1-41d6-be6f-8caa046dc602	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 16:00:00+00	2025-09-21 17:00:00+00	f	\N	\N
 \.
 
 
@@ -4503,12 +4625,12 @@ ae077f0d-d20b-4eb1-9b24-a9a335fc88b6	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-0
 -- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.users (user_id, username, email, first_name, last_name, phone_number, role, credit_balance, points_balance, registration_date, last_login, is_active, status) FROM stdin;
-073c625c-eb02-45e8-9c67-50acbdc72cd6	harsh	harsh@gmail.com	harsh	shah	09426775977	venue_owner	0.00	0.00	\N	\N	t	active
-e86f726e-9210-47ca-8dc7-c84d46cc55e2	admin	admin@playnation.com	admin	\N	\N	admin	0.00	0.00	\N	\N	t	active
-c90139a0-2de3-4237-89b8-032367f73a37	surbhi	surbhiroy780@gmail.com	srubhi	roy	07852156984	venue_owner	0.00	0.00	\N	\N	t	active
-bb3e7bae-8aed-4e6c-bb71-bd644eff5402	swayam	otherswayam@gmail.com	swayam	shah	6353040453	player	0.00	0.00	\N	\N	t	active
-541b69e6-5c6e-4ad7-8764-7aa01c435021	ironman	tony@gmail.com	tony	stark	8624753159	player	0.00	0.00	\N	\N	t	active
+COPY public.users (user_id, username, email, first_name, last_name, phone_number, role, credit_balance, points_balance, registration_date, last_login, status) FROM stdin;
+e86f726e-9210-47ca-8dc7-c84d46cc55e2	admin	admin@playnation.com	admin	\N	\N	admin	0.00	0.00	\N	\N	active
+c90139a0-2de3-4237-89b8-032367f73a37	surbhi	surbhiroy780@gmail.com	srubhi	roy	07852156984	venue_owner	0.00	0.00	\N	\N	active
+bb3e7bae-8aed-4e6c-bb71-bd644eff5402	swayam	otherswayam@gmail.com	swayam	shah	6353040453	player	0.00	0.00	\N	\N	active
+541b69e6-5c6e-4ad7-8764-7aa01c435021	ironman	tony@gmail.com	tony	stark	8624753159	player	0.00	0.00	\N	\N	active
+073c625c-eb02-45e8-9c67-50acbdc72cd6	harsh	harsh@gmail.com	harsh	shah	09426775977	venue_owner	0.00	0.00	\N	\N	active
 \.
 
 
@@ -4518,11 +4640,11 @@ bb3e7bae-8aed-4e6c-bb71-bd644eff5402	swayam	otherswayam@gmail.com	swayam	shah	63
 
 COPY public.venues (venue_id, owner_id, name, address, city, state, zip_code, description, contact_email, contact_phone, latitude, longitude, opening_time, closing_time, is_approved, created_at, updated_at, image_url, rejection_reason) FROM stdin;
 1dde8e3f-b39d-446a-b8b1-cd1b958804a6	073c625c-eb02-45e8-9c67-50acbdc72cd6	Pool & Snooker	Adajan	surat	gujarat	395007	Step into the ultimate haven for snooker enthusiasts. With tournament-grade tables, ambient lighting, and a relaxed lounge atmosphere, CuePoint offers the perfect blend of competition and camaraderie. Whether you're a seasoned player or just picking up a cue, our club is your go-to destination for precision, passion, and play.	ps@gmail.com	08888888888	\N	\N	06:00:00	23:00:00	f	\N	\N	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-turf.jpg	poor amenities facility
-a1a1a1a1-1111-41d4-a7f6-000000000001	073c625c-eb02-45e8-9c67-50acbdc72cd6	Elite Sports Arena	123 VIP Road	Surat	Gujarat	395007	State-of-the-art multi-sport facility with floodlights.	\N	\N	\N	\N	06:00:00	23:00:00	t	2025-08-09 10:10:50.930041	2025-08-09 10:10:50.930041	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/hero-playnation.jpg	\N
-b2b2b2b2-2222-41d4-a7f6-000000000002	c90139a0-2de3-4237-89b8-032367f73a37	Champion Turf	700 VIP road, Vesu	Surat	Gujarat	395007	Premium 5-a-side football turf with excellent drainage.	championturf@gmail.com	8753214569	\N	\N	07:00:00	22:00:00	t	2025-08-09 10:10:50.930041	2025-08-09 10:10:50.930041	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-pickleball.jpg	\N
+a1a1a1a1-1111-41d4-a7f6-000000000001	073c625c-eb02-45e8-9c67-50acbdc72cd6	Elite Sports Arena	123 VIP Road	Surat	Gujarat	395007	State-of-the-art multi-sport facility with floodlights.	\N	\N	\N	\N	06:00:00	23:00:00	t	2025-08-09 10:10:50.930041+00	2025-08-09 10:10:50.930041+00	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/hero-playnation.jpg	\N
+b2b2b2b2-2222-41d4-a7f6-000000000002	c90139a0-2de3-4237-89b8-032367f73a37	Champion Turf	700 VIP road, Vesu	Surat	Gujarat	395007	Premium 5-a-side football turf with excellent drainage.	championturf@gmail.com	8753214569	\N	\N	07:00:00	22:00:00	t	2025-08-09 10:10:50.930041+00	2025-08-09 10:10:50.930041+00	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-pickleball.jpg	\N
 852d97ba-f482-4a73-8a0f-0b9fe003b7a7	c90139a0-2de3-4237-89b8-032367f73a37	GameZONE	Amroli	Surat	Gujarat	394107	make your play-time fantastic.	surbhiroy780@gmail.com	07984261806	\N	\N	09:00:00	23:00:00	f	\N	\N	\N	bla bla bla
 d2800a9a-2e21-44f2-acbc-578f598dac03	c90139a0-2de3-4237-89b8-032367f73a37	let's-play	citylight	Surat	Gujarat	394107	make your play-time fantastic.	surbhiroy780@gmail.com	07984261806	\N	\N	06:00:00	23:00:00	f	\N	\N	\N	\N
-c3c3c3c3-3333-41d4-a7f6-000000000003	c90139a0-2de3-4237-89b8-032367f73a37	Adajan Badminton Club	789 Ghod Dod Road	Surat	Gujarat	395001	Professional wooden courts for badminton enthusiasts.	badmintonclub@gmail.com	08523654821	\N	\N	09:00:00	21:00:00	f	2025-08-09 10:10:50.930041	2025-08-09 10:10:50.930041	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-snooker.jpg	poor safety standards
+c3c3c3c3-3333-41d4-a7f6-000000000003	c90139a0-2de3-4237-89b8-032367f73a37	Adajan Badminton Club	789 Ghod Dod Road	Surat	Gujarat	395001	Professional wooden courts for badminton enthusiasts.	badmintonclub@gmail.com	08523654821	\N	\N	09:00:00	21:00:00	f	2025-08-09 10:10:50.930041+00	2025-08-09 10:10:50.930041+00	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-snooker.jpg	poor safety standards
 7d4edf26-9237-4e33-bcd1-b01041832278	c90139a0-2de3-4237-89b8-032367f73a37	khelo-Area	Parvat-patiya	Surat	Gujarat	394107	make your play-time fantastic.	surbhiroy780@gmail.com	07984261806	\N	\N	09:00:00	23:00:00	t	\N	\N	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1757949218183-20240511_112006.jpg	\N
 47582fd3-e63e-43f5-9409-f505be69220e	c90139a0-2de3-4237-89b8-032367f73a37	Fun strike	vesu	Surat	Gujarat	394107	a great place to enjoy	surbhiroy780@gmail.com	07984261806	\N	\N	10:00:00	23:00:00	t	\N	\N	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1757949433233-20240515_163801.jpg	\N
 16a86a6d-c300-4cda-bebf-9bc74ddfb8cc	c90139a0-2de3-4237-89b8-032367f73a37	Fun & Play	pal	surat	gujarat	395007	come and enjoy	fun@gmail.com	08532658412	\N	\N	10:00:00	23:00:00	f	\N	\N	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue_16a86a6d-c300-4cda-bebf-9bc74ddfb8cc_1756483481340.jpg	due to some safety reasons
@@ -4614,6 +4736,7 @@ COPY realtime.subscription (id, subscription_id, entity, filters, claims, create
 
 COPY storage.buckets (id, name, owner, created_at, updated_at, public, avif_autodetection, file_size_limit, allowed_mime_types, owner_id, type) FROM stdin;
 venue-images	venue-images	\N	2025-08-09 11:48:27.119271+00	2025-08-09 11:48:27.119271+00	t	f	\N	\N	\N	STANDARD
+offer-backgrounds	offer-backgrounds	\N	2025-09-21 12:34:39.741028+00	2025-09-21 12:34:39.741028+00	f	f	\N	\N	\N	STANDARD
 \.
 
 
@@ -4681,6 +4804,7 @@ COPY storage.objects (id, bucket_id, name, owner, created_at, updated_at, last_a
 405798bd-3acb-4e07-87bd-e95286d56634	venue-images	hero-playnation.jpg	\N	2025-08-09 11:51:04.245245+00	2025-08-09 17:34:41.540568+00	2025-08-09 11:51:04.245245+00	{"eTag": "\\"c13a5713e1463941e160cce15dcaabe7-1\\"", "size": 42571, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-08-09T11:51:04.000Z", "contentLength": 42571, "httpStatusCode": 200}	c742db23-7d40-477d-9227-44d6e1133f3a	\N	\N	1
 7d839e27-6dc5-44c2-81ce-818caa9ece1b	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1757949433233-20240515_163801.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-15 15:17:25.330092+00	2025-09-15 15:17:25.330092+00	2025-09-15 15:17:25.330092+00	{"eTag": "\\"a410c3259680bcd1d0ec75fcf399a8d9\\"", "size": 3095858, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-15T15:17:26.000Z", "contentLength": 3095858, "httpStatusCode": 200}	c721ba4e-8678-455c-adb8-e1f9f0281328	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
 8a687f37-aae0-4d04-8db6-77ce26ed450b	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1757949218183-20240511_112006.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-15 15:13:49.956205+00	2025-09-15 15:13:49.956205+00	2025-09-15 15:13:49.956205+00	{"eTag": "\\"295e3920bbafda00fe134f6d2b3b65be\\"", "size": 3686349, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-15T15:13:50.000Z", "contentLength": 3686349, "httpStatusCode": 200}	27947250-0e79-4735-af7e-6fa3f47b2f0f	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+5baa4251-4710-4e41-ba70-45d12286ddc1	offer-backgrounds	default-offer-bg.png	\N	2025-09-21 13:01:18.419984+00	2025-09-21 13:01:18.419984+00	2025-09-21 13:01:18.419984+00	{"eTag": "\\"973aaf46ed35975fd5696ab469260f0b-1\\"", "size": 912705, "mimetype": "image/png", "cacheControl": "max-age=3600", "lastModified": "2025-09-21T13:01:18.000Z", "contentLength": 912705, "httpStatusCode": 200}	0fc88769-0132-4726-9ce1-3007aaae339a	\N	\N	1
 af5bf9e9-1a75-46ff-88c9-4573f3cbab82	venue-images	venue-pickleball.jpg	\N	2025-08-09 11:51:04.24646+00	2025-08-09 17:34:41.540568+00	2025-08-09 11:51:04.24646+00	{"eTag": "\\"70f5359a0bb7c9fb35ae894d2e6c52e2-1\\"", "size": 81937, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-08-09T11:51:04.000Z", "contentLength": 81937, "httpStatusCode": 200}	dc3fca7a-57bf-4500-979b-2fd71bba29b3	\N	\N	1
 475337b8-d9ca-49ce-9ba8-247f50798d18	venue-images	venue-snooker.jpg	\N	2025-08-09 11:51:04.233952+00	2025-08-09 17:34:41.540568+00	2025-08-09 11:51:04.233952+00	{"eTag": "\\"1429a8b25a618567ffadf1d6c721c084-1\\"", "size": 78274, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-08-09T11:51:04.000Z", "contentLength": 78274, "httpStatusCode": 200}	c9c19d51-2070-47b9-a509-826fcf56d479	\N	\N	1
 b2875b73-888a-463e-b9bc-a4c948ffbb9f	venue-images	venue-turf.jpg	\N	2025-08-09 11:51:04.179971+00	2025-08-09 17:34:41.540568+00	2025-08-09 11:51:04.179971+00	{"eTag": "\\"781b462416c485ca3678feb05a51882c-1\\"", "size": 129525, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-08-09T11:51:04.000Z", "contentLength": 129525, "httpStatusCode": 200}	447d1447-810a-4596-96ff-343ec9203830	\N	\N	1
@@ -4725,7 +4849,7 @@ COPY vault.secrets (id, name, description, secret, key_id, nonce, created_at, up
 -- Name: refresh_tokens_id_seq; Type: SEQUENCE SET; Schema: auth; Owner: supabase_auth_admin
 --
 
-SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 287, true);
+SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 315, true);
 
 
 --
@@ -5876,6 +6000,14 @@ ALTER TABLE ONLY public.points_transactions
 
 
 --
+-- Name: reviews reviews_booking_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT reviews_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.bookings(booking_id) ON DELETE CASCADE;
+
+
+--
 -- Name: reviews reviews_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6062,6 +6194,17 @@ CREATE POLICY "Admin can manage all users" ON public.users USING (((auth.jwt() -
 
 
 --
+-- Name: offers Admins and Owners can manage offers; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Admins and Owners can manage offers" ON public.offers USING (((( SELECT users.role
+   FROM public.users
+  WHERE (users.user_id = auth.uid())) = 'admin'::text) OR (( SELECT venues.owner_id
+   FROM public.venues
+  WHERE (venues.venue_id = offers.venue_id)) = auth.uid())));
+
+
+--
 -- Name: users Admins full access on users; Type: POLICY; Schema: public; Owner: postgres
 --
 
@@ -6070,6 +6213,16 @@ CREATE POLICY "Admins full access on users" ON public.users USING ((( SELECT use
   WHERE (users_1.user_id = auth.uid())) = 'admin'::text)) WITH CHECK ((( SELECT users_1.role
    FROM public.users users_1
   WHERE (users_1.user_id = auth.uid())) = 'admin'::text));
+
+
+--
+-- Name: bookings All: Read own bookings or bookings in own venues; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "All: Read own bookings or bookings in own venues" ON public.bookings FOR SELECT USING (((user_id = auth.uid()) OR (EXISTS ( SELECT 1
+   FROM (public.facilities f
+     JOIN public.venues v ON ((f.venue_id = v.venue_id)))
+  WHERE ((f.facility_id = bookings.facility_id) AND (v.owner_id = auth.uid()))))));
 
 
 --
@@ -6097,10 +6250,31 @@ CREATE POLICY "Allow users to update (cancel) their own bookings" ON public.book
 
 
 --
+-- Name: users Allow users to update own profile; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Allow users to update own profile" ON public.users FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK ((auth.uid() = user_id));
+
+
+--
 -- Name: users Allow users to view their own data; Type: POLICY; Schema: public; Owner: postgres
 --
 
 CREATE POLICY "Allow users to view their own data" ON public.users FOR SELECT TO authenticated USING ((auth.uid() = user_id));
+
+
+--
+-- Name: amenities Enable read access for amenities; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Enable read access for amenities" ON public.amenities FOR SELECT USING (true);
+
+
+--
+-- Name: sports Enable read access for sports; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Enable read access for sports" ON public.sports FOR SELECT USING (true);
 
 
 --
@@ -6134,6 +6308,37 @@ CREATE POLICY "Owners update their own" ON public.venues FOR UPDATE TO authentic
 
 
 --
+-- Name: facilities Owners: All access to their facilities; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Owners: All access to their facilities" ON public.facilities USING ((EXISTS ( SELECT 1
+   FROM public.venues
+  WHERE ((venues.venue_id = facilities.venue_id) AND (venues.owner_id = auth.uid()))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM public.venues
+  WHERE ((venues.venue_id = facilities.venue_id) AND (venues.owner_id = auth.uid())))));
+
+
+--
+-- Name: time_slots Owners: All access to their time slots; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Owners: All access to their time slots" ON public.time_slots USING ((EXISTS ( SELECT 1
+   FROM (public.facilities f
+     JOIN public.venues v ON ((f.venue_id = v.venue_id)))
+  WHERE ((f.facility_id = time_slots.facility_id) AND (v.owner_id = auth.uid()))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM (public.facilities f
+     JOIN public.venues v ON ((f.venue_id = v.venue_id)))
+  WHERE ((f.facility_id = time_slots.facility_id) AND (v.owner_id = auth.uid())))));
+
+
+--
+-- Name: bookings Players: Can create bookings; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Players: Can create bookings" ON public.bookings FOR INSERT TO authenticated WITH CHECK (((auth.uid() = user_id) AND ((auth.jwt() ->> 'role'::text) = 'player'::text)));
+
+
+--
 -- Name: offers Public can view active offers; Type: POLICY; Schema: public; Owner: postgres
 --
 
@@ -6145,6 +6350,25 @@ CREATE POLICY "Public can view active offers" ON public.offers FOR SELECT USING 
 --
 
 CREATE POLICY "Public can view approved venues" ON public.venues FOR SELECT USING ((is_approved = true));
+
+
+--
+-- Name: facilities Public: Select approved facilities; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Public: Select approved facilities" ON public.facilities FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM public.venues
+  WHERE ((venues.venue_id = facilities.venue_id) AND (venues.is_approved = true)))));
+
+
+--
+-- Name: time_slots Public: Select available time slots; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Public: Select available time slots" ON public.time_slots FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM (public.facilities f
+     JOIN public.venues v ON ((f.venue_id = v.venue_id)))
+  WHERE ((f.facility_id = time_slots.facility_id) AND (v.is_approved = true) AND (f.is_active = true)))));
 
 
 --
@@ -6903,6 +7127,15 @@ GRANT ALL ON FUNCTION public.get_owner_dashboard_statistics() TO service_role;
 GRANT ALL ON FUNCTION public.get_owner_dashboard_statistics(days_to_track integer) TO anon;
 GRANT ALL ON FUNCTION public.get_owner_dashboard_statistics(days_to_track integer) TO authenticated;
 GRANT ALL ON FUNCTION public.get_owner_dashboard_statistics(days_to_track integer) TO service_role;
+
+
+--
+-- Name: FUNCTION get_owner_venues_details(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.get_owner_venues_details() TO anon;
+GRANT ALL ON FUNCTION public.get_owner_venues_details() TO authenticated;
+GRANT ALL ON FUNCTION public.get_owner_venues_details() TO service_role;
 
 
 --
