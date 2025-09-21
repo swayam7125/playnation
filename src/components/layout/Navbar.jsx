@@ -138,11 +138,11 @@ function Navbar() {
               </>
             )}
 
-            {/* Links for Admins: Consolidated and corrected */}
+            {/* Links for Admins: Duplicates removed */}
             {profile?.role === "admin" && (
               <>
                 <Link
-                  to="/admin/venues"
+                  to="/admin/venues" // Corresponds to AdminVenueManagement.jsx
                   className={`${navLinkClasses} ${
                     location.pathname === "/admin/venues"
                       ? activeLinkClasses
@@ -152,27 +152,7 @@ function Navbar() {
                   Manage Venues
                 </Link>
                 <Link
-                  to="/admin/users"
-                  className={`${navLinkClasses} ${
-                    location.pathname === "/admin/users"
-                      ? activeLinkClasses
-                      : ""
-                  }`}
-                >
-                  Manage users
-                </Link>
-                <Link
-                  to="/admin/venues"
-                  className={`${navLinkClasses} ${
-                    location.pathname === "/admin/venues"
-                      ? activeLinkClasses
-                      : ""
-                  }`}
-                >
-                  Manage Venues
-                </Link>
-                <Link
-                  to="/admin/users"
+                  to="/admin/users" // Corresponds to AdminUserManagement.jsx
                   className={`${navLinkClasses} ${
                     location.pathname === "/admin/users"
                       ? activeLinkClasses
@@ -182,7 +162,7 @@ function Navbar() {
                   Manage Users
                 </Link>
                 <Link
-                  to="/admin/bookings"
+                  to="/admin/bookings" // Corresponds to AdminBooking.jsx
                   className={`${navLinkClasses} ${
                     location.pathname === "/admin/bookings"
                       ? activeLinkClasses
@@ -192,7 +172,7 @@ function Navbar() {
                   Manage Bookings
                 </Link>
                 <Link
-                  to="/admin/notify"
+                  to="/admin/notify" // Corresponds to Admin Notify Page
                   className={`${navLinkClasses} ${
                     location.pathname === "/admin/notify"
                       ? activeLinkClasses
