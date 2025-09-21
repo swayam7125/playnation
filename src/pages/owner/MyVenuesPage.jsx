@@ -16,12 +16,12 @@ function MyVenuesPage() {
       setLoading(true);
       try {
         const { data, error } = await supabase
-          .from('venues')
-          .select(`*, facilities (*, sports (name), facility_amenities (amenities (name)))`)
-          .eq('owner_id', user.id)
-          .order('created_at', { ascending: false });
+          .rpc('get_owner_venues_details'); // Call the new PostgreSQL function
+          
         if (error) throw error;
-        setVenues(data || []);
+        
+        setVenues(data || []); 
+        
       } catch (error) {
         console.error("Error fetching owner venues:", error);
       } finally {

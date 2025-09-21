@@ -1,55 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
-import { supabase } from '../../supabaseClient'; // Corrected path
+import { useAuth } from '../../AuthContext';
 
 const AdminProtectedRoute = () => {
-    const [isAdmin, setIsAdmin] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+    // Reads state directly from AuthContext
+    const { user, profile, loading } = useAuth(); 
 
-    useEffect(() => {
-        const checkUserRole = async () => {
-            try {
-                const { data: { user } } = await supabase.auth.getUser();
-
-                if (user) {
-                    const { data: profile, error } = await supabase
-                        .from('users')
-                        .select('role')
-                        .eq('user_id', user.id)
-                        .single();
-
-                    if (error) {
-                        throw error;
-                    }
-                    
-                    if (profile && profile.role === 'admin') {
-                        setIsAdmin(true);
-                    } else {
-                        setIsAdmin(false);
-                    }
-                } else {
-                    setIsAdmin(false);
-                }
-            } catch (error) {
-                console.error('Error checking admin role:', error);
-                setIsAdmin(false);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        checkUserRole();
-    }, []);
-
-    if (isLoading) {
+    if (loading) {
+        // Waits for AuthContext to finish initial check
         return (
             <div className="flex justify-center items-center min-h-screen">
-                <p className="text-lg">Loading Venues...</p>
+                <p className="text-lg">Loading Auth...</p>
             </div>
         );
     }
 
-    return isAdmin ? <Outlet /> : <Navigate to="/" replace />;
+    // Grants access only if user is logged in AND their role is 'admin'
+    if (user && profile?.role === 'admin') {
+        return <Outlet />;
+    } else {
+        // Redirects all unauthorized users
+        return <Navigate to="/" replace />;
+    }
 };
 
 export default AdminProtectedRoute;

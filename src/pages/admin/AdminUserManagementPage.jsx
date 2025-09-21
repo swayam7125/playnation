@@ -2,20 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useModal } from '../../ModalContext';
 import { FaUserCircle, FaUsers, FaUserCog, FaUserShield, FaSearch, FaFilter, FaEnvelope, FaCalendarAlt, FaEdit, FaTrash, FaBan, FaCheck, FaExclamationTriangle } from 'react-icons/fa';
-
-const StatsCard = ({ title, count, icon: Icon, color, bgColor }) => (
-    <div className={`bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300`}>
-        <div className="flex items-center justify-between">
-            <div>
-                <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
-                <p className="text-3xl font-bold text-gray-900">{count}</p>
-            </div>
-            <div className={`${color} p-3 rounded-xl`}>
-                <Icon className="text-xl text-white" />
-            </div>
-        </div>
-    </div>
-);
+import StatsCard from '../../components/common/StatsCard';
 
 const UserCard = ({ user, onRoleChange, onDeleteUser, onToggleStatus }) => {
     const getRoleConfig = (role) => {
@@ -178,7 +165,7 @@ const EmptyState = ({ activeTab }) => {
         all: { icon: FaUsers, title: 'No Users Found', description: 'No users match your current search criteria.', color: 'text-medium-text' },
         players: { icon: FaUserCircle, title: 'No Players Found', description: 'No players match your current search criteria.', color: 'text-blue-500' },
         venue_owners: { icon: FaUserCog, title: 'No Venue Owners Found', description: 'No venue owners match your current search criteria.', color: 'text-green-500' },
-        admins: { icon: FaUserShield, title: 'No Admins Found', description: 'No admin users match your current search criteria.', color: 'text-purple-500' },
+        admins: { icon: FaUserShield, title: 'No Admins Found', description: 'No admin users match your current search criteria.', color: 'purple-500' },
         suspended: { icon: FaBan, title: 'No Suspended Users', description: 'No suspended users found.', color: 'text-red-500' }
     }[activeTab] || { icon: FaUsers, title: 'No Users Found', description: 'No users match your current criteria.', color: 'text-medium-text' };
 

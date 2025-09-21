@@ -11,9 +11,22 @@ function VenueCard({ venue, viewMode = 'grid' }) {
 
     const getImageUrl = () => {
         if (!venue.image_url) return placeholderImage;
-        return venue.image_url.includes('/venue_image/') 
+        let url = venue.image_url.includes('/venue_image/') 
             ? venue.image_url.replace('/venue_image/', '/venue-images/') 
             : venue.image_url;
+
+        // --- MODIFIED: Append image transformation parameters ---
+        if (url.includes('supabase.co')) {
+            const transformParams = viewMode === 'list' 
+                ? '?width=400&height=200&resize=cover' // Wider image for list view
+                : '?width=300&height=200&resize=cover'; // Smaller image for grid view
+            
+            // Check if the URL already has parameters (unlikely for Supabase storage URLs)
+            url = url.includes('?') ? url + '&' + transformParams.substring(1) : url + transformParams;
+        }
+        // --------------------------------------------------------
+
+        return url;
     };
 
     // LIST VIEW
