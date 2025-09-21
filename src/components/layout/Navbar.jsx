@@ -1,3 +1,4 @@
+// src/components/layout/Navbar.jsx
 import React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
@@ -31,7 +32,6 @@ function Navbar() {
     <nav className="bg-card-bg border-b border-border-color py-4 sticky top-0 z-50 shadow-sm">
       <div className="container mx-auto px-4 flex justify-between items-center">
         <div className="flex items-center gap-10">
-          {/* Logo */}
           <Link
             to="/"
             className="flex items-center gap-4 no-underline transition duration-300 hover:scale-105"
@@ -44,7 +44,6 @@ function Navbar() {
             </span>
           </Link>
 
-          {/* Main Navigation Links */}
           <div className="hidden md:flex items-center gap-10">
             {/* Links for Players and Guests */}
             {profile?.role !== "venue_owner" && profile?.role !== "admin" && (
@@ -106,6 +105,16 @@ function Navbar() {
                   My Venues
                 </Link>
                 <Link
+                  to="/owner/manage-offers"
+                  className={`${navLinkClasses} ${
+                    location.pathname === "/owner/manage-offers"
+                      ? activeLinkClasses
+                      : ""
+                  }`}
+                >
+                  Manage Offers
+                </Link>
+                <Link
                   to="/owner/calendar"
                   className={`${navLinkClasses} ${
                     location.pathname === "/owner/calendar"
@@ -138,11 +147,11 @@ function Navbar() {
               </>
             )}
 
-            {/* Links for Admins: Duplicates removed */}
+            {/* Links for Admins */}
             {profile?.role === "admin" && (
               <>
                 <Link
-                  to="/admin/venues" // Corresponds to AdminVenueManagement.jsx
+                  to="/admin/venues"
                   className={`${navLinkClasses} ${
                     location.pathname === "/admin/venues"
                       ? activeLinkClasses
@@ -152,7 +161,7 @@ function Navbar() {
                   Manage Venues
                 </Link>
                 <Link
-                  to="/admin/users" // Corresponds to AdminUserManagement.jsx
+                  to="/admin/users"
                   className={`${navLinkClasses} ${
                     location.pathname === "/admin/users"
                       ? activeLinkClasses
@@ -162,7 +171,7 @@ function Navbar() {
                   Manage Users
                 </Link>
                 <Link
-                  to="/admin/bookings" // Corresponds to AdminBooking.jsx
+                  to="/admin/bookings"
                   className={`${navLinkClasses} ${
                     location.pathname === "/admin/bookings"
                       ? activeLinkClasses
@@ -171,8 +180,19 @@ function Navbar() {
                 >
                   Manage Bookings
                 </Link>
+                {/* NEW ADMIN LINK */}
                 <Link
-                  to="/admin/notify" // Corresponds to Admin Notify Page
+                  to="/admin/manage-offers"
+                  className={`${navLinkClasses} ${
+                    location.pathname === "/admin/manage-offers"
+                      ? activeLinkClasses
+                      : ""
+                  }`}
+                >
+                  Manage Offers
+                </Link>
+                <Link
+                  to="/admin/notify"
                   className={`${navLinkClasses} ${
                     location.pathname === "/admin/notify"
                       ? activeLinkClasses
@@ -181,7 +201,6 @@ function Navbar() {
                 >
                   Notify Players
                 </Link>
-
                 {user && (
                   <Link
                     to="/profile"
