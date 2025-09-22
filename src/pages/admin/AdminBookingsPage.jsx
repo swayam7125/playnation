@@ -43,6 +43,9 @@ const BookingDetailModal = ({ booking, onClose, onRefundAction }) => {
         refunded: 'bg-yellow-50 text-yellow-700 border-yellow-200',
         pending_refund: 'bg-orange-50 text-orange-700 border-orange-200'
     };
+    
+    // Safely get user info, defaulting to 'N/A' or an empty object if booking_user is null
+    const user = booking.booking_user || {};
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -74,8 +77,9 @@ const BookingDetailModal = ({ booking, onClose, onRefundAction }) => {
                                     <FaUser className="text-primary-green" />
                                     <h3 className="font-semibold text-dark-text">User Information</h3>
                                 </div>
-                                <p className="font-bold text-dark-text">{booking.users.username}</p>
-                                <p className="text-medium-text">{booking.users.email}</p>
+                                {/* Use the safely accessed 'user' object here as well */}
+                                <p className="font-bold text-dark-text">{user.username || 'N/A'}</p>
+                                <p className="text-medium-text">{user.email || 'User Deleted'}</p>
                             </div>
                         </div>
 
@@ -160,6 +164,9 @@ const BookingRow = ({ booking, onRefundAction, onViewDetails, isExpanded, onTogg
         refunded: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
         pending_refund: 'bg-orange-100 text-orange-800 border border-orange-200'
     };
+    
+    // Safely get user info, defaulting to 'N/A' or an empty object if booking_user is null
+    const user = booking.booking_user || {};
 
     return (
         <>
@@ -186,8 +193,9 @@ const BookingRow = ({ booking, onRefundAction, onViewDetails, isExpanded, onTogg
                             <FaUser className="text-primary-green text-xs" />
                         </div>
                         <div>
-                            <div className="text-sm font-semibold text-dark-text">{booking.users.username}</div>
-                            <div className="text-xs text-light-text">{booking.users.email}</div>
+                            {/* Correctly using the aliased property from the fixed query */}
+                            <div className="text-sm font-semibold text-dark-text">{user.username || 'N/A'}</div>
+                            <div className="text-xs text-light-text">{user.email || 'User Deleted'}</div>
                         </div>
                     </div>
                 </td>
@@ -297,9 +305,10 @@ function AdminBookingsPage() {
         try {
             const { data, error } = await supabase
                 .from('bookings')
+                // 💡 FIX: Explicitly alias the 'users' join to avoid ambiguity.
                 .select(`
                     *, 
-                    users(username, email), 
+                    booking_user:user_id(username, email), 
                     facilities(*, venues(*))
                 `)
                 .order('booking_date', { ascending: false }); 
@@ -372,8 +381,9 @@ function AdminBookingsPage() {
             ...filteredAndSortedBookings.map(booking => [
                 booking.facilities.venues.name,
                 booking.facilities.name,
-                booking.users.username,
-                booking.users.email,
+                // Using the alias here for export
+                (booking.booking_user?.username || 'N/A'),
+                (booking.booking_user?.email || 'User Deleted'),
                 new Date(booking.booking_date).toLocaleDateString('en-IN'),
                 new Date(booking.start_time).toLocaleTimeString('en-IN'),
                 booking.total_amount,
@@ -398,8 +408,9 @@ function AdminBookingsPage() {
             const lowerCaseSearch = searchTerm.toLowerCase();
             filtered = filtered.filter(b =>
                 (b.facilities?.venues?.name || '').toLowerCase().includes(lowerCaseSearch) ||
-                (b.users?.username || '').toLowerCase().includes(lowerCaseSearch) ||
-                (b.users?.email || '').toLowerCase().includes(lowerCaseSearch) ||
+                // Filtering now correctly uses the 'booking_user' alias
+                (b.booking_user?.username || '').toLowerCase().includes(lowerCaseSearch) ||
+                (b.booking_user?.email || '').toLowerCase().includes(lowerCaseSearch) ||
                 b.booking_id.toString().includes(lowerCaseSearch)
             );
         }
@@ -438,16 +449,28 @@ function AdminBookingsPage() {
 
         // Sort
         filtered.sort((a, b) => {
-            let aVal = a[sortConfig.key];
-            let bVal = b[sortConfig.key];
+            let aVal;
+            let bVal;
 
-            if (sortConfig.key === 'total_amount') {
-                aVal = parseFloat(aVal);
-                bVal = parseFloat(bVal);
+            if (sortConfig.key === 'facilities.venues.name') {
+                aVal = a.facilities?.venues?.name || '';
+                bVal = b.facilities?.venues?.name || '';
+            } else if (sortConfig.key === 'booking_user.username') {
+                aVal = a.booking_user?.username || '';
+                bVal = b.booking_user?.username || '';
+            } else if (sortConfig.key === 'total_amount') {
+                aVal = parseFloat(a.total_amount);
+                bVal = parseFloat(b.total_amount);
             } else if (sortConfig.key === 'booking_date' || sortConfig.key === 'created_at') {
-                aVal = new Date(aVal);
-                bVal = new Date(bVal);
-            } else if (typeof aVal === 'string') {
+                aVal = new Date(a[sortConfig.key]);
+                bVal = new Date(b[sortConfig.key]);
+            } else {
+                aVal = a[sortConfig.key];
+                bVal = b[sortConfig.key];
+            }
+
+
+            if (typeof aVal === 'string') {
                 aVal = aVal.toLowerCase();
                 bVal = bVal.toLowerCase();
             }
@@ -499,6 +522,12 @@ function AdminBookingsPage() {
             </div>
         );
     }
+
+    const getSortIcon = (key) => {
+        if (sortConfig.key !== key) return null;
+        return sortConfig.direction === 'asc' ? <FaSortAmountUp /> : <FaSortAmountDown />;
+    };
+
 
     return (
         <div className="container mx-auto px-4 py-8">
@@ -627,21 +656,17 @@ function AdminBookingsPage() {
                                 >
                                     <div className="flex items-center gap-2">
                                         Venue
-                                        {sortConfig.key === 'facilities.venues.name' && (
-                                            sortConfig.direction === 'asc' ? <FaSortAmountUp /> : <FaSortAmountDown />
-                                        )}
+                                        {getSortIcon('facilities.venues.name')}
                                     </div>
                                 </th>
                                 <th 
                                     scope="col" 
                                     className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider cursor-pointer hover:bg-primary-green-light hover:bg-opacity-20 transition-colors"
-                                    onClick={() => handleSort('users.username')}
+                                    onClick={() => handleSort('booking_user.username')}
                                 >
                                     <div className="flex items-center gap-2">
                                         User
-                                        {sortConfig.key === 'users.username' && (
-                                            sortConfig.direction === 'asc' ? <FaSortAmountUp /> : <FaSortAmountDown />
-                                        )}
+                                        {getSortIcon('booking_user.username')}
                                     </div>
                                 </th>
                                 <th 
@@ -651,9 +676,7 @@ function AdminBookingsPage() {
                                 >
                                     <div className="flex items-center gap-2">
                                         Booking Date
-                                        {sortConfig.key === 'booking_date' && (
-                                            sortConfig.direction === 'asc' ? <FaSortAmountUp /> : <FaSortAmountDown />
-                                        )}
+                                        {getSortIcon('booking_date')}
                                     </div>
                                 </th>
                                 <th 
@@ -663,9 +686,7 @@ function AdminBookingsPage() {
                                 >
                                     <div className="flex items-center gap-2">
                                         Amount
-                                        {sortConfig.key === 'total_amount' && (
-                                            sortConfig.direction === 'asc' ? <FaSortAmountUp /> : <FaSortAmountDown />
-                                        )}
+                                        {getSortIcon('total_amount')}
                                     </div>
                                 </th>
                                 <th 
@@ -675,9 +696,7 @@ function AdminBookingsPage() {
                                 >
                                     <div className="flex items-center gap-2">
                                         Status
-                                        {sortConfig.key === 'status' && (
-                                            sortConfig.direction === 'asc' ? <FaSortAmountUp /> : <FaSortAmountDown />
-                                        )}
+                                        {getSortIcon('status')}
                                     </div>
                                 </th>
                                 <th 
@@ -687,9 +706,7 @@ function AdminBookingsPage() {
                                 >
                                     <div className="flex items-center gap-2">
                                         Payment
-                                        {sortConfig.key === 'payment_status' && (
-                                            sortConfig.direction === 'asc' ? <FaSortAmountUp /> : <FaSortAmountDown />
-                                        )}
+                                        {getSortIcon('payment_status')}
                                     </div>
                                 </th>
                                 <th scope="col" className="relative px-6 py-4">

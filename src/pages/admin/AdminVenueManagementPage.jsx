@@ -5,6 +5,10 @@ import { useModal } from '../../ModalContext';
 import StatsCard from '../../components/common/StatsCard';
 
 const VenueCard = ({ venue, onApprove, onDecline }) => {
+    // 🛑 CORRECTED LINE: Access owner data from the 'owner_id' property 
+    // as renamed in the fetch query to resolve FK ambiguity.
+    const owner = venue.owner_id;
+
     const isApproved = venue.is_approved;
     const isDeclined = !isApproved && venue.rejection_reason;
 
@@ -21,7 +25,8 @@ const VenueCard = ({ venue, onApprove, onDecline }) => {
                     <div className="flex-1">
                         <h3 className="text-xl font-semibold text-dark-text mb-2 group-hover:text-primary-green-dark transition-colors">{venue.name}</h3>
                         <div className="flex items-center gap-4 text-sm text-medium-text mb-3">
-                            <div className="flex items-center gap-2"><FaUser className="text-xs" /><span>{venue.users?.username || venue.users?.email}</span></div>
+                            {/* 🛑 CORRECTED LINE: Use 'owner' variable (which holds venue.owner_id data) */}
+                            <div className="flex items-center gap-2"><FaUser className="text-xs" /><span>{owner?.username || owner?.email}</span></div>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-light-text"><FaMapMarkerAlt className="text-xs" /><span>{venue.address}, {venue.city}</span></div>
                     </div>
@@ -103,7 +108,9 @@ function AdminVenueManagementPage() {
         setLoading(true);
         setError(null);
         try {
-            const { data, error } = await supabase.from('venues').select(`*, users (username, email)`).order('created_at', { ascending: false });
+            // 🛑 CORRECTED LINE: Using 'owner_id' as the embedded relationship name 
+            // to uniquely select the owner user data.
+            const { data, error } = await supabase.from('venues').select(`*, owner_id (username, email)`).order('created_at', { ascending: false });
             if (error) throw error;
             setVenues(data || []);
         } catch (err) {
@@ -155,7 +162,8 @@ function AdminVenueManagementPage() {
         if (!searchTerm) return venueList;
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
         return venueList.filter(v => 
-            `${v.name} ${v.city} ${v.address} ${v.users?.username || ''} ${v.users?.email || ''}`.toLowerCase().includes(lowerCaseSearchTerm)
+            // 🛑 CORRECTED LINE: Search against 'owner_id' properties
+            `${v.name} ${v.city} ${v.address} ${v.owner_id?.username || ''} ${v.owner_id?.email || ''}`.toLowerCase().includes(lowerCaseSearchTerm)
         );
     };
 
