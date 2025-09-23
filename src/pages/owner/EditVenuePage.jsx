@@ -9,6 +9,27 @@ import {
   FaClock, FaPhone, FaEnvelope, FaUpload, FaEye, FaUsers, 
   FaRupeeSign, FaStar 
 } from 'react-icons/fa';
+import { v4 as uuidv4 } from 'uuid'; // Import uuid for unique filenames
+
+// Placeholder image for when no images are available
+const placeholderImage = 'https://images.unsplash.com/photo-1593341646782-e02a_a4ff2ab?w=500';
+
+// Utility function to upload a single image to Supabase Storage
+const uploadVenueImage = async (file, userId) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${uuidv4()}.${fileExt}`;
+    const filePath = `venue-images/${userId}/${fileName}`;
+
+    const { data, error } = await supabase.storage
+        .from('venue-images')
+        .upload(filePath, file);
+
+    if (error) {
+        console.error('Error uploading file:', error);
+        return null;
+    }
+    return supabase.storage.from('venue-images').getPublicUrl(filePath).data.publicUrl;
+};
 
 function EditVenuePage() {
     const { venueId } = useParams();
@@ -24,9 +45,10 @@ function EditVenuePage() {
         contact_email: '', contact_phone: '', opening_time: '', closing_time: ''
     });
     
+    // State to manage images
     const [newImageFiles, setNewImageFiles] = useState([]);
     const [imagePreviews, setImagePreviews] = useState([]);
-    const [existingImages, setExistingImages] = useState([]); // State to hold existing images
+    const [existingImages, setExistingImages] = useState([]); 
     
     const [sports, setSports] = useState([]);
     const [showAddFacilityForm, setShowAddFacilityForm] = useState(false);
@@ -104,14 +126,12 @@ function EditVenuePage() {
 
         if (isConfirmed) {
             try {
-                // Delete the image from Supabase Storage
                 const imageName = imageUrl.split('/').pop();
                 const { error: storageError } = await supabase.storage
                     .from('venue-images')
                     .remove([`${user.id}/${imageName}`]);
                 if (storageError) throw storageError;
 
-                // Update the database by removing the URL from the array
                 const updatedImageArray = existingImages.filter(url => url !== imageUrl);
                 const { error: updateError } = await supabase
                     .from('venues')
@@ -120,7 +140,7 @@ function EditVenuePage() {
                 if (updateError) throw updateError;
                 
                 await showModal({ title: "Success", message: "Image deleted successfully!" });
-                setExistingImages(updatedImageArray); // Update local state
+                setExistingImages(updatedImageArray); 
             } catch (err) {
                 await showModal({ title: "Deletion Failed", message: `Deletion failed: ${err.message}` });
             }
@@ -135,14 +155,10 @@ function EditVenuePage() {
             const uploadedImageUrls = [];
             if (newImageFiles.length > 0) {
                 for (const file of newImageFiles) {
-                    const imageName = `${user.id}/${Date.now()}-${file.name}`;
-                    const { error: uploadError } = await supabase.storage
-                        .from('venue-images')
-                        .upload(imageName, file);
-                    if (uploadError) throw uploadError;
-
-                    const publicURL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/venue-images/${imageName}`;
-                    uploadedImageUrls.push(publicURL);
+                    const publicURL = await uploadVenueImage(file, user.id);
+                    if (publicURL) {
+                        uploadedImageUrls.push(publicURL);
+                    }
                 }
             }
 
@@ -150,7 +166,7 @@ function EditVenuePage() {
     
             const { error: updateError } = await supabase
                 .from('venues')
-                .update({ ...venueDetails, image_url: updatedImageArray })
+                .update({ ...venueDetails, image_url: updatedImageArray }) 
                 .eq('venue_id', venueId);
             if (updateError) throw updateError;
 
@@ -326,7 +342,7 @@ function EditVenuePage() {
                                     <input 
                                         type="file" 
                                         onChange={handleImageChange} 
-                                        multiple // Allow multiple file selection
+                                        multiple 
                                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                         accept="image/*"
                                     />
