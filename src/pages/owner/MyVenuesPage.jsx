@@ -40,17 +40,17 @@ function MyVenuesPage() {
   });
 
   const tabData = [
-    { key: 'all', label: 'All Venues', count: venues.length, color: 'text-primary-green', bg: 'bg-primary-green/5' },
-    { key: 'pending', label: 'Pending', count: venues.filter(v => !v.is_approved && !v.rejection_reason).length, color: 'text-yellow-600', bg: 'bg-yellow-50' },
-    { key: 'approved', label: 'Active', count: venues.filter(v => v.is_approved).length, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { key: 'rejected', label: 'Review', count: venues.filter(v => !!v.rejection_reason).length, color: 'text-red-600', bg: 'bg-red-50' }
+    { key: 'all', label: 'All Venues', count: venues.length },
+    { key: 'pending', label: 'Pending', count: venues.filter(v => !v.is_approved && !v.rejection_reason).length },
+    { key: 'approved', label: 'Active', count: venues.filter(v => v.is_approved).length },
+    { key: 'rejected', label: 'Review', count: venues.filter(v => !!v.rejection_reason).length }
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-white to-light-green-bg/30">
       <div className="container mx-auto px-6 py-8 max-w-7xl">
         
-        {/* Elegant Header */}
+        {/* Elegant Header with Integrated Filter Tabs */}
         <div className="relative overflow-hidden bg-gradient-to-r from-primary-green to-primary-green-dark rounded-2xl shadow-xl mb-8">
           <div className="absolute inset-0 bg-black/5"></div>
           <div className="relative px-8 py-6">
@@ -87,9 +87,9 @@ function MyVenuesPage() {
               </div>
             </div>
             
-            {/* Refined Stats Cards */}
+            {/* Refined Stats Cards that now act as the main filter tabs */}
             <div className="grid grid-cols-4 gap-4 mt-6">
-              {tabData.map((tab, index) => (
+              {tabData.map((tab) => (
                 <div key={tab.key} className="bg-white/15 backdrop-blur rounded-xl p-4 border border-white/20 hover:bg-white/20 transition-all duration-200 group cursor-pointer" onClick={() => setActiveTab(tab.key)}>
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -104,34 +104,7 @@ function MyVenuesPage() {
           </div>
         </div>
 
-        {/* Sophisticated Filter Tabs */}
-        <div className="mb-8">
-          <div className="flex items-center space-x-2 bg-white/80 backdrop-blur rounded-2xl p-2 border border-border-color/50 shadow-lg">
-            {tabData.map(tab => (
-              <button 
-                key={tab.key} 
-                onClick={() => setActiveTab(tab.key)}
-                className={`relative flex-1 px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-300 group ${
-                  activeTab === tab.key 
-                    ? 'bg-primary-green text-white shadow-lg transform scale-[1.02]' 
-                    : 'text-medium-text hover:text-dark-text hover:bg-white/70'
-                }`}
-              >
-                <div className="flex items-center justify-center space-x-2">
-                  <span>{tab.label}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                    activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-primary-green/10 text-primary-green'
-                  }`}>
-                    {tab.count}
-                  </span>
-                </div>
-                {activeTab === tab.key && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-white rounded-full"></div>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* The second set of filter tabs has been REMOVED */}
         
         {/* Content Area */}
         {loading ? (
