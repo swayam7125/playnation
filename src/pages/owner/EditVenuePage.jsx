@@ -1,3 +1,4 @@
+// src/pages/EditVenuePage.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
@@ -20,11 +21,13 @@ function EditVenuePage() {
     const [activeTab, setActiveTab] = useState('details');
     const [venueDetails, setVenueDetails] = useState({
         name: '', address: '', city: '', state: '', zip_code: '', description: '', 
-        contact_email: '', contact_phone: '', opening_time: '', closing_time: '', image_url: ''
+        contact_email: '', contact_phone: '', opening_time: '', closing_time: ''
     });
     
-    const [newImageFile, setNewImageFile] = useState(null);
-    const [imagePreview, setImagePreview] = useState(null);
+    const [newImageFiles, setNewImageFiles] = useState([]);
+    const [imagePreviews, setImagePreviews] = useState([]);
+    const [existingImages, setExistingImages] = useState([]); // State to hold existing images
+    
     const [sports, setSports] = useState([]);
     const [showAddFacilityForm, setShowAddFacilityForm] = useState(false);
     const [newFacility, setNewFacility] = useState({ 
@@ -61,8 +64,9 @@ function EditVenuePage() {
                 contact_phone: venueData.contact_phone || '',
                 opening_time: venueData.opening_time || '', 
                 closing_time: venueData.closing_time || '',
-                image_url: venueData.image_url || ''
             });
+            // Ensure existing images are stored as an array
+            setExistingImages(venueData.image_url || []);
         } catch (err) {
             console.error("Error fetching data:", err);
         } finally {
@@ -78,39 +82,75 @@ function EditVenuePage() {
     const handleNewFacilityChange = (e) => setNewFacility({ ...newFacility, [e.target.name]: e.target.value });
 
     const handleImageChange = (e) => {
-        const file = e.target.files[0];
-        setNewImageFile(file);
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => setImagePreview(reader.result);
-            reader.readAsDataURL(file);
+        const files = Array.from(e.target.files);
+        setNewImageFiles(files);
+        setImagePreviews(files.map(file => URL.createObjectURL(file)));
+    };
+
+    const handleRemoveNewImage = (index) => {
+        const updatedFiles = newImageFiles.filter((_, i) => i !== index);
+        const updatedPreviews = imagePreviews.filter((_, i) => i !== index);
+        setNewImageFiles(updatedFiles);
+        setImagePreviews(updatedPreviews);
+    };
+
+    const handleRemoveExistingImage = async (imageUrl) => {
+        const isConfirmed = await showModal({
+            title: "Confirm Deletion",
+            message: "Are you sure you want to delete this image? This action cannot be undone.",
+            confirmText: "Delete",
+            confirmStyle: "danger"
+        });
+
+        if (isConfirmed) {
+            try {
+                // Delete the image from Supabase Storage
+                const imageName = imageUrl.split('/').pop();
+                const { error: storageError } = await supabase.storage
+                    .from('venue-images')
+                    .remove([`${user.id}/${imageName}`]);
+                if (storageError) throw storageError;
+
+                // Update the database by removing the URL from the array
+                const updatedImageArray = existingImages.filter(url => url !== imageUrl);
+                const { error: updateError } = await supabase
+                    .from('venues')
+                    .update({ image_url: updatedImageArray })
+                    .eq('venue_id', venueId);
+                if (updateError) throw updateError;
+                
+                await showModal({ title: "Success", message: "Image deleted successfully!" });
+                setExistingImages(updatedImageArray); // Update local state
+            } catch (err) {
+                await showModal({ title: "Deletion Failed", message: `Deletion failed: ${err.message}` });
+            }
         }
     };
 
     const handleDetailsUpdate = async (e) => {
         e.preventDefault();
         setLoading(true);
-        let updatedImageUrl = venueDetails.image_url;
     
         try {
-            if (newImageFile) {
-                const imageName = `${user.id}/${Date.now()}-${newImageFile.name}`;
-                const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('venue-images')
-                    .upload(imageName, newImageFile);
-                if (uploadError) throw uploadError;
+            const uploadedImageUrls = [];
+            if (newImageFiles.length > 0) {
+                for (const file of newImageFiles) {
+                    const imageName = `${user.id}/${Date.now()}-${file.name}`;
+                    const { error: uploadError } = await supabase.storage
+                        .from('venue-images')
+                        .upload(imageName, file);
+                    if (uploadError) throw uploadError;
 
-                updatedImageUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/venue-images/${imageName}`;
-
-                if (venue.image_url) {
-                    const oldImageName = venue.image_url.split('/').pop();
-                    await supabase.storage.from('venue-images').remove([`${user.id}/${oldImageName}`]);
+                    const publicURL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/venue-images/${imageName}`;
+                    uploadedImageUrls.push(publicURL);
                 }
             }
 
+            const updatedImageArray = [...existingImages, ...uploadedImageUrls];
+    
             const { error: updateError } = await supabase
                 .from('venues')
-                .update({ ...venueDetails, image_url: updatedImageUrl })
+                .update({ ...venueDetails, image_url: updatedImageArray })
                 .eq('venue_id', venueId);
             if (updateError) throw updateError;
 
@@ -120,8 +160,8 @@ function EditVenuePage() {
             await showModal({ title: "Update Failed", message: `Update failed: ${err.message}` });
         } finally {
             setLoading(false);
-            setNewImageFile(null);
-            setImagePreview(null);
+            setNewImageFiles([]);
+            setImagePreviews([]);
         }
     };
     
@@ -136,7 +176,7 @@ function EditVenuePage() {
             if (error) throw error;
             await showModal({ title: "Success", message: "Facility added successfully!" });
             setShowAddFacilityForm(false);
-            setNewFacility({ name: '', sport_id: '', capacity: '', hourly_rate: '', description: '' });
+            setNewFacility({ name: '', sport_id: sports[0]?.sport_id || '', capacity: '', hourly_rate: '', description: '' });
             fetchVenueData();
         } catch (error) {
             await showModal({ title: "Error", message: `Error adding facility: ${error.message}` });
@@ -240,52 +280,57 @@ function EditVenuePage() {
                         <form onSubmit={handleDetailsUpdate} className="p-6 space-y-6">
                             {/* Compact Image Section */}
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-2">Venue Image</label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2">Venue Images</label>
                                 
-                                {(venueDetails.image_url || imagePreview) && (
-                                    <div className="relative group">
-                                        <img 
-                                            src={imagePreview || venueDetails.image_url} 
-                                            alt="Venue" 
-                                            className="w-full h-40 object-cover rounded-2xl shadow-lg"
-                                        />
-                                        <div className="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <label className="bg-white text-slate-700 px-4 py-2 rounded-xl font-medium cursor-pointer hover:bg-gray-50 transition-colors flex items-center gap-2">
-                                                <FaUpload className="text-sm" /> Change
-                                                <input 
-                                                    type="file" 
-                                                    onChange={handleImageChange} 
-                                                    className="hidden"
-                                                    accept="image/*"
-                                                />
-                                            </label>
-                                        </div>
-                                        {imagePreview && (
-                                            <button
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                    {existingImages.map((imageUrl, index) => (
+                                        <div key={index} className="relative group rounded-xl overflow-hidden">
+                                            <img 
+                                                src={imageUrl} 
+                                                alt={`Venue ${index}`}
+                                                className="w-full h-32 object-cover"
+                                            />
+                                            <button 
                                                 type="button"
-                                                onClick={() => {setImagePreview(null); setNewImageFile(null);}}
-                                                className="absolute top-3 right-3 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors"
+                                                onClick={() => handleRemoveExistingImage(imageUrl)}
+                                                className="absolute top-1 right-1 bg-red-500/80 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <FaTrash className="text-xs" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {imagePreviews.map((preview, index) => (
+                                        <div key={index} className="relative group rounded-xl overflow-hidden">
+                                            <img 
+                                                src={preview} 
+                                                alt={`New Image ${index}`} 
+                                                className="w-full h-32 object-cover"
+                                            />
+                                            <button 
+                                                type="button"
+                                                onClick={() => handleRemoveNewImage(index)}
+                                                className="absolute top-1 right-1 bg-red-500/80 text-white p-1 rounded-full"
                                             >
                                                 <FaTimes className="text-xs" />
                                             </button>
-                                        )}
-                                    </div>
-                                )}
-
-                                {!venueDetails.image_url && !imagePreview && (
-                                    <div className="relative">
-                                        <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:border-primary-green transition-colors">
-                                            <FaUpload className="mx-auto text-3xl text-slate-400 mb-2" />
-                                            <p className="text-slate-600 font-medium text-sm">Upload venue image</p>
                                         </div>
-                                        <input 
-                                            type="file" 
-                                            onChange={handleImageChange} 
-                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                            accept="image/*"
-                                        />
+                                    ))}
+                                </div>
+                                
+                                <div className="relative">
+                                    <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:border-primary-green transition-colors cursor-pointer">
+                                        <FaUpload className="mx-auto text-3xl text-slate-400 mb-2" />
+                                        <p className="text-slate-600 font-medium">Upload new venue images</p>
+                                        <p className="text-slate-400 text-sm">PNG, JPG up to 10MB</p>
                                     </div>
-                                )}
+                                    <input 
+                                        type="file" 
+                                        onChange={handleImageChange} 
+                                        multiple // Allow multiple file selection
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        accept="image/*"
+                                    />
+                                </div>
                             </div>
 
                             {/* Compact Form Grid */}

@@ -28,7 +28,6 @@ import ManageOffersPage from "./pages/owner/ManageOffersPage";
 
 // Admin Pages
 import AdminVenueManagementPage from "./pages/admin/AdminVenueManagementPage";
-import AdminPlayersPage from "./pages/admin/AdminPlayersPage";
 import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
 import AdminUserManagementPage from "./pages/admin/AdminUserManagementPage";
 import AdminNotifyPage from "./pages/admin/AdminNotifyPage";
@@ -49,7 +48,9 @@ function App() {
           <Route path="/explore" element={<ExplorePage />} />
           <Route path="/login" element={<AuthPage />} />
           <Route path="/signup" element={<AuthPage />} />
-          <Route path="/venue/:venueId" element={<VenuePage />} />
+          
+          {/* Changed from /venue/:venueId to /venues/:venueId to match VenueCard links */}
+          <Route path="/venues/:venueId" element={<VenuePage />} />
 
           {/* Player-specific routes */}
           <Route path="/my-bookings" element={<MyBookingsPage />} />
@@ -76,7 +77,7 @@ function App() {
               path="/admin/venues"
               element={<AdminVenueManagementPage />}
             />
-            <Route path="/admin/players" element={<AdminPlayersPage />} />
+            
             <Route path="/admin/bookings" element={<AdminBookingsPage />} />
             <Route path="/admin/users" element={<AdminUserManagementPage />} />
             {/* ADD THE NEW ADMIN ROUTE */}

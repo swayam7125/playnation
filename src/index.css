@@ -61,3 +61,57 @@
 .animate-spin {
   animation: spin 1s linear infinite;
 }
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* src/index.css */
+
+/* Hide Swiper.js navigation arrows by default */
+.custom-swiper-container .swiper-button-next,
+.custom-swiper-container .swiper-button-prev {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  color: #fff; /* Optional: Set arrow color for better visibility */
+  background-color: rgba(0, 0, 0, 0.4); /* Optional: Add a subtle background */
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+}
+
+/* Show arrows on hover for the entire card */
+.group:hover .custom-swiper-container .swiper-button-next,
+.group:hover .custom-swiper-container .swiper-button-prev {
+  opacity: 1;
+}
+
+/* Hide pagination dots (optional) */
+.custom-swiper-container .swiper-pagination {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* Show dots on hover */
+.group:hover .custom-swiper-container .swiper-pagination {
+    opacity: 1;
+}
+/* src/index.css */
+
+/* Hide Swiper.js navigation arrows for the owner card carousel */
+.owner-card-swiper .swiper-button-next,
+.owner-card-swiper .swiper-button-prev {
+  opacity: 0;
+}
+/* src/index.css */
+
+/* Hide Swiper.js navigation arrows for the user card carousel */
+.user-card-swiper .swiper-button-next,
+.user-card-swiper .swiper-button-prev {
+  opacity: 0;
+}
+
+/* Optional: Hide pagination dots as well for a cleaner look */
+.user-card-swiper .swiper-pagination {
+    display: none;
+}
+

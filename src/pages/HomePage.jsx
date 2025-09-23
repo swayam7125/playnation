@@ -30,7 +30,7 @@ export default function HomePage() {
         const { data: venuesData, error: venuesError } = await supabase
           .from("venues")
           .select(
-            `*, facilities (sports (name), facility_amenities ( amenities (name) ) )`
+            `*, image_url,facilities (sports (name), facility_amenities ( amenities (name) ) )`
           )
           .eq("is_approved", true)
           .order("created_at", { ascending: false })
@@ -126,7 +126,8 @@ export default function HomePage() {
           {loading ? (
             <p>Loading top venues...</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            // Updated container to hide the scrollbar
+            <div className="flex flex-nowrap overflow-x-auto gap-6 pb-4 scrollbar-hide">
               {topVenues.length > 0 ? (
                 topVenues.map((venue) => (
                   <VenueCard key={venue.venue_id} venue={venue} />
