@@ -1,5 +1,5 @@
 // src/components/layout/Navbar.jsx
-import React from "react";
+import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 import { useModal } from "../../ModalContext";
@@ -9,6 +9,7 @@ function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { showModal } = useModal();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     const isConfirmed = await showModal({
@@ -25,228 +26,197 @@ function Navbar() {
   };
 
   const navLinkClasses =
-    "no-underline text-medium-text font-semibold text-sm transition duration-300 relative py-2 after:content-[''] after:absolute after:w-0 after:h-0.5 after:bottom-0 after:left-1/2 after:bg-primary-green after:transition-all after:duration-300 after:-translate-x-1/2 hover:text-primary-green hover:after:w-full";
-  const activeLinkClasses = "text-primary-green after:w-full";
+    "relative px-4 py-2 text-sm font-medium text-medium-text transition-all duration-300 rounded-lg hover:text-primary-green hover:bg-light-green-bg/50 group";
+  
+  const activeLinkClasses = 
+    "text-primary-green bg-light-green-bg shadow-sm ring-1 ring-primary-green/20";
+
+  const mobileNavLinkClasses =
+    "block px-4 py-3 text-medium-text font-medium transition-all duration-200 rounded-lg hover:text-primary-green hover:bg-light-green-bg/50";
+
+  const getNavLinks = () => {
+    // Links for Players and Guests
+    if (profile?.role !== "venue_owner" && profile?.role !== "admin") {
+      const links = [
+        { to: "/explore", label: "Explore" },
+      ];
+      
+      if (user) {
+        links.push(
+          { to: "/my-bookings", label: "My Bookings" },
+          { to: "/profile", label: "My Profile" }
+        );
+      }
+      
+      return links;
+    }
+
+    // Links for Venue Owners
+    if (profile?.role === "venue_owner") {
+      const links = [
+        { to: "/owner/dashboard", label: "Dashboard" },
+        { to: "/owner/my-venues", label: "My Venues" },
+        { to: "/owner/manage-offers", label: "Manage Offers" },
+        { to: "/owner/calendar", label: "Bookings" },
+        { to: "/owner/manage-slots", label: "Manage Slots" },
+      ];
+      
+      if (user) {
+        links.push({ to: "/profile", label: "My Profile" });
+      }
+      
+      return links;
+    }
+
+    // Links for Admins
+    if (profile?.role === "admin") {
+      const links = [
+        { to: "/admin/venues", label: "Manage Venues" },
+        { to: "/admin/users", label: "Manage Users" },
+        { to: "/admin/bookings", label: "Manage Bookings" },
+        { to: "/admin/manage-offers", label: "Manage Offers" },
+        { to: "/admin/notify", label: "Notify Players" },
+      ];
+      
+      if (user) {
+        links.push({ to: "/profile", label: "My Profile" });
+      }
+      
+      return links;
+    }
+
+    return [];
+  };
+
+  const navLinks = getNavLinks();
 
   return (
-    <nav className="bg-card-bg border-b border-border-color py-4 sticky top-0 z-50 shadow-sm">
-      <div className="container mx-auto px-4 flex justify-between items-center">
-        <div className="flex items-center gap-10">
+    <nav className="bg-card-bg/95 backdrop-blur-md border-b border-border-color-light sticky top-0 z-50 shadow-sm">
+      <div className="container mx-auto px-6 py-4">
+        <div className="flex justify-between items-center">
+          {/* Logo */}
           <Link
             to="/"
-            className="flex items-center gap-4 no-underline transition duration-300 hover:scale-105"
+            className="flex items-center gap-3 no-underline group transition-all duration-300"
           >
-            <div className="bg-primary-green text-white font-extrabold text-base h-9 w-9 grid place-content-center rounded-lg shadow-md">
+            <div className="bg-gradient-to-br from-primary-green to-primary-green-dark text-white font-bold text-lg h-11 w-11 grid place-content-center rounded-xl shadow-lg group-hover:shadow-primary-green/25 group-hover:scale-105 transition-all duration-300">
               PN
             </div>
-            <span className="font-extrabold text-xl text-dark-text">
+            <span className="font-bold text-xl bg-gradient-to-r from-dark-text to-medium-text bg-clip-text text-transparent group-hover:from-primary-green group-hover:to-primary-green-dark transition-all duration-300">
               PlayNation
             </span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-10">
-            {/* Links for Players and Guests */}
-            {profile?.role !== "venue_owner" && profile?.role !== "admin" && (
-              <>
+          {/* Desktop Navigation */}
+          <div className="hidden lg:flex items-center">
+            <div className="flex items-center gap-2 bg-background/60 rounded-xl p-2 border border-border-color-light">
+              {navLinks.map((link) => (
                 <Link
-                  to="/explore"
+                  key={link.to}
+                  to={link.to}
                   className={`${navLinkClasses} ${
-                    location.pathname === "/explore" ? activeLinkClasses : ""
+                    location.pathname === link.to ? activeLinkClasses : ""
                   }`}
                 >
-                  Explore
+                  {link.label}
+                  {location.pathname === link.to && (
+                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary-green rounded-full"></div>
+                  )}
                 </Link>
-                {user && (
-                  <Link
-                    to="/my-bookings"
-                    className={`${navLinkClasses} ${
-                      location.pathname === "/my-bookings"
-                        ? activeLinkClasses
-                        : ""
-                    }`}
-                  >
-                    My Bookings
-                  </Link>
-                )}
-                {user && (
-                  <Link
-                    to="/profile"
-                    className={`${navLinkClasses} ${
-                      location.pathname === "/profile" ? activeLinkClasses : ""
-                    }`}
-                  >
-                    My Profile
-                  </Link>
-                )}
-              </>
+              ))}
+            </div>
+          </div>
+
+          {/* Auth Section */}
+          <div className="flex items-center gap-4">
+            {user ? (
+              <div className="flex items-center gap-4">
+                <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-background/60 rounded-xl border border-border-color-light">
+                  <div className="w-8 h-8 bg-gradient-to-br from-primary-green to-primary-green-dark rounded-full flex items-center justify-center">
+                    <span className="text-white font-semibold text-sm">
+                      {(profile?.username || "U").charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <span className="font-medium text-medium-text text-sm">
+                    {profile?.username || "User"}
+                  </span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 text-sm font-medium text-medium-text bg-background/60 border border-border-color-light rounded-lg transition-all duration-300 hover:text-primary-green hover:border-primary-green/30 hover:bg-light-green-bg/50 hover:shadow-sm"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/login"
+                  className="px-5 py-2.5 text-sm font-medium text-medium-text bg-background border border-border-color rounded-lg no-underline transition-all duration-300 hover:text-primary-green hover:border-primary-green/30 hover:bg-light-green-bg/50 hover:shadow-sm hover:-translate-y-0.5"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-primary-green to-primary-green-dark rounded-lg no-underline shadow-lg transition-all duration-300 hover:shadow-primary-green/25 hover:-translate-y-0.5 hover:shadow-xl"
+                >
+                  Sign up
+                </Link>
+              </div>
             )}
 
-            {/* Links for Venue Owners */}
-            {profile?.role === "venue_owner" && (
-              <>
-                <Link
-                  to="/owner/dashboard"
-                  className={`${navLinkClasses} ${
-                    location.pathname === "/owner/dashboard"
-                      ? activeLinkClasses
-                      : ""
-                  }`}
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  to="/owner/my-venues"
-                  className={`${navLinkClasses} ${
-                    location.pathname === "/owner/my-venues"
-                      ? activeLinkClasses
-                      : ""
-                  }`}
-                >
-                  My Venues
-                </Link>
-                <Link
-                  to="/owner/manage-offers"
-                  className={`${navLinkClasses} ${
-                    location.pathname === "/owner/manage-offers"
-                      ? activeLinkClasses
-                      : ""
-                  }`}
-                >
-                  Manage Offers
-                </Link>
-                <Link
-                  to="/owner/calendar"
-                  className={`${navLinkClasses} ${
-                    location.pathname === "/owner/calendar"
-                      ? activeLinkClasses
-                      : ""
-                  }`}
-                >
-                  Bookings
-                </Link>
-                <Link
-                  to="/owner/manage-slots"
-                  className={`${navLinkClasses} ${
-                    location.pathname === "/owner/manage-slots"
-                      ? activeLinkClasses
-                      : ""
-                  }`}
-                >
-                  Manage Slots
-                </Link>
-                {user && (
-                  <Link
-                    to="/profile"
-                    className={`${navLinkClasses} ${
-                      location.pathname === "/profile" ? activeLinkClasses : ""
-                    }`}
-                  >
-                    My Profile
-                  </Link>
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="lg:hidden p-2 text-medium-text hover:text-primary-green transition-colors duration-300"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                {isMobileMenuOpen ? (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                ) : (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
                 )}
-              </>
-            )}
-
-            {/* Links for Admins */}
-            {profile?.role === "admin" && (
-              <>
-                <Link
-                  to="/admin/venues"
-                  className={`${navLinkClasses} ${
-                    location.pathname === "/admin/venues"
-                      ? activeLinkClasses
-                      : ""
-                  }`}
-                >
-                  Manage Venues
-                </Link>
-                <Link
-                  to="/admin/users"
-                  className={`${navLinkClasses} ${
-                    location.pathname === "/admin/users"
-                      ? activeLinkClasses
-                      : ""
-                  }`}
-                >
-                  Manage Users
-                </Link>
-                <Link
-                  to="/admin/bookings"
-                  className={`${navLinkClasses} ${
-                    location.pathname === "/admin/bookings"
-                      ? activeLinkClasses
-                      : ""
-                  }`}
-                >
-                  Manage Bookings
-                </Link>
-                {/* NEW ADMIN LINK */}
-                <Link
-                  to="/admin/manage-offers"
-                  className={`${navLinkClasses} ${
-                    location.pathname === "/admin/manage-offers"
-                      ? activeLinkClasses
-                      : ""
-                  }`}
-                >
-                  Manage Offers
-                </Link>
-                <Link
-                  to="/admin/notify"
-                  className={`${navLinkClasses} ${
-                    location.pathname === "/admin/notify"
-                      ? activeLinkClasses
-                      : ""
-                  }`}
-                >
-                  Notify Players
-                </Link>
-                {user && (
-                  <Link
-                    to="/profile"
-                    className={`${navLinkClasses} ${
-                      location.pathname === "/profile" ? activeLinkClasses : ""
-                    }`}
-                  >
-                    My Profile
-                  </Link>
-                )}
-              </>
-            )}
+              </svg>
+            </button>
           </div>
         </div>
 
-        {/* Auth Buttons */}
-        <div className="flex items-center gap-4">
-          {user ? (
-            <>
-              <span className="hidden sm:inline font-semibold text-medium-text text-sm">
-                Hi, {profile?.username || "User"}
-              </span>
-              <button
-                onClick={handleLogout}
-                className="bg-transparent border-none font-sans text-sm font-semibold text-medium-text cursor-pointer py-2 px-4 rounded-md transition duration-300 hover:bg-hover-bg hover:text-primary-green"
-              >
-                Logout
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                to="/login"
-                className="py-2 px-5 rounded-lg font-semibold text-sm transition duration-300 no-underline bg-card-bg text-medium-text border border-border-color shadow-sm hover:bg-hover-bg hover:border-primary-green hover:text-primary-green hover:-translate-y-px hover:shadow-md"
-              >
-                Login
-              </Link>
-              <Link
-                to="/signup"
-                className="py-2 px-5 rounded-lg font-semibold text-sm transition duration-300 no-underline bg-primary-green text-white shadow-sm hover:bg-primary-green-dark hover:-translate-y-px hover:shadow-md"
-              >
-                Sign up
-              </Link>
-            </>
-          )}
-        </div>
+        {/* Mobile Navigation */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden mt-4 py-4 border-t border-border-color-light">
+            <div className="space-y-2">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`${mobileNavLinkClasses} ${
+                    location.pathname === link.to
+                      ? "text-primary-green bg-light-green-bg/50"
+                      : ""
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   );

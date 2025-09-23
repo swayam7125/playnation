@@ -2,37 +2,301 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../supabaseClient';
 import { 
     FaSearch, 
-    FaRedo, 
     FaFilter, 
-    FaCalendarAlt, // Used for StatsCard props
-    FaRupeeSign,   // Used for StatsCard props
-    FaDownload,    // Used in Export button
-    FaTimes,       // Used in Clear Filters button
-    FaClock        // Used for StatsCard props and Footer display
+    FaRedo, 
+    FaUndo, 
+    FaEye, 
+    FaDownload, 
+    FaCalendar,
+    FaUser,
+    FaMapMarkerAlt,
+    FaCreditCard,
+    FaChevronDown,
+    FaChevronUp,
+    FaSortAmountDown,
+    FaSortAmountUp
 } from 'react-icons/fa';
 import { useModal } from '../../ModalContext';
 
-// --- Import Reusable Components & Utilities ---
-import StatsCard from '../../components/common/StatsCard'; 
-import BookingRow from '../../components/admin/BookingRow'; 
-import FilterPanel from '../../components/admin/FilterPanel'; 
-import { LoadingSpinner, ErrorState } from '../../components/common/LoadingAndError'; 
-import { formatTimestamp } from '../../utils/formatters'; 
-// --- End Imports ---
+const BookingDetailModal = ({ booking, onClose, onRefundAction }) => {
+    if (!booking) return null;
+
+    const formatDate = (date) => new Date(date).toLocaleDateString('en-IN', { 
+        weekday: 'long', 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+    });
+    const formatTime = (time) => new Date(time).toLocaleTimeString('en-IN', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
+
+    const statusColors = {
+        confirmed: 'bg-blue-50 text-blue-700 border-blue-200',
+        completed: 'bg-green-50 text-green-700 border-green-200',
+        cancelled: 'bg-red-50 text-red-700 border-red-200',
+    };
+
+    const paymentColors = {
+        paid: 'bg-green-50 text-green-700 border-green-200',
+        refunded: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+        pending_refund: 'bg-orange-50 text-orange-700 border-orange-200'
+    };
+    
+    // Safely get user info, defaulting to 'N/A' or an empty object if booking_user is null
+    const user = booking.booking_user || {};
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-card-bg rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-8">
+                    <div className="flex justify-between items-start mb-6">
+                        <h2 className="text-2xl font-bold text-dark-text">Booking Details</h2>
+                        <button 
+                            onClick={onClose}
+                            className="text-light-text hover:text-dark-text text-xl"
+                        >
+                            ×
+                        </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div className="space-y-4">
+                            <div className="bg-light-green-bg rounded-xl p-4">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <FaMapMarkerAlt className="text-primary-green" />
+                                    <h3 className="font-semibold text-dark-text">Venue Information</h3>
+                                </div>
+                                <p className="font-bold text-dark-text">{booking.facilities.venues.name}</p>
+                                <p className="text-medium-text">{booking.facilities.name}</p>
+                            </div>
+
+                            <div className="bg-hover-bg rounded-xl p-4">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <FaUser className="text-primary-green" />
+                                    <h3 className="font-semibold text-dark-text">User Information</h3>
+                                </div>
+                                {/* Use the safely accessed 'user' object here as well */}
+                                <p className="font-bold text-dark-text">{user.username || 'N/A'}</p>
+                                <p className="text-medium-text">{user.email || 'User Deleted'}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="bg-hover-bg rounded-xl p-4">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <FaCalendar className="text-primary-green" />
+                                    <h3 className="font-semibold text-dark-text">Booking Time</h3>
+                                </div>
+                                <p className="font-bold text-dark-text">{formatDate(booking.booking_date)}</p>
+                                <p className="text-medium-text">{formatTime(booking.start_time)}</p>
+                            </div>
+
+                            <div className="bg-hover-bg rounded-xl p-4">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <FaCreditCard className="text-primary-green" />
+                                    <h3 className="font-semibold text-dark-text">Payment</h3>
+                                </div>
+                                <p className="font-bold text-2xl text-primary-green">₹{booking.total_amount}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-4 mb-6">
+                        <div className={`px-4 py-2 rounded-full border ${statusColors[booking.status]} font-semibold`}>
+                            Status: {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                        </div>
+                        <div className={`px-4 py-2 rounded-full border ${paymentColors[booking.payment_status]} font-semibold`}>
+                            Payment: {booking.payment_status.replace('_', ' ').charAt(0).toUpperCase() + booking.payment_status.replace('_', ' ').slice(1)}
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-border-color-light">
+                        {booking.status === 'cancelled' && booking.payment_status === 'paid' && (
+                            <button 
+                                onClick={() => onRefundAction(booking.booking_id, 'refunded')} 
+                                className="flex items-center gap-2 px-6 py-3 bg-primary-green text-white rounded-xl hover:bg-primary-green-dark transition-all duration-200 font-medium"
+                            >
+                                <FaRedo /> Approve Refund
+                            </button>
+                        )}
+                        {booking.payment_status === 'refunded' && (
+                            <button 
+                                onClick={() => onRefundAction(booking.booking_id, 'paid')} 
+                                className="flex items-center gap-2 px-6 py-3 bg-yellow-500 text-white rounded-xl hover:bg-yellow-600 transition-all duration-200 font-medium"
+                            >
+                                <FaUndo /> Revert Refund
+                            </button>
+                        )}
+                        <button 
+                            onClick={onClose}
+                            className="px-6 py-3 bg-border-color text-medium-text rounded-xl hover:bg-border-color-light transition-all duration-200 font-medium"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const BookingRow = ({ booking, onRefundAction, onViewDetails, isExpanded, onToggleExpand }) => {
+    const formatDate = (date) => new Date(date).toLocaleDateString('en-IN', { 
+        day: 'numeric', 
+        month: 'short', 
+        year: 'numeric' 
+    });
+    const formatTime = (time) => new Date(time).toLocaleTimeString('en-IN', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
+
+    const statusClasses = {
+        confirmed: 'bg-blue-100 text-blue-800 border border-blue-200',
+        completed: 'bg-green-100 text-green-800 border border-green-200',
+        cancelled: 'bg-red-100 text-red-800 border border-red-200',
+    };
+
+    const paymentStatusClasses = {
+        paid: 'bg-green-100 text-green-800 border border-green-200',
+        refunded: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+        pending_refund: 'bg-orange-100 text-orange-800 border border-orange-200'
+    };
+    
+    // Safely get user info, defaulting to 'N/A' or an empty object if booking_user is null
+    const user = booking.booking_user || {};
+
+    return (
+        <>
+            <tr className="border-b border-border-color-light hover:bg-light-green-bg transition-all duration-200 group">
+                <td className="px-6 py-6">
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => onToggleExpand(booking.booking_id)}
+                            className="text-light-text hover:text-primary-green transition-colors"
+                        >
+                            {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
+                        </button>
+                        <div>
+                            <div className="text-sm font-bold text-dark-text">{booking.facilities.venues.name}</div>
+                            <div className="text-xs text-medium-text bg-hover-bg px-2 py-1 rounded-md inline-block mt-1">
+                                {booking.facilities.name}
+                            </div>
+                        </div>
+                    </div>
+                </td>
+                <td className="px-6 py-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-primary-green-light rounded-full flex items-center justify-center">
+                            <FaUser className="text-primary-green text-xs" />
+                        </div>
+                        <div>
+                            {/* Correctly using the aliased property from the fixed query */}
+                            <div className="text-sm font-semibold text-dark-text">{user.username || 'N/A'}</div>
+                            <div className="text-xs text-light-text">{user.email || 'User Deleted'}</div>
+                        </div>
+                    </div>
+                </td>
+                <td className="px-6 py-6">
+                    <div className="bg-hover-bg rounded-lg p-2 text-center">
+                        <div className="text-sm font-semibold text-dark-text">{formatDate(booking.booking_date)}</div>
+                        <div className="text-xs text-medium-text">{formatTime(booking.start_time)}</div>
+                    </div>
+                </td>
+                <td className="px-6 py-6">
+                    <div className="text-lg font-bold text-primary-green">₹{booking.total_amount}</div>
+                </td>
+                <td className="px-6 py-6">
+                    <span className={`px-3 py-2 inline-flex text-xs leading-5 font-semibold rounded-lg ${statusClasses[booking.status]}`}>
+                        {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                    </span>
+                </td>
+                <td className="px-6 py-6">
+                    <span className={`px-3 py-2 inline-flex text-xs leading-5 font-semibold rounded-lg ${paymentStatusClasses[booking.payment_status]}`}>
+                        {booking.payment_status.replace('_', ' ').charAt(0).toUpperCase() + booking.payment_status.replace('_', ' ').slice(1)}
+                    </span>
+                </td>
+                <td className="px-6 py-6 text-right">
+                    <div className="flex items-center gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <button 
+                            onClick={() => onViewDetails(booking)} 
+                            className="p-2 text-primary-green hover:bg-primary-green hover:text-white rounded-lg transition-all duration-200"
+                            title="View Details"
+                        >
+                            <FaEye />
+                        </button>
+                        {booking.status === 'cancelled' && booking.payment_status === 'paid' && (
+                            <button 
+                                onClick={() => onRefundAction(booking.booking_id, 'refunded')} 
+                                className="p-2 text-green-600 hover:bg-green-600 hover:text-white rounded-lg transition-all duration-200"
+                                title="Approve Refund"
+                            >
+                                <FaRedo />
+                            </button>
+                        )}
+                        {booking.payment_status === 'refunded' && (
+                            <button 
+                                onClick={() => onRefundAction(booking.booking_id, 'paid')} 
+                                className="p-2 text-yellow-600 hover:bg-yellow-600 hover:text-white rounded-lg transition-all duration-200"
+                                title="Revert Refund"
+                            >
+                                <FaUndo />
+                            </button>
+                        )}
+                    </div>
+                </td>
+            </tr>
+            {isExpanded && (
+                <tr className="bg-light-green-bg">
+                    <td colSpan="7" className="px-6 py-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <span className="text-light-text">Booking ID:</span>
+                                <span className="ml-2 font-mono bg-hover-bg px-2 py-1 rounded">
+                                    {booking.booking_id}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-light-text">Created:</span>
+                                <span className="ml-2 text-medium-text">
+                                    {new Date(booking.created_at).toLocaleDateString('en-IN')}
+                                </span>
+                            </div>
+                            <div className="md:text-right">
+                                <button 
+                                    onClick={() => onViewDetails(booking)}
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary-green text-white rounded-lg hover:bg-primary-green-dark transition-all duration-200"
+                                >
+                                    <FaEye /> View Full Details
+                                </button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            )}
+        </>
+    );
+};
 
 function AdminBookingsPage() {
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedBooking, setSelectedBooking] = useState(null);
     const [expandedRows, setExpandedRows] = useState(new Set());
-    const [showFilters, setShowFilters] = useState(false);
     const [filters, setFilters] = useState({
-        status: '',
-        paymentStatus: '',
-        dateFrom: '',
-        dateTo: ''
+        status: 'all',
+        payment_status: 'all',
+        date_range: 'all'
     });
+    const [sortConfig, setSortConfig] = useState({
+        key: 'booking_date',
+        direction: 'desc'
+    });
+    const [showFilters, setShowFilters] = useState(false);
     const { showModal } = useModal();
 
     // Helper function used in modal and export (uses external formatTimestamp)
@@ -49,13 +313,11 @@ function AdminBookingsPage() {
         try {
             let query = supabase
                 .from('bookings')
+                // 💡 FIX: Explicitly alias the 'users' join to avoid ambiguity.
                 .select(`
-                    *,
-                    users:bookings_user_id_fkey(username, email, phone_number),
-                    facilities(
-                        name,
-                        venues(name, address, city)
-                    )
+                    *, 
+                    booking_user:user_id(username, email), 
+                    facilities(*, venues(*))
                 `)
                 .order('booking_date', { ascending: false });
 
@@ -84,42 +346,6 @@ function AdminBookingsPage() {
         }
     }, []);
 
-    // Debounce Fetching
-    useEffect(() => {
-        const timeout = setTimeout(() => {
-            fetchBookings(searchTerm, filters);
-        }, 300);
-        return () => clearTimeout(timeout);
-    }, [searchTerm, filters, fetchBookings]);
-
-    /**
-     * Statistics Calculation - FIX APPLIED HERE
-     */
-    const stats = useMemo(() => {
-        const paidBookings = bookings.filter(b => b.payment_status === 'paid');
-        
-        // FIX: Ensure total_amount is parsed as float for correct summation
-        const totalRevenue = paidBookings.reduce((sum, b) => sum + parseFloat(b.total_amount || 0), 0);
-        const today = new Date().toDateString();
-
-        const monthlyRevenue = bookings.filter(b => {
-            const date = new Date(b.booking_date);
-            return date.getMonth() === new Date().getMonth() && date.getFullYear() === new Date().getFullYear() && b.payment_status === 'paid';
-        }).reduce((sum, b) => sum + parseFloat(b.total_amount || 0), 0); // FIX: Ensure parsing
-
-        return {
-            totalBookings: bookings.length,
-            totalRevenue: totalRevenue,
-            pendingRefunds: bookings.filter(b => b.payment_status === 'pending_refund').length,
-            completedBookings: bookings.filter(b => b.status === 'completed').length,
-            todayBookings: bookings.filter(b => new Date(b.booking_date).toDateString() === today).length,
-            monthlyRevenue: monthlyRevenue,
-        };
-    }, [bookings]);
-
-    /**
-     * Action Handlers
-     */
     const handleRefundAction = async (bookingId, newPaymentStatus) => {
         const action = newPaymentStatus === 'refunded' ? 'Approve Refund' : 'Revert Refund';
         const isConfirmed = await showModal({
@@ -137,280 +363,438 @@ function AdminBookingsPage() {
                     .eq('booking_id', bookingId);
                 
                 if (error) throw error;
-                await showModal({ title: "Success", message: `${action} completed successfully.`, showCancel: false });
-                fetchBookings(searchTerm, filters);
+                await showModal({ title: "Success", message: `Action completed successfully.` });
+                fetchBookings();
+                if (selectedBooking && selectedBooking.booking_id === bookingId) {
+                    const updatedBooking = bookings.find(b => b.booking_id === bookingId);
+                    if (updatedBooking) {
+                        setSelectedBooking({ ...updatedBooking, payment_status: newPaymentStatus });
+                    }
+                }
             } catch (err) {
-                await showModal({ title: "Error", message: `Failed to ${action.toLowerCase()}: ${err.message}`, showCancel: false });
+                await showModal({ title: "Error", message: `Failed to update booking: ${err.message}` });
             }
         }
     };
 
-    const handleViewDetails = (booking) => {
-        const formatDate = (date) => new Date(date).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        const formatTime = (time) => new Date(time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-
-        showModal({
-            title: `Booking Details - ${booking.booking_id}`,
-            message: `
-📍 VENUE INFORMATION:
-   • Venue: ${booking.facilities?.venues?.name || 'N/A'}
-   • Facility: ${booking.facilities?.name || 'N/A'}
-   • Address: ${booking.facilities?.venues?.address || 'N/A'}${booking.facilities?.venues?.city ? `, ${booking.facilities.venues.city}` : ''}
-
-👤 USER INFORMATION:
-   • Name: ${booking.users?.username || 'N/A'}
-   • Email: ${booking.users?.email || 'N/A'}
-   • Phone: ${booking.users?.phone_number || 'N/A'}
-
-📅 BOOKING INFORMATION:
-   • Date: ${formatDate(booking.booking_date)}
-   • Time: ${formatTime(booking.start_time)} - ${formatTime(booking.end_time)}
-   • Duration: ${((new Date(booking.end_time) - new Date(booking.start_time)) / (1000 * 60 * 60)).toFixed(1)} hours
-   • Amount: ₹${booking.total_amount?.toLocaleString('en-IN') || '0'}
-
-📊 STATUS INFORMATION:
-   • Booking Status: ${booking.status?.toUpperCase() || 'N/A'}
-   • Payment Status: ${booking.payment_status?.replace('_', ' ').toUpperCase() || 'N/A'}
-   • Payment Method: ${booking.payment_method || 'Online Payment'}
-   • Created: ${safeFormatTimestampForModal(booking.booking_date)}
-            `,
-            showCancel: false,
-            confirmText: "Close"
-        });
+    const handleSort = (key) => {
+        setSortConfig(prev => ({
+            key,
+            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+        }));
     };
 
-    const toggleRowExpansion = (bookingId) => {
+    const handleToggleExpand = (bookingId) => {
         setExpandedRows(prev => {
             const newSet = new Set(prev);
-            newSet.has(bookingId) ? newSet.delete(bookingId) : newSet.add(bookingId);
+            if (newSet.has(bookingId)) {
+                newSet.delete(bookingId);
+            } else {
+                newSet.add(bookingId);
+            }
             return newSet;
         });
     };
 
-    const handleExportData = () => {
-        try {
-            const csv = [
-                ['Booking ID', 'Venue', 'Facility', 'User', 'Email', 'Phone', 'Date', 'Start Time', 'End Time', 'Duration (Hours)', 'Amount', 'Status', 'Payment Status', 'Payment Method', 'Created At', 'Notes'],
-                ...bookings.map(booking => [
-                    booking.booking_id || '', booking.facilities?.venues?.name || '', booking.facilities?.name || '', booking.users?.username || '', booking.users?.email || '', booking.users?.phone_number || '',
-                    new Date(booking.booking_date).toLocaleDateString('en-IN'), new Date(booking.start_time).toLocaleTimeString('en-IN'), new Date(booking.end_time).toLocaleTimeString('en-IN'),
-                    ((new Date(booking.end_time) - new Date(booking.start_time)) / (1000 * 60 * 60)).toFixed(1),
-                    booking.total_amount || 0, booking.status || '', booking.payment_status || '', booking.payment_method || 'Online Payment',
-                    safeFormatTimestampForModal(booking.booking_date),
-                    booking.notes || ''
-                ])
-            ].map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const exportToCSV = () => {
+        const csvContent = [
+            ['Venue', 'Facility', 'User', 'Email', 'Date', 'Time', 'Amount', 'Status', 'Payment Status'],
+            ...filteredAndSortedBookings.map(booking => [
+                booking.facilities.venues.name,
+                booking.facilities.name,
+                // Using the alias here for export
+                (booking.booking_user?.username || 'N/A'),
+                (booking.booking_user?.email || 'User Deleted'),
+                new Date(booking.booking_date).toLocaleDateString('en-IN'),
+                new Date(booking.start_time).toLocaleTimeString('en-IN'),
+                booking.total_amount,
+                booking.status,
+                booking.payment_status
+            ])
+        ].map(row => row.join(',')).join('\n');
 
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const a = document.createElement('a');
-            a.setAttribute('hidden', '');
-            a.setAttribute('href', window.URL.createObjectURL(blob));
-            a.setAttribute('download', `bookings-export-${new Date().toISOString().split('T')[0]}.csv`);
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(a.href);
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bookings-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+    };
 
-            showModal({ title: "Export Successful", message: `Successfully exported ${bookings.length} booking records to CSV format.`, showCancel: false, confirmText: "Close" });
-        } catch (err) {
-            showModal({ title: "Export Error", message: `Failed to export data: ${err.message}`, showCancel: false, confirmText: "Close" });
+    const filteredAndSortedBookings = useMemo(() => {
+        let filtered = bookings;
+
+        // Search filter
+        if (searchTerm) {
+            const lowerCaseSearch = searchTerm.toLowerCase();
+            filtered = filtered.filter(b =>
+                (b.facilities?.venues?.name || '').toLowerCase().includes(lowerCaseSearch) ||
+                // Filtering now correctly uses the 'booking_user' alias
+                (b.booking_user?.username || '').toLowerCase().includes(lowerCaseSearch) ||
+                (b.booking_user?.email || '').toLowerCase().includes(lowerCaseSearch) ||
+                b.booking_id.toString().includes(lowerCaseSearch)
+            );
         }
+
+        // Status filters
+        if (filters.status !== 'all') {
+            filtered = filtered.filter(b => b.status === filters.status);
+        }
+        if (filters.payment_status !== 'all') {
+            filtered = filtered.filter(b => b.payment_status === filters.payment_status);
+        }
+
+        // Date range filter
+        if (filters.date_range !== 'all') {
+            const today = new Date();
+            const filterDate = new Date(today);
+            
+            switch (filters.date_range) {
+                case 'today':
+                    filterDate.setHours(0, 0, 0, 0);
+                    filtered = filtered.filter(b => 
+                        new Date(b.booking_date) >= filterDate && 
+                        new Date(b.booking_date) < new Date(filterDate.getTime() + 24 * 60 * 60 * 1000)
+                    );
+                    break;
+                case 'week':
+                    filterDate.setDate(today.getDate() - 7);
+                    filtered = filtered.filter(b => new Date(b.booking_date) >= filterDate);
+                    break;
+                case 'month':
+                    filterDate.setMonth(today.getMonth() - 1);
+                    filtered = filtered.filter(b => new Date(b.booking_date) >= filterDate);
+                    break;
+            }
+        }
+
+        // Sort
+        filtered.sort((a, b) => {
+            let aVal;
+            let bVal;
+
+            if (sortConfig.key === 'facilities.venues.name') {
+                aVal = a.facilities?.venues?.name || '';
+                bVal = b.facilities?.venues?.name || '';
+            } else if (sortConfig.key === 'booking_user.username') {
+                aVal = a.booking_user?.username || '';
+                bVal = b.booking_user?.username || '';
+            } else if (sortConfig.key === 'total_amount') {
+                aVal = parseFloat(a.total_amount);
+                bVal = parseFloat(b.total_amount);
+            } else if (sortConfig.key === 'booking_date' || sortConfig.key === 'created_at') {
+                aVal = new Date(a[sortConfig.key]);
+                bVal = new Date(b[sortConfig.key]);
+            } else {
+                aVal = a[sortConfig.key];
+                bVal = b[sortConfig.key];
+            }
+
+
+            if (typeof aVal === 'string') {
+                aVal = aVal.toLowerCase();
+                bVal = bVal.toLowerCase();
+            }
+
+            if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return filtered;
+    }, [bookings, searchTerm, filters, sortConfig]);
+
+    const stats = useMemo(() => {
+        const total = bookings.length;
+        const confirmed = bookings.filter(b => b.status === 'confirmed').length;
+        const completed = bookings.filter(b => b.status === 'completed').length;
+        const cancelled = bookings.filter(b => b.status === 'cancelled').length;
+        const totalRevenue = bookings
+            .filter(b => b.payment_status === 'paid')
+            .reduce((sum, b) => sum + parseFloat(b.total_amount), 0);
+        
+        return { total, confirmed, completed, cancelled, totalRevenue };
+    }, [bookings]);
+
+    if (loading) {
+        return (
+            <div className="container mx-auto px-4 py-12 flex items-center justify-center min-h-96">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-green mx-auto mb-4"></div>
+                    <p className="text-medium-text">Loading bookings...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="container mx-auto px-4 py-12">
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+                    <p className="text-red-600 text-lg font-semibold mb-2">Error Loading Bookings</p>
+                    <p className="text-red-500">{error}</p>
+                    <button 
+                        onClick={fetchBookings}
+                        className="mt-4 px-6 py-3 bg-primary-green text-white rounded-xl hover:bg-primary-green-dark transition-colors"
+                    >
+                        Try Again
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    const getSortIcon = (key) => {
+        if (sortConfig.key !== key) return null;
+        return sortConfig.direction === 'asc' ? <FaSortAmountUp /> : <FaSortAmountDown />;
     };
 
-    const clearFilters = () => {
-        setFilters({ status: '', paymentStatus: '', dateFrom: '', dateTo: '' });
-        setSearchTerm('');
-        setExpandedRows(new Set());
-    };
-
-    if (loading) return <LoadingSpinner />;
-    if (error) return <ErrorState error={error} onRetry={() => fetchBookings(searchTerm, filters)} />;
 
     return (
-        <div className="container mx-auto px-4 py-8 space-y-8">
+        <div className="container mx-auto px-4 py-8">
             {/* Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                    <h1 className="text-4xl font-bold text-dark-text">Booking Management</h1>
-                    <p className="text-medium-text mt-2">Monitor and manage all venue bookings</p>
-                </div>
-                <div className="flex items-center space-x-3 mt-4 lg:mt-0">
-                    <button onClick={handleExportData} disabled={bookings.length === 0} className="px-4 py-2.5 bg-card-bg border border-border-color text-medium-text hover:text-primary-green hover:border-primary-green disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-all duration-200 flex items-center space-x-2">
-                        <FaDownload className="text-sm" /><span>Export ({bookings.length})</span>
-                    </button>
-                    <button onClick={() => fetchBookings(searchTerm, filters)} className="px-4 py-2.5 bg-primary-green text-white hover:bg-primary-green-dark rounded-lg transition-all duration-200 flex items-center space-x-2">
-                        <FaRedo className="text-sm" /><span>Refresh</span>
-                    </button>
-                </div>
+            <div className="mb-8">
+                <h1 className="text-4xl font-bold text-dark-text mb-2">Booking Management</h1>
+                <p className="text-medium-text">Manage and monitor all venue bookings</p>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatsCard 
-                    title="Total Bookings" 
-                    value={stats.totalBookings.toLocaleString()} 
-                    icon={FaCalendarAlt} 
-                    color="primary-green" 
-                    subtitle={`${stats.todayBookings} today`} 
-                />
-                <StatsCard 
-                    title="Total Revenue" 
-                    value={`₹${stats.totalRevenue.toLocaleString('en-IN')}`} 
-                    icon={FaRupeeSign} 
-                    color="primary-green" 
-                    subtitle={`₹${stats.monthlyRevenue.toLocaleString('en-IN')} this month`} 
-                />
-                <StatsCard 
-                    title="Completed" 
-                    value={stats.completedBookings.toLocaleString()} 
-                    icon={FaClock} 
-                    color="primary-green" 
-                    subtitle={`${((stats.completedBookings / Math.max(stats.totalBookings, 1)) * 100).toFixed(1)}% completion rate`} 
-                />
-                <StatsCard 
-                    title="Pending Refunds" 
-                    value={stats.pendingRefunds.toLocaleString()} 
-                    icon={FaClock} 
-                    color="orange-600" 
-                    subtitle={stats.pendingRefunds > 0 ? "Requires attention" : "All clear"} 
-                />
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+                <div className="bg-gradient-to-br from-primary-green to-primary-green-dark text-white p-6 rounded-2xl shadow-lg">
+                    <h3 className="text-sm font-medium opacity-90">Total Bookings</h3>
+                    <p className="text-3xl font-bold">{stats.total}</p>
+                </div>
+                <div className="bg-card-bg border-2 border-blue-200 p-6 rounded-2xl">
+                    <h3 className="text-sm font-medium text-blue-600">Confirmed</h3>
+                    <p className="text-2xl font-bold text-blue-700">{stats.confirmed}</p>
+                </div>
+                <div className="bg-card-bg border-2 border-green-200 p-6 rounded-2xl">
+                    <h3 className="text-sm font-medium text-green-600">Completed</h3>
+                    <p className="text-2xl font-bold text-green-700">{stats.completed}</p>
+                </div>
+                <div className="bg-card-bg border-2 border-red-200 p-6 rounded-2xl">
+                    <h3 className="text-sm font-medium text-red-600">Cancelled</h3>
+                    <p className="text-2xl font-bold text-red-700">{stats.cancelled}</p>
+                </div>
+                <div className="bg-gradient-to-br from-primary-green-light to-primary-green text-white p-6 rounded-2xl shadow-lg">
+                    <h3 className="text-sm font-medium opacity-90">Total Revenue</h3>
+                    <p className="text-2xl font-bold">₹{stats.totalRevenue.toLocaleString()}</p>
+                </div>
             </div>
 
-            {/* Main Content Card */}
-            <div className="bg-card-bg rounded-2xl shadow-lg border border-border-color-light">
-                {/* Search and Filters Header */}
-                <div className="p-6 border-b border-border-color-light">
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-                        <div className="relative flex-1 max-w-md">
-                            <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-light-text" />
-                            <input type="text" placeholder="Search venues, users, emails..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-hover-bg border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-primary-green transition-all duration-200" />
-                        </div>
-                        <div className="flex items-center space-x-3">
-                            <button onClick={() => setShowFilters(!showFilters)} className={`px-4 py-2.5 rounded-xl border transition-all duration-200 flex items-center space-x-2 ${showFilters ? 'bg-primary-green text-white border-primary-green' : 'bg-card-bg border-border-color text-medium-text hover:border-primary-green hover:text-primary-green'}`}>
-                                <FaFilter className="text-sm" /><span>Filters</span>
-                                {Object.values(filters).some(f => f) && (<span className="bg-white text-primary-green text-xs px-1.5 py-0.5 rounded-full font-medium">{Object.values(filters).filter(f => f).length}</span>)}
-                            </button>
-                            {(filters.status || filters.paymentStatus || filters.dateFrom || filters.dateTo || searchTerm) && (<button onClick={clearFilters} className="px-3 py-2.5 text-light-text hover:text-medium-text rounded-xl hover:bg-hover-bg transition-all duration-200" title="Clear all filters"><FaTimes /></button>)}
-                        </div>
+            {/* Controls */}
+            <div className="bg-card-bg rounded-2xl shadow-lg border border-border-color-light p-6 mb-8">
+                <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between mb-4">
+                    {/* Search */}
+                    <div className="relative flex-1 max-w-md">
+                        <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-light-text" />
+                        <input
+                            type="text"
+                            placeholder="Search bookings, users, venues..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-12 pr-4 py-3 bg-hover-bg border-2 border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent transition-all duration-200"
+                        />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`flex items-center gap-2 px-4 py-3 rounded-xl transition-all duration-200 border-2 font-medium ${
+                                showFilters 
+                                    ? 'bg-primary-green text-white border-primary-green' 
+                                    : 'bg-hover-bg text-medium-text border-border-color hover:border-primary-green'
+                            }`}
+                        >
+                            <FaFilter /> Filters
+                        </button>
+                        <button
+                            onClick={exportToCSV}
+                            className="flex items-center gap-2 px-4 py-3 bg-card-bg text-medium-text rounded-xl hover:bg-primary-green hover:text-white transition-all duration-200 border-2 border-border-color hover:border-primary-green font-medium"
+                        >
+                            <FaDownload /> Export
+                        </button>
                     </div>
                 </div>
 
-                {/* Filters Panel */}
-                <FilterPanel filters={filters} onFiltersChange={setFilters} onClear={clearFilters} isOpen={showFilters} onToggle={() => setShowFilters(!showFilters)} />
+                {/* Filters */}
+                {showFilters && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-border-color-light">
+                        <div>
+                            <label className="block text-sm font-medium text-dark-text mb-2">Status</label>
+                            <select
+                                value={filters.status}
+                                onChange={(e) => setFilters({...filters, status: e.target.value})}
+                                className="w-full p-3 bg-hover-bg border-2 border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
+                            >
+                                <option value="all">All Statuses</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-dark-text mb-2">Payment Status</label>
+                            <select
+                                value={filters.payment_status}
+                                onChange={(e) => setFilters({...filters, payment_status: e.target.value})}
+                                className="w-full p-3 bg-hover-bg border-2 border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
+                            >
+                                <option value="all">All Payment Statuses</option>
+                                <option value="paid">Paid</option>
+                                <option value="refunded">Refunded</option>
+                                <option value="pending_refund">Pending Refund</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-dark-text mb-2">Date Range</label>
+                            <select
+                                value={filters.date_range}
+                                onChange={(e) => setFilters({...filters, date_range: e.target.value})}
+                                className="w-full p-3 bg-hover-bg border-2 border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
+                            >
+                                <option value="all">All Dates</option>
+                                <option value="today">Today</option>
+                                <option value="week">Last 7 Days</option>
+                                <option value="month">Last 30 Days</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
+            </div>
 
-                {/* Table Container */}
+            {/* Table */}
+            <div className="bg-card-bg rounded-2xl shadow-lg border border-border-color-light overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-border-color-light">
-                        <thead className="bg-hover-bg">
+                        <thead className="bg-gradient-to-r from-hover-bg to-light-green-bg">
                             <tr>
-                                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider">Venue & Facility</th>
-                                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider">User Details</th>
-                                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider">Booking Time</th>
-                                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider">Amount</th>
-                                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider">Status</th>
-                                <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider">Payment</th>
-                                <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-dark-text uppercase tracking-wider">Actions</th>
+                                <th 
+                                    scope="col" 
+                                    className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider cursor-pointer hover:bg-primary-green-light hover:bg-opacity-20 transition-colors"
+                                    onClick={() => handleSort('facilities.venues.name')}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        Venue
+                                        {getSortIcon('facilities.venues.name')}
+                                    </div>
+                                </th>
+                                <th 
+                                    scope="col" 
+                                    className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider cursor-pointer hover:bg-primary-green-light hover:bg-opacity-20 transition-colors"
+                                    onClick={() => handleSort('booking_user.username')}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        User
+                                        {getSortIcon('booking_user.username')}
+                                    </div>
+                                </th>
+                                <th 
+                                    scope="col" 
+                                    className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider cursor-pointer hover:bg-primary-green-light hover:bg-opacity-20 transition-colors"
+                                    onClick={() => handleSort('booking_date')}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        Booking Date
+                                        {getSortIcon('booking_date')}
+                                    </div>
+                                </th>
+                                <th 
+                                    scope="col" 
+                                    className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider cursor-pointer hover:bg-primary-green-light hover:bg-opacity-20 transition-colors"
+                                    onClick={() => handleSort('total_amount')}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        Amount
+                                        {getSortIcon('total_amount')}
+                                    </div>
+                                </th>
+                                <th 
+                                    scope="col" 
+                                    className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider cursor-pointer hover:bg-primary-green-light hover:bg-opacity-20 transition-colors"
+                                    onClick={() => handleSort('status')}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        Status
+                                        {getSortIcon('status')}
+                                    </div>
+                                </th>
+                                <th 
+                                    scope="col" 
+                                    className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider cursor-pointer hover:bg-primary-green-light hover:bg-opacity-20 transition-colors"
+                                    onClick={() => handleSort('payment_status')}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        Payment
+                                        {getSortIcon('payment_status')}
+                                    </div>
+                                </th>
+                                <th scope="col" className="relative px-6 py-4">
+                                    <span className="sr-only">Actions</span>
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="bg-card-bg divide-y divide-border-color-light">
-                            {bookings.map(booking => (
-                                <BookingRow
-                                    key={booking.booking_id}
-                                    booking={booking}
-                                    onRefundAction={handleRefundAction}
-                                    onViewDetails={handleViewDetails}
-                                    isExpanded={expandedRows.has(booking.booking_id)}
-                                    onToggleExpand={() => toggleRowExpansion(booking.booking_id)}
-                                />
-                            ))}
+                            {filteredAndSortedBookings.length > 0 ? (
+                                filteredAndSortedBookings.map(booking => (
+                                    <BookingRow 
+                                        key={booking.booking_id} 
+                                        booking={booking} 
+                                        onRefundAction={handleRefundAction}
+                                        onViewDetails={setSelectedBooking}
+                                        isExpanded={expandedRows.has(booking.booking_id)}
+                                        onToggleExpand={handleToggleExpand}
+                                    />
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan="7" className="px-6 py-12 text-center">
+                                        <div className="flex flex-col items-center gap-4">
+                                            <div className="w-16 h-16 bg-border-color-light rounded-full flex items-center justify-center">
+                                                <FaCalendar className="text-light-text text-xl" />
+                                            </div>
+                                            <div>
+                                                <p className="text-medium-text font-semibold mb-1">No bookings found</p>
+                                                <p className="text-light-text text-sm">
+                                                    {searchTerm || filters.status !== 'all' || filters.payment_status !== 'all' || filters.date_range !== 'all'
+                                                        ? 'Try adjusting your filters or search terms'
+                                                        : 'No bookings have been made yet'
+                                                    }
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
 
-                {/* Empty State */}
-                {bookings.length === 0 && (
-                    <div className="text-center py-16">
-                        <div className="text-6xl mb-4">📅</div>
-                        <h3 className="text-xl font-semibold text-dark-text mb-2">No bookings found</h3>
-                        <p className="text-medium-text mb-6 max-w-md mx-auto">
-                            {searchTerm || Object.values(filters).some(f => f) 
-                                ? "We couldn't find any bookings matching your search criteria. Try adjusting your filters or search terms." 
-                                : "No bookings have been made yet. Once customers start booking venues, they'll appear here."}
-                        </p>
-                        {(searchTerm || Object.values(filters).some(f => f)) && (
-                            <button onClick={clearFilters} className="px-6 py-3 bg-primary-green text-white rounded-lg hover:bg-primary-green-dark transition-colors duration-200">Clear All Filters</button>
-                        )}
-                    </div>
-                )}
-
-                {/* Footer with pagination info */}
-                {bookings.length > 0 && (
-                    <div className="px-6 py-4 border-t border-border-color-light">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-                            <div className="flex items-center space-x-2 text-sm text-medium-text">
-                                <span>Showing</span>
-                                <span className="font-semibold text-dark-text">{bookings.length}</span>
-                                <span>{bookings.length === 1 ? 'booking' : 'bookings'}{(searchTerm || Object.values(filters).some(f => f)) && ' (filtered)'}</span>
-                            </div>
-                            <div className="flex items-center space-x-4">
-                                <div className="flex items-center space-x-2 text-sm text-medium-text">
-                                    <FaClock className="text-primary-green" />
-                                    <span>Last updated:</span>
-                                    <span className="font-medium text-dark-text">
-                                        {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                </div>
-                                {expandedRows.size > 0 && (
-                                    <button onClick={() => setExpandedRows(new Set())} className="text-xs text-light-text hover:text-medium-text px-2 py-1 rounded hover:bg-hover-bg transition-all duration-200">Collapse All ({expandedRows.size})</button>
-                                )}
-                            </div>
+                {/* Pagination Info */}
+                {filteredAndSortedBookings.length > 0 && (
+                    <div className="bg-hover-bg px-6 py-4 flex items-center justify-between border-t border-border-color-light">
+                        <div className="text-sm text-medium-text">
+                            Showing <span className="font-semibold">{filteredAndSortedBookings.length}</span> of{' '}
+                            <span className="font-semibold">{bookings.length}</span> bookings
+                        </div>
+                        <div className="text-sm text-light-text">
+                            {searchTerm && (
+                                <span>Filtered by: "{searchTerm}"</span>
+                            )}
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Quick Actions Panel */}
-            <div className="bg-card-bg rounded-2xl shadow-lg border border-border-color-light p-6">
-                <h2 className="text-xl font-semibold text-dark-text mb-4 flex items-center"><span className="mr-2">⚡</span>Quick Actions & Insights</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 border border-border-color rounded-xl hover:border-primary-green hover:bg-light-green-bg transition-all duration-200 cursor-pointer group">
-                        <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition-colors">
-                                <span className="text-orange-600 text-lg">⏰</span>
-                            </div>
-                            <div>
-                                <h3 className="font-medium text-dark-text">Pending Refunds</h3>
-                                <p className="text-sm text-medium-text">{stats.pendingRefunds} {stats.pendingRefunds === 1 ? 'request' : 'requests'} awaiting approval</p>
-                                {stats.pendingRefunds > 0 && (<button onClick={() => setFilters({...filters, paymentStatus: 'pending_refund'})} className="text-xs text-primary-green hover:text-primary-green-dark mt-1">View pending refunds →</button>)}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="p-4 border border-border-color rounded-xl hover:border-primary-green hover:bg-light-green-bg transition-all duration-200 cursor-pointer group">
-                        <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
-                                <FaCalendarAlt className="text-blue-600 text-lg" />
-                            </div>
-                            <div>
-                                <h3 className="font-medium text-dark-text">Today's Bookings</h3>
-                                <p className="text-sm text-medium-text">{stats.todayBookings} {stats.todayBookings === 1 ? 'booking' : 'bookings'} scheduled for today</p>
-                                {stats.todayBookings > 0 && (<button onClick={() => { const today = new Date().toISOString().split('T')[0]; setFilters({...filters, dateFrom: today, dateTo: today}); }} className="text-xs text-primary-green hover:text-primary-green-dark mt-1">View today's bookings →</button>)}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="p-4 border border-border-color rounded-xl hover:border-primary-green hover:bg-light-green-bg transition-all duration-200 cursor-pointer group">
-                        <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
-                                <FaRupeeSign className="text-primary-green text-lg" />
-                            </div>
-                            <div>
-                                <h3 className="font-medium text-dark-text">Monthly Revenue</h3>
-                                <p className="text-sm text-medium-text">₹{stats.monthlyRevenue.toLocaleString('en-IN')} earned this month</p>
-                                <p className="text-xs text-light-text mt-1">{((stats.monthlyRevenue / Math.max(stats.totalRevenue, 1)) * 100).toFixed(1)}% of total revenue</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {/* Booking Detail Modal */}
+            {selectedBooking && (
+                <BookingDetailModal 
+                    booking={selectedBooking} 
+                    onClose={() => setSelectedBooking(null)}
+                    onRefundAction={handleRefundAction}
+                />
+            )}
         </div>
     );
 }
