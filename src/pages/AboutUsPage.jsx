@@ -62,9 +62,10 @@ function AboutUsPage() {
               </h3>
               <p className="text-primary-green text-lg font-medium mb-4">
                 co-founder
+              
               </p>
               <p className="text-medium-text text-sm leading-relaxed">
-                As a lifelong sports enthusiast, Swayam envisioned a platform that would simplify the process of playing, making it accessible to everyone.
+               With a strong background in technology, Swayam built the robust and scalable platform that powers PlayNation's seamless booking experience. 
               </p>
             </div>
 
@@ -82,8 +83,9 @@ function AboutUsPage() {
                 Founder
               </p>
               <p className="text-medium-text text-sm leading-relaxed">
-                With a strong background in technology, Harsh built the robust and scalable platform that powers PlayNation's seamless booking experience.
+                As a lifelong sports enthusiast, Harsh envisioned a platform that would simplify the process of playing, making it accessible to everyone.
               </p>
+              
             </div>
 
             {/* Surbhi Roy's Profile */}
