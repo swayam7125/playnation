@@ -1,4 +1,3 @@
-// src/components/layout/Navbar.jsx
 import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
@@ -39,6 +38,8 @@ function Navbar() {
     if (profile?.role !== "venue_owner" && profile?.role !== "admin") {
       const links = [
         { to: "/explore", label: "Explore" },
+        { to: "/about", label: "About Us" },
+        { to: "/contact", label: "Contact Us" },
       ];
       
       if (user) {
@@ -59,6 +60,8 @@ function Navbar() {
         { to: "/owner/manage-offers", label: "Manage Offers" },
         { to: "/owner/calendar", label: "Bookings" },
         { to: "/owner/manage-slots", label: "Manage Slots" },
+        { to: "/about", label: "About Us" },
+        { to: "/contact", label: "Contact Us" },
       ];
       
       if (user) {
@@ -76,6 +79,8 @@ function Navbar() {
         { to: "/admin/bookings", label: "Manage Bookings" },
         { to: "/admin/manage-offers", label: "Manage Offers" },
         { to: "/admin/notify", label: "Notify Players" },
+        { to: "/about", label: "About Us" },
+        { to: "/contact", label: "Contact Us" },
       ];
       
       if (user) {

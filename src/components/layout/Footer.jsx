@@ -41,7 +41,7 @@ function Footer() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
           {/* Brand Section */}
           <div className="lg:col-span-1">
-            <Link to="/" className="flex items-center gap-3 no-underline mb-6 group">
+            <Link to="/" className="flex items-center gap-3 no-underline group">
               <div className="bg-gradient-to-br from-primary-green to-primary-green-dark text-white font-bold text-lg h-11 w-11 grid place-content-center rounded-xl shadow-lg group-hover:shadow-primary-green/25 group-hover:scale-105 transition-all duration-300">
                 PN
               </div>
@@ -128,7 +128,7 @@ function Footer() {
             <h4 className="font-semibold text-dark-text mb-6">Company</h4>
             <div className="bg-hover-bg backdrop-blur-sm rounded-xl p-5 border border-border-color">
               <ul className="list-none p-0 m-0 space-y-3">
-                <li><Link to="#" className={linkStyles}>About Us</Link></li>
+                <li><Link to="/about" className={linkStyles}>About Us</Link></li>
                 <li><Link to="#" className={linkStyles}>Careers</Link></li>
                 <li><Link to="#" className={linkStyles}>Contact</Link></li>
                 <li><Link to="#" className={linkStyles}>Help Center</Link></li>

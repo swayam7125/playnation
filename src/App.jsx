@@ -1,37 +1,38 @@
-// src/App.jsx
-import React from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
-import Navbar from "./components/layout/Navbar";
-import OwnerProtectedRoute from "./components/auth/OwnerProtectedRoute";
-import AdminProtectedRoute from "./components/auth/AdminProtectedRoute";
-import Footer from "./components/layout/Footer";
+import React from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
+import Navbar from './components/layout/Navbar';
+import OwnerProtectedRoute from './components/auth/OwnerProtectedRoute';
+import AdminProtectedRoute from './components/auth/AdminProtectedRoute';
+import Footer from './components/layout/Footer';
 
 // Public Pages
-import HomePage from "./pages/HomePage";
-import AuthPage from "./pages/AuthPage";
-import ExplorePage from "./pages/ExplorePage";
-import VenuePage from "./pages/VenuePage";
+import HomePage from './pages/HomePage';
+import AuthPage from './pages/AuthPage';
+import ExplorePage from './pages/ExplorePage';
+import VenuePage from './pages/VenuePage';
+import AboutUsPage from './pages/AboutUsPage';
+import ContactUsPage from './pages/ContactUsPage'; // New import
 
 // Player Pages
-import MyBookingsPage from "./pages/player/MyBookingsPage";
-import BookingPage from "./pages/player/BookingPage";
-import ProfilePage from "./pages/player/ProfilePage";
+import MyBookingsPage from './pages/player/MyBookingsPage';
+import BookingPage from './pages/player/BookingPage';
+import ProfilePage from './pages/player/ProfilePage';
 
 // Owner Pages
-import OwnerDashboardPage from "./pages/owner/OwnerDashboardPage";
-import AddVenuePage from "./pages/owner/AddVenuePage";
-import EditVenuePage from "./pages/owner/EditVenuePage";
-import MyVenuesPage from "./pages/owner/MyVenuesPage";
-import BookingCalendarPage from "./pages/owner/BookingCalendarPage";
-import ManageSlotsPage from "./pages/owner/ManageSlotsPage";
-import ManageOffersPage from "./pages/owner/ManageOffersPage";
+import OwnerDashboardPage from './pages/owner/OwnerDashboardPage';
+import AddVenuePage from './pages/owner/AddVenuePage';
+import EditVenuePage from './pages/owner/EditVenuePage';
+import MyVenuesPage from './pages/owner/MyVenuesPage';
+import BookingCalendarPage from './pages/owner/BookingCalendarPage';
+import ManageSlotsPage from './pages/owner/ManageSlotsPage';
+import ManageOffersPage from './pages/owner/ManageOffersPage';
 
 // Admin Pages
-import AdminVenueManagementPage from "./pages/admin/AdminVenueManagementPage";
-import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
-import AdminUserManagementPage from "./pages/admin/AdminUserManagementPage";
-import AdminNotifyPage from "./pages/admin/AdminNotifyPage";
-import AdminManageOffersPage from "./pages/admin/AdminManageOffersPage"; // <-- IMPORT NEW ADMIN PAGE
+import AdminVenueManagementPage from './pages/admin/AdminVenueManagementPage';
+import AdminBookingsPage from './pages/admin/AdminBookingsPage';
+import AdminUserManagementPage from './pages/admin/AdminUserManagementPage';
+import AdminNotifyPage from './pages/admin/AdminNotifyPage';
+import AdminManageOffersPage from './pages/admin/AdminManageOffersPage';
 
 function App() {
   const location = useLocation();
@@ -46,6 +47,8 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
           <Route path="/explore" element={<ExplorePage />} />
+          <Route path="/about" element={<AboutUsPage />} />
+          <Route path="/contact" element={<ContactUsPage />} /> {/* New route */}
           <Route path="/login" element={<AuthPage />} />
           <Route path="/signup" element={<AuthPage />} />
           
@@ -80,7 +83,6 @@ function App() {
             
             <Route path="/admin/bookings" element={<AdminBookingsPage />} />
             <Route path="/admin/users" element={<AdminUserManagementPage />} />
-            {/* ADD THE NEW ADMIN ROUTE */}
             <Route
               path="/admin/manage-offers"
               element={<AdminManageOffersPage />}
