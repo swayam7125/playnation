@@ -20,19 +20,24 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: email,
         password: password,
       });
-      if (error) throw error;
+      if (signInError) throw signInError;
 
       const userProfile = await updateUser();
 
-      if (userProfile && userProfile.role === "venue_owner") {
+      // Redirect based on role
+      if (userProfile?.role === "venue_owner") {
         navigate("/owner/dashboard");
+      } else if (userProfile?.role === "admin") {
+        navigate("/admin/venues");
       } else if (from) {
+        // If there was a page they were trying to access before login
         navigate(from.pathname, { state: from.state, replace: true });
       } else {
+        // Default redirect for players
         navigate("/");
       }
     } catch (error) {
@@ -42,7 +47,8 @@ function LoginForm() {
     }
   };
 
-  const inputStyles = "w-full py-3 px-4 border border-border-color rounded-lg text-sm bg-card-bg text-dark-text transition duration-300 focus:outline-none focus:border-primary-green focus:ring-2 focus:ring-primary-green/20";
+  const inputStyles =
+    "w-full py-3 px-4 border border-border-color rounded-lg text-sm bg-card-bg text-dark-text transition duration-300 focus:outline-none focus:border-primary-green focus:ring-2 focus:ring-primary-green/20";
   const labelStyles = "font-semibold text-sm text-dark-text";
 
   return (
@@ -54,7 +60,9 @@ function LoginForm() {
       )}
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex flex-col gap-2">
-          <label htmlFor="email" className={labelStyles}>Email Address</label>
+          <label htmlFor="email" className={labelStyles}>
+            Email Address
+          </label>
           <input
             id="email"
             type="email"
@@ -66,7 +74,9 @@ function LoginForm() {
           />
         </div>
         <div className="flex flex-col gap-2">
-          <label htmlFor="password" className={labelStyles}>Password</label>
+          <label htmlFor="password" className={labelStyles}>
+            Password
+          </label>
           <input
             id="password"
             type="password"
@@ -78,7 +88,11 @@ function LoginForm() {
           />
         </div>
       </div>
-      <button type="submit" className="bg-primary-green text-white p-4 rounded-lg text-base font-bold cursor-pointer transition duration-300 mt-4 hover:bg-primary-green-dark hover:-translate-y-px hover:shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none" disabled={loading}>
+      <button
+        type="submit"
+        className="bg-primary-green text-white p-4 rounded-lg text-base font-bold cursor-pointer transition duration-300 mt-4 hover:bg-primary-green-dark hover:-translate-y-px hover:shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none"
+        disabled={loading}
+      >
         {loading ? "Logging in..." : "Login"}
       </button>
     </form>

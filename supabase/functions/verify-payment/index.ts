@@ -1,6 +1,13 @@
+// supabase/functions/verify-payment/index.ts
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import crypto from 'https://deno.land/std@0.168.0/node/crypto.ts';
+
+// Helper function to convert the signature buffer to a hex string for comparison
+const bufferToHex = (buffer) => {
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+};
 
 serve(async (req) => {
   const corsHeaders = {
@@ -8,58 +15,70 @@ serve(async (req) => {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   };
 
-  try {
-    const { event, payload } = await req.json();
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
 
-    // Check if it's a payment success event
+  try {
+    const rawBody = await req.text(); // Read the request body as plain text for signature verification
+    const { event, payload } = JSON.parse(rawBody);
+    const razorpaySignature = req.headers.get('x-razorpay-signature');
+    const webhookSecret = Deno.env.get('RAZORPAY_WEBHOOK_SECRET');
+
+    if (!razorpaySignature || !webhookSecret) {
+      throw new Error('Missing Razorpay signature or webhook secret.');
+    }
+
+    // --- JAVASCRIPT CRYPTO VERIFICATION ---
+    // This block uses the Web Crypto API, which is standard in modern JS environments like Deno.
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(webhookSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const signature = await crypto.subtle.sign(
+      'HMAC',
+      key,
+      new TextEncoder().encode(rawBody)
+    );
+    const digest = bufferToHex(signature);
+    
+    if (digest !== razorpaySignature) {
+      console.error('Signature verification failed.');
+      throw new Error('Invalid signature');
+    }
+    // --- END OF FIX ---
+
+    // If the signature is valid, proceed with the booking logic
     if (event === 'payment.captured') {
       const payment = payload.payment.entity;
       const order = payload.order.entity;
-
-      const razorpaySignature = req.headers.get('x-razorpay-signature');
-      const webhookSecret = Deno.env.get('RAZORPAY_WEBHOOK_SECRET')!;
-
-      // 1. Securely verify the webhook signature
-      const shasum = crypto.createHmac('sha256', webhookSecret);
-      shasum.update(JSON.stringify(payload));
-      const digest = shasum.digest('hex');
-
-      if (digest !== razorpaySignature) {
-        throw new Error('Invalid signature');
-      }
       
-      // 2. Signature is valid, proceed with booking
-      const { user_id, slot_id } = order.notes;
+      const { user_id, slot_id, facility_id, start_time, end_time } = order.notes;
+
+      if (!user_id || !slot_id || !facility_id || !start_time || !end_time) {
+        throw new Error('Missing required information in order notes.');
+      }
 
       const supabaseAdmin = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        Deno.env.get('SUPABASE_URL'),
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
       );
 
-      // 3. Insert the new booking into the database
-      const { error: bookingError } = await supabaseAdmin
-        .from('bookings')
-        .insert({
-          user_id: user_id,
-          slot_id: slot_id,
-          facility_id: payment.notes.facility_id, // Pass this from notes
-          booking_date: new Date(),
-          start_time: payment.notes.start_time,
-          end_time: payment.notes.end_time,
-          total_amount: payment.amount / 100,
-          status: 'confirmed',
-          payment_status: 'paid',
-        });
-        
-      if (bookingError) throw bookingError;
-      
-      // 4. Mark the time slot as unavailable
-      const { error: slotError } = await supabaseAdmin
-        .from('time_slots')
-        .update({ is_available: false })
-        .eq('slot_id', slot_id);
+      // Call the secure database function to create the booking
+      const { error: rpcError } = await supabaseAdmin.rpc('create_booking_for_user', {
+          p_user_id: user_id,
+          p_facility_id: facility_id,
+          p_slot_id: slot_id,
+          p_total_amount: payment.amount / 100,
+      });
 
-      if (slotError) throw slotError;
+      if (rpcError) {
+        console.error('RPC Error:', rpcError);
+        throw rpcError;
+      }
     }
 
     return new Response(JSON.stringify({ status: 'success' }), {
@@ -68,6 +87,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    console.error('Function Error:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,

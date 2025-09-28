@@ -359,7 +359,7 @@ export default function HomePage() {
         </section>
 
         {/* Stats Section */}
-        <section className="py-20">
+        {/* <section className="py-20">
           <div className="bg-gradient-to-r from-primary-green to-primary-green-dark rounded-3xl p-12 text-center text-white">
             <h2 className="text-4xl font-bold mb-4">
               Join Thousands of Happy Players
@@ -377,7 +377,7 @@ export default function HomePage() {
               ))}
             </div>
           </div>
-        </section>
+        </section> */}
 
         {/* Testimonials Section */}
         <section className="py-20">

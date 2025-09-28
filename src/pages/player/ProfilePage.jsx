@@ -1,3 +1,4 @@
+// src/pages/player/ProfilePage.jsx
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
@@ -5,7 +6,7 @@ import ChangePasswordForm from "../../components/auth/ChangePasswordForm";
 import { FaSave } from "react-icons/fa";
 
 const ProfilePage = () => {
-  // --- THE FIX: Destructure 'loading' from useAuth as well ---
+  // Destructure 'loading' from useAuth to check initial profile load
   const { user, profile, setProfile, loading: authLoading } = useAuth();
 
   const [username, setUsername] = useState("");
@@ -25,6 +26,13 @@ const ProfilePage = () => {
       setAvatarUrl(profile.avatar_url);
     }
   }, [profile]);
+
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(""), 3000); // Automatically clear success message
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
 
   async function updateProfile(e) {
     e.preventDefault();
@@ -50,7 +58,7 @@ const ProfilePage = () => {
           .from("avatars")
           .getPublicUrl(filePath);
 
-        // --- THE FIX IS HERE: Add a unique timestamp to bust the browser cache ---
+        // Add a unique timestamp to bust the browser cache and ensure the new image loads
         newAvatarUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
         setUploading(false);
       }
@@ -67,14 +75,12 @@ const ProfilePage = () => {
       const { error } = await supabase.from("users").upsert(updates);
       if (error) throw error;
 
-      // Update the global and local state so the UI refreshes instantly
       setProfile((prevProfile) => ({ ...prevProfile, ...updates }));
       setAvatarUrl(newAvatarUrl);
 
       setAvatarFile(null);
       setAvatarPreview(null);
       setSuccess("Profile updated successfully!");
-      setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -91,7 +97,6 @@ const ProfilePage = () => {
   };
 
   const handleRemoveAvatar = async () => {
-    // ... function remains the same, no changes needed here
     setError("");
     setSuccess("");
     setAvatarPreview(null);
@@ -106,14 +111,12 @@ const ProfilePage = () => {
       if (error) throw error;
       setProfile((prev) => ({ ...prev, avatar_url: null }));
       setSuccess("Avatar removed.");
-      setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       setError(`Failed to remove avatar: ${err.message}`);
       setAvatarUrl(profile.avatar_url);
     }
   };
 
-  // --- THE FIX: Add a loading state check ---
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -126,10 +129,16 @@ const ProfilePage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
+      {/* Success Toast Notification */}
+      {success && (
+        <div className="fixed top-24 right-5 bg-primary-green text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in-down z-50">
+          {success}
+        </div>
+      )}
+
       <div className="container mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold text-dark-text mb-8">My Profile</h1>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2">
             <form onSubmit={updateProfile}>
@@ -138,7 +147,6 @@ const ProfilePage = () => {
                   Account Details
                 </h2>
                 <div className="space-y-4">
-                  {/* Avatar Section */}
                   <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6">
                     <img
                       src={
@@ -230,9 +238,6 @@ const ProfilePage = () => {
                   </div>
 
                   {error && <p className="text-red-500 text-sm">{error}</p>}
-                  {success && (
-                    <p className="text-green-500 text-sm">{success}</p>
-                  )}
 
                   <div className="pt-2">
                     <button

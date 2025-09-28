@@ -8,34 +8,6 @@ function Footer() {
 
   return (
     <footer className="bg-background backdrop-blur-md border-t border-border-color">
-      {/* Newsletter Section */}
-      <div className="bg-hover-bg/90 backdrop-blur-md border-b border-border-color">
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          <div className="bg-hover-bg backdrop-blur-sm rounded-2xl p-8 border border-border-color shadow-sm">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="text-center md:text-left">
-                <h3 className="text-xl font-bold text-dark-text mb-2">
-                  Stay Updated with PlayNation
-                </h3>
-                <p className="text-medium-text">
-                  Get the latest venue updates and exclusive offers
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="px-4 py-3 rounded-xl bg-background border border-border-color text-dark-text placeholder-light-text focus:outline-none focus:ring-2 focus:ring-primary-green/20 focus:border-primary-green/30 transition-all duration-300 min-w-72"
-                />
-                <button className="px-6 py-3 bg-gradient-to-r from-primary-green to-primary-green-dark text-white font-medium rounded-xl shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
-                  Subscribe
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main Footer Content */}
       <div className="max-w-7xl mx-auto px-6 py-16">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
@@ -134,28 +106,6 @@ function Footer() {
                 <li><Link to="#" className={linkStyles}>Help Center</Link></li>
                 <li><Link to="#" className={linkStyles}>Blog</Link></li>
               </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats Section */}
-        <div className="mt-16 pt-12 border-t border-border-color">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="bg-hover-bg backdrop-blur-sm rounded-xl p-6 border border-border-color text-center hover:bg-light-green-bg/30 hover:border-primary-green/20 transition-all duration-300">
-              <div className="text-2xl font-bold text-primary-green">1000+</div>
-              <div className="text-medium-text text-sm font-medium">Venues</div>
-            </div>
-            <div className="bg-hover-bg backdrop-blur-sm rounded-xl p-6 border border-border-color text-center hover:bg-light-green-bg/30 hover:border-primary-green/20 transition-all duration-300">
-              <div className="text-2xl font-bold text-primary-green">50K+</div>
-              <div className="text-medium-text text-sm font-medium">Users</div>
-            </div>
-            <div className="bg-hover-bg backdrop-blur-sm rounded-xl p-6 border border-border-color text-center hover:bg-light-green-bg/30 hover:border-primary-green/20 transition-all duration-300">
-              <div className="text-2xl font-bold text-primary-green">25+</div>
-              <div className="text-medium-text text-sm font-medium">Sports</div>
-            </div>
-            <div className="bg-hover-bg backdrop-blur-sm rounded-xl p-6 border border-border-color text-center hover:bg-light-green-bg/30 hover:border-primary-green/20 transition-all duration-300">
-              <div className="text-2xl font-bold text-primary-green">24/7</div>
-              <div className="text-medium-text text-sm font-medium">Support</div>
             </div>
           </div>
         </div>
