@@ -24,6 +24,11 @@ function Navbar() {
     }
   };
 
+  const handleProfileClick = () => {
+    navigate("/profile");
+    setIsMobileMenuOpen(false); // Close mobile menu if open
+  };
+
   const navLinkClasses =
     "relative px-4 py-2 text-sm font-medium text-medium-text transition-all duration-300 rounded-lg hover:text-primary-green hover:bg-light-green-bg/50 group";
   
@@ -38,15 +43,18 @@ function Navbar() {
     if (profile?.role !== "venue_owner" && profile?.role !== "admin") {
       const links = [
         { to: "/explore", label: "Explore" },
-        { to: "/about", label: "About Us" },
-        { to: "/contact", label: "Contact Us" },
       ];
       
-      if (user) {
+      // Only add About Us and Contact Us if user is NOT logged in
+      if (!user) {
         links.push(
-          { to: "/my-bookings", label: "My Bookings" },
-          { to: "/profile", label: "My Profile" }
+          { to: "/about", label: "About Us" },
+          { to: "/contact", label: "Contact Us" }
         );
+      }
+      
+      if (user) {
+        links.push({ to: "/my-bookings", label: "My Bookings" });
       }
       
       return links;
@@ -60,12 +68,14 @@ function Navbar() {
         { to: "/owner/manage-offers", label: "Manage Offers" },
         { to: "/owner/calendar", label: "Bookings" },
         { to: "/owner/manage-slots", label: "Manage Slots" },
-        { to: "/about", label: "About Us" },
-        { to: "/contact", label: "Contact Us" },
       ];
       
-      if (user) {
-        links.push({ to: "/profile", label: "My Profile" });
+      // Only add About Us and Contact Us if user is NOT logged in (shouldn't happen for venue owners, but for consistency)
+      if (!user) {
+        links.push(
+          { to: "/about", label: "About Us" },
+          { to: "/contact", label: "Contact Us" }
+        );
       }
       
       return links;
@@ -79,12 +89,14 @@ function Navbar() {
         { to: "/admin/bookings", label: "Manage Bookings" },
         { to: "/admin/manage-offers", label: "Manage Offers" },
         { to: "/admin/notify", label: "Notify Players" },
-        { to: "/about", label: "About Us" },
-        { to: "/contact", label: "Contact Us" },
       ];
       
-      if (user) {
-        links.push({ to: "/profile", label: "My Profile" });
+      // Only add About Us and Contact Us if user is NOT logged in (shouldn't happen for admins, but for consistency)
+      if (!user) {
+        links.push(
+          { to: "/about", label: "About Us" },
+          { to: "/contact", label: "Contact Us" }
+        );
       }
       
       return links;
@@ -136,16 +148,31 @@ function Navbar() {
           <div className="flex items-center gap-4">
             {user ? (
               <div className="flex items-center gap-4">
-                <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-background/60 rounded-xl border border-border-color-light">
+                {/* Clickable Profile Section */}
+                <button
+                  onClick={handleProfileClick}
+                  className="hidden sm:flex items-center gap-3 px-4 py-2 bg-background/60 rounded-xl border border-border-color-light transition-all duration-300 hover:bg-light-green-bg/50 hover:border-primary-green/30 hover:shadow-sm cursor-pointer"
+                >
                   <div className="w-8 h-8 bg-gradient-to-br from-primary-green to-primary-green-dark rounded-full flex items-center justify-center">
                     <span className="text-white font-semibold text-sm">
                       {(profile?.username || "U").charAt(0).toUpperCase()}
                     </span>
                   </div>
-                  <span className="font-medium text-medium-text text-sm">
+                  <span className="font-medium text-medium-text text-sm hover:text-primary-green transition-colors duration-300">
                     {profile?.username || "User"}
                   </span>
-                </div>
+                </button>
+                
+                {/* Mobile Profile Button */}
+                <button
+                  onClick={handleProfileClick}
+                  className="sm:hidden w-8 h-8 bg-gradient-to-br from-primary-green to-primary-green-dark rounded-full flex items-center justify-center transition-all duration-300 hover:shadow-lg hover:scale-105"
+                >
+                  <span className="text-white font-semibold text-sm">
+                    {(profile?.username || "U").charAt(0).toUpperCase()}
+                  </span>
+                </button>
+                
                 <button
                   onClick={handleLogout}
                   className="px-4 py-2 text-sm font-medium text-medium-text bg-background/60 border border-border-color-light rounded-lg transition-all duration-300 hover:text-primary-green hover:border-primary-green/30 hover:bg-light-green-bg/50 hover:shadow-sm"
@@ -219,6 +246,20 @@ function Navbar() {
                   {link.label}
                 </Link>
               ))}
+              
+              {/* Mobile Profile Link for logged in users */}
+              {user && (
+                <button
+                  onClick={handleProfileClick}
+                  className={`${mobileNavLinkClasses} ${
+                    location.pathname === "/profile"
+                      ? "text-primary-green bg-light-green-bg/50"
+                      : ""
+                  } w-full text-left`}
+                >
+                  My Profile
+                </button>
+              )}
             </div>
           </div>
         )}

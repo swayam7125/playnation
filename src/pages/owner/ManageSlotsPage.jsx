@@ -4,7 +4,29 @@ import { useAuth } from '../../AuthContext';
 import { useModal } from '../../ModalContext';
 import { FaTrash, FaPlusCircle, FaTimesCircle, FaEdit, FaBan, FaCheck, FaTimes, FaChevronLeft, FaChevronRight, FaClock, FaCalendarAlt, FaMapMarkerAlt, FaCheckDouble } from 'react-icons/fa';
 
+// Helper function to get today's date string in local timezone
 const getTodayString = () => new Date().toISOString().split('T')[0];
+
+// Helper function to create timezone-aware timestamps
+const createTimezoneAwareTimestamp = (dateString, hour) => {
+    const date = new Date(dateString + 'T00:00:00');
+    date.setHours(hour, 0, 0, 0);
+    return date.toISOString();
+};
+
+// Helper function to parse timestamp and get local hour
+const getLocalHourFromTimestamp = (timestamp) => {
+    return new Date(timestamp).getHours();
+};
+
+// Helper function to format timestamp for display
+const formatTimestampForDisplay = (timestamp) => {
+    const date = new Date(timestamp);
+    return {
+        hour: date.getHours(),
+        displayTime: `${date.getHours().toString().padStart(2, '0')}:00 - ${(date.getHours() + 1).toString().padStart(2, '0')}:00`
+    };
+};
 
 // Helper component for form fields in the control panel
 const ControlField = ({ label, icon: Icon, children }) => (
@@ -29,6 +51,10 @@ const TimeSlotCard = ({ item, isSelected, facility, actions }) => {
     };
     const finalClass = `${baseClasses} ${status === 'empty' && isSelected ? statusClasses.selected : statusClasses[status]}`;
     const stopPropagation = (fn) => (e) => { e.stopPropagation(); fn(); };
+
+    // Format display time for the slot
+    const displayTime = slot ? formatTimestampForDisplay(slot.start_time) : 
+        { hour, displayTime: `${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00` };
 
     const renderContent = () => {
         switch (status) {
@@ -101,8 +127,8 @@ const TimeSlotCard = ({ item, isSelected, facility, actions }) => {
     return (
         <div className={finalClass} onClick={() => status === 'empty' && actions.onToggleSelection(hour)}>
             <div className="text-center mb-4">
-                <div className="font-bold text-xl text-dark-text mb-1">{hour}:00</div>
-                <div className="text-xs text-medium-text">{hour}:00 - {hour + 1}:00</div>
+                <div className="font-bold text-xl text-dark-text mb-1">{displayTime.hour}:00</div>
+                <div className="text-xs text-medium-text">{displayTime.displayTime}</div>
             </div>
             {renderContent()}
         </div>
@@ -128,7 +154,12 @@ function ManageSlotsPage() {
         if (!user) { setLoading(false); return; }
         setLoading(true);
         try {
-            const { data, error } = await supabase.from('venues').select(`*, facilities(*, sports(name), time_slots(*, bookings(booking_id, status)))`).eq('owner_id', user.id);
+            const { data, error } = await supabase
+                .from('venues')
+                .select(`*, facilities(*, sports(name), time_slots(*, bookings(booking_id, status)))`)
+                .eq('owner_id', user.id)
+                .eq('is_approved', true); // Only fetch approved venues
+            
             if (error) throw error;
             setVenues(data || []);
             if (data?.length > 0 && !selectedVenueId) {
@@ -218,12 +249,20 @@ function ManageSlotsPage() {
     };
 
     const handleBulkAddSlots = async () => {
-        if (slotsToCreate.size === 0) { await showModal({ title: "No Slots Selected", message: "Please select slots to add." }); return; }
+        if (slotsToCreate.size === 0) { 
+            await showModal({ title: "No Slots Selected", message: "Please select slots to add." }); 
+            return; 
+        }
+        
+        // Create timezone-aware timestamps
         const slotsToInsert = Array.from(slotsToCreate).map(hour => ({
             facility_id: selectedFacilityId,
-            start_time: `${selectedDate}T${String(hour).padStart(2, '0')}:00:00`,
-            end_time: `${selectedDate}T${String(hour + 1).padStart(2, '0')}:00:00`,
+            start_time: createTimezoneAwareTimestamp(selectedDate, hour),
+            end_time: createTimezoneAwareTimestamp(selectedDate, hour + 1),
         }));
+
+        console.log('Creating slots with timezone-aware timestamps:', slotsToInsert);
+        
         await runSupabaseAction(() => supabase.from('time_slots').insert(slotsToInsert), `${slotsToInsert.length} slot(s) added successfully!`, "Error adding slots");
         setSlotsToCreate(new Set());
     };
@@ -255,11 +294,22 @@ function ManageSlotsPage() {
         const openingHour = parseInt(selectedVenue.opening_time.split(':')[0], 10);
         const closingHour = parseInt(selectedVenue.closing_time.split(':')[0], 10);
         
-        const schedule = Array.from({ length: closingHour - openingHour }, (_, i) => ({ hour: openingHour + i, slot: null, status: 'empty' }));
-        const slotsForDate = currentFacility?.time_slots?.filter(s => new Date(s.start_time).toISOString().split('T')[0] === selectedDate) || [];
+        const schedule = Array.from({ length: closingHour - openingHour }, (_, i) => ({ 
+            hour: openingHour + i, 
+            slot: null, 
+            status: 'empty' 
+        }));
+        
+        // Filter slots for the selected date using timezone-aware comparison
+        const slotsForDate = currentFacility?.time_slots?.filter(s => {
+            const slotDate = new Date(s.start_time);
+            const selectedDateTime = new Date(selectedDate);
+            return slotDate.toDateString() === selectedDateTime.toDateString();
+        }) || [];
 
         return schedule.map(item => {
-            const slot = slotsForDate.find(s => new Date(s.start_time).getHours() === item.hour);
+            // Find slot by comparing the local hour from the timestamp
+            const slot = slotsForDate.find(s => getLocalHourFromTimestamp(s.start_time) === item.hour);
             if (!slot) return item;
             
             const bookingForSlot = (slot.bookings || []).find(b => b.status === 'confirmed');
@@ -291,7 +341,13 @@ function ManageSlotsPage() {
             <div className="container mx-auto px-6 py-8">
                 {venues.length === 0 ? (
                     <div className="bg-card-bg rounded-2xl border border-border-color p-16 text-center shadow-sm">
-                        <div className="max-w-md mx-auto"><div className="p-4 bg-light-green-bg rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center"><FaMapMarkerAlt className="text-primary-green text-2xl" /></div><h3 className="text-xl font-semibold text-dark-text mb-2">No Venues Found</h3><p className="text-medium-text">You need to add a venue first before managing time slots.</p></div>
+                        <div className="max-w-md mx-auto">
+                            <div className="p-4 bg-light-green-bg rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                                <FaMapMarkerAlt className="text-primary-green text-2xl" />
+                            </div>
+                            <h3 className="text-xl font-semibold text-dark-text mb-2">No Approved Venues Found</h3>
+                            <p className="text-medium-text">You need to have at least one approved venue before managing time slots. Please wait for admin approval or contact support.</p>
+                        </div>
                     </div>
                 ) : (
                     <>
@@ -358,9 +414,23 @@ function ManageSlotsPage() {
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
                     <div className="bg-card-bg rounded-2xl shadow-2xl w-full max-w-md">
                         <div className="p-8">
-                            <div className="text-center mb-6"><div className="p-4 bg-yellow-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center"><FaBan className="text-yellow-600 text-2xl" /></div><h3 className="text-2xl font-bold text-dark-text mb-2">Block Time Slot</h3><p className="text-medium-text">Time: {new Date(slotToBlock.start_time).getHours()}:00 - {new Date(slotToBlock.start_time).getHours() + 1}:00</p></div>
-                            <div className="space-y-4 mb-8"><label htmlFor="block-reason" className="block font-semibold text-dark-text">Reason for blocking (optional)</label><input id="block-reason" type="text" value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="e.g., Maintenance, Private event..." className="w-full p-4 border border-border-color rounded-xl bg-card-bg focus:border-primary-green focus:ring-4 focus:ring-primary-green/10" /></div>
-                            <div className="flex gap-4"><button onClick={closeBlockForm} className="flex-1 py-3 px-6 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200">Cancel</button><button onClick={handleConfirmBlock} className="flex-1 py-3 px-6 bg-yellow-500 text-white rounded-xl font-semibold hover:bg-yellow-600 flex items-center justify-center gap-2"><FaBan />Block Slot</button></div>
+                            <div className="text-center mb-6">
+                                <div className="p-4 bg-yellow-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                                    <FaBan className="text-yellow-600 text-2xl" />
+                                </div>
+                                <h3 className="text-2xl font-bold text-dark-text mb-2">Block Time Slot</h3>
+                                <p className="text-medium-text">
+                                    Time: {formatTimestampForDisplay(slotToBlock.start_time).displayTime}
+                                </p>
+                            </div>
+                            <div className="space-y-4 mb-8">
+                                <label htmlFor="block-reason" className="block font-semibold text-dark-text">Reason for blocking (optional)</label>
+                                <input id="block-reason" type="text" value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="e.g., Maintenance, Private event..." className="w-full p-4 border border-border-color rounded-xl bg-card-bg focus:border-primary-green focus:ring-4 focus:ring-primary-green/10" />
+                            </div>
+                            <div className="flex gap-4">
+                                <button onClick={closeBlockForm} className="flex-1 py-3 px-6 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200">Cancel</button>
+                                <button onClick={handleConfirmBlock} className="flex-1 py-3 px-6 bg-yellow-500 text-white rounded-xl font-semibold hover:bg-yellow-600 flex items-center justify-center gap-2"><FaBan />Block Slot</button>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -38,20 +38,26 @@ const ProfilePage = () => {
         setUploading(true);
         const fileExt = avatarFile.name.split(".").pop();
         const fileName = `${user.id}.${fileExt}`;
-        const filePath = `${fileName}`;
+        const filePath = `${user.id}/${fileName}`;
+
         const { error: uploadError } = await supabase.storage
           .from("avatars")
           .upload(filePath, avatarFile, { upsert: true });
+
         if (uploadError) throw uploadError;
+
         const { data } = supabase.storage
           .from("avatars")
           .getPublicUrl(filePath);
-        newAvatarUrl = data.publicUrl;
+
+        // --- THE FIX IS HERE: Add a unique timestamp to bust the browser cache ---
+        newAvatarUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
         setUploading(false);
       }
 
       const updates = {
         user_id: user.id,
+        email: user.email,
         username,
         phone_number: phone,
         avatar_url: newAvatarUrl,
@@ -61,8 +67,10 @@ const ProfilePage = () => {
       const { error } = await supabase.from("users").upsert(updates);
       if (error) throw error;
 
+      // Update the global and local state so the UI refreshes instantly
       setProfile((prevProfile) => ({ ...prevProfile, ...updates }));
       setAvatarUrl(newAvatarUrl);
+
       setAvatarFile(null);
       setAvatarPreview(null);
       setSuccess("Profile updated successfully!");
