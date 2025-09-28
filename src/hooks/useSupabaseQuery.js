@@ -1,5 +1,5 @@
 // src/hooks/useSupabaseQuery.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 
 /**
@@ -7,52 +7,44 @@ import { supabase } from '../supabaseClient';
  * @param {string} tableName - The name of the table to query.
  * @param {string} selectQuery - The select query string (e.g., '*', 'id, name').
  * @param {Object} filters - An object of filters to apply (e.g., { owner_id: '...' }).
- * @returns {{data: any[], loading: boolean, error: string|null}}
+ * @returns {{data: any[], loading: boolean, error: string|null, setData: Function}}
  */
-function useSupabaseQuery(tableName, selectQuery, filters = {}) {
+export default function useSupabaseQuery(tableName, selectQuery, filters = {}) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      // Don't run the query if a filter value is missing.
-      // For example, if we need user.id but the user is not loaded yet.
-      const filterValues = Object.values(filters);
-      if (filterValues.some(value => value === null || value === undefined)) {
-        // We are not setting loading to false here, because we expect
-        // the hook to re-run when the filter value is available.
-        return;
-      }
-      
-      setLoading(true);
-      setError(null);
+  const fetchData = useCallback(async () => {
+    const filterValues = Object.values(filters);
+    if (filterValues.some(value => value === null || value === undefined)) {
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
 
-      let query = supabase.from(tableName).select(selectQuery);
+    let query = supabase.from(tableName).select(selectQuery);
 
-      // Apply all filters from the filters object
-      for (const column in filters) {
-        query = query.eq(column, filters[column]);
-      }
+    for (const column in filters) {
+      query = query.eq(column, filters[column]);
+    }
 
-      const { data, error } = await query;
+    const { data: resultData, error: queryError } = await query;
 
-      if (error) {
-        console.error(`Error fetching from ${tableName}:`, error);
-        setError(error.message);
-      } else {
-        setData(data);
-      }
-      
-      setLoading(false);
-    };
-
-    fetchData();
-    // We stringify the filters object to prevent infinite re-renders
-    // because an object will have a new reference on every render.
+    if (queryError) {
+      console.error(`Error fetching from ${tableName}:`, queryError);
+      setError(queryError.message);
+    } else {
+      setData(resultData);
+    }
+    
+    setLoading(false);
   }, [tableName, selectQuery, JSON.stringify(filters)]);
 
-  return { data, loading, error };
-}
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-export default useSupabaseQuery;
+  // Return setData so components can perform optimistic updates
+  return { data, loading, error, setData };
+}

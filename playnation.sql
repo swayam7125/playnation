@@ -833,7 +833,7 @@ CREATE TABLE public.venues (
     is_approved boolean DEFAULT false,
     created_at timestamp with time zone,
     updated_at timestamp with time zone,
-    image_url text,
+    image_url text[],
     rejection_reason text
 );
 
@@ -1021,7 +1021,7 @@ CREATE FUNCTION public.get_owner_venues_details() RETURNS json
       'name', v.name,
       'address', v.address,
       'city', v.city,
-      'image_url', v.image_url,
+      'image_url', v.image_url, -- This line is crucial.
       'is_approved', v.is_approved,
       'rejection_reason', v.rejection_reason,
       'created_at', v.created_at,
@@ -1916,6 +1916,73 @@ $$;
 ALTER FUNCTION storage.can_insert_object(bucketid text, name text, owner uuid, metadata jsonb) OWNER TO supabase_storage_admin;
 
 --
+-- Name: delete_leaf_prefixes(text[], text[]); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE FUNCTION storage.delete_leaf_prefixes(bucket_ids text[], names text[]) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+DECLARE
+    v_rows_deleted integer;
+BEGIN
+    LOOP
+        WITH candidates AS (
+            SELECT DISTINCT
+                t.bucket_id,
+                unnest(storage.get_prefixes(t.name)) AS name
+            FROM unnest(bucket_ids, names) AS t(bucket_id, name)
+        ),
+        uniq AS (
+             SELECT
+                 bucket_id,
+                 name,
+                 storage.get_level(name) AS level
+             FROM candidates
+             WHERE name <> ''
+             GROUP BY bucket_id, name
+        ),
+        leaf AS (
+             SELECT
+                 p.bucket_id,
+                 p.name,
+                 p.level
+             FROM storage.prefixes AS p
+                  JOIN uniq AS u
+                       ON u.bucket_id = p.bucket_id
+                           AND u.name = p.name
+                           AND u.level = p.level
+             WHERE NOT EXISTS (
+                 SELECT 1
+                 FROM storage.objects AS o
+                 WHERE o.bucket_id = p.bucket_id
+                   AND o.level = p.level + 1
+                   AND o.name COLLATE "C" LIKE p.name || '/%'
+             )
+             AND NOT EXISTS (
+                 SELECT 1
+                 FROM storage.prefixes AS c
+                 WHERE c.bucket_id = p.bucket_id
+                   AND c.level = p.level + 1
+                   AND c.name COLLATE "C" LIKE p.name || '/%'
+             )
+        )
+        DELETE
+        FROM storage.prefixes AS p
+            USING leaf AS l
+        WHERE p.bucket_id = l.bucket_id
+          AND p.name = l.name
+          AND p.level = l.level;
+
+        GET DIAGNOSTICS v_rows_deleted = ROW_COUNT;
+        EXIT WHEN v_rows_deleted = 0;
+    END LOOP;
+END;
+$$;
+
+
+ALTER FUNCTION storage.delete_leaf_prefixes(bucket_ids text[], names text[]) OWNER TO supabase_storage_admin;
+
+--
 -- Name: delete_prefix(text, text); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
 --
 
@@ -2225,6 +2292,65 @@ $_$;
 ALTER FUNCTION storage.list_objects_with_delimiter(bucket_id text, prefix_param text, delimiter_param text, max_keys integer, start_after text, next_token text) OWNER TO supabase_storage_admin;
 
 --
+-- Name: lock_top_prefixes(text[], text[]); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE FUNCTION storage.lock_top_prefixes(bucket_ids text[], names text[]) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+DECLARE
+    v_bucket text;
+    v_top text;
+BEGIN
+    FOR v_bucket, v_top IN
+        SELECT DISTINCT t.bucket_id,
+            split_part(t.name, '/', 1) AS top
+        FROM unnest(bucket_ids, names) AS t(bucket_id, name)
+        WHERE t.name <> ''
+        ORDER BY 1, 2
+        LOOP
+            PERFORM pg_advisory_xact_lock(hashtextextended(v_bucket || '/' || v_top, 0));
+        END LOOP;
+END;
+$$;
+
+
+ALTER FUNCTION storage.lock_top_prefixes(bucket_ids text[], names text[]) OWNER TO supabase_storage_admin;
+
+--
+-- Name: objects_delete_cleanup(); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE FUNCTION storage.objects_delete_cleanup() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+DECLARE
+    v_bucket_ids text[];
+    v_names      text[];
+BEGIN
+    IF current_setting('storage.gc.prefixes', true) = '1' THEN
+        RETURN NULL;
+    END IF;
+
+    PERFORM set_config('storage.gc.prefixes', '1', true);
+
+    SELECT COALESCE(array_agg(d.bucket_id), '{}'),
+           COALESCE(array_agg(d.name), '{}')
+    INTO v_bucket_ids, v_names
+    FROM deleted AS d
+    WHERE d.name <> '';
+
+    PERFORM storage.lock_top_prefixes(v_bucket_ids, v_names);
+    PERFORM storage.delete_leaf_prefixes(v_bucket_ids, v_names);
+
+    RETURN NULL;
+END;
+$$;
+
+
+ALTER FUNCTION storage.objects_delete_cleanup() OWNER TO supabase_storage_admin;
+
+--
 -- Name: objects_insert_prefix_trigger(); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
 --
 
@@ -2241,6 +2367,120 @@ $$;
 
 
 ALTER FUNCTION storage.objects_insert_prefix_trigger() OWNER TO supabase_storage_admin;
+
+--
+-- Name: objects_update_cleanup(); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE FUNCTION storage.objects_update_cleanup() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+DECLARE
+    -- NEW - OLD (destinations to create prefixes for)
+    v_add_bucket_ids text[];
+    v_add_names      text[];
+
+    -- OLD - NEW (sources to prune)
+    v_src_bucket_ids text[];
+    v_src_names      text[];
+BEGIN
+    IF TG_OP <> 'UPDATE' THEN
+        RETURN NULL;
+    END IF;
+
+    -- 1) Compute NEW−OLD (added paths) and OLD−NEW (moved-away paths)
+    WITH added AS (
+        SELECT n.bucket_id, n.name
+        FROM new_rows n
+        WHERE n.name <> '' AND position('/' in n.name) > 0
+        EXCEPT
+        SELECT o.bucket_id, o.name FROM old_rows o WHERE o.name <> ''
+    ),
+    moved AS (
+         SELECT o.bucket_id, o.name
+         FROM old_rows o
+         WHERE o.name <> ''
+         EXCEPT
+         SELECT n.bucket_id, n.name FROM new_rows n WHERE n.name <> ''
+    )
+    SELECT
+        -- arrays for ADDED (dest) in stable order
+        COALESCE( (SELECT array_agg(a.bucket_id ORDER BY a.bucket_id, a.name) FROM added a), '{}' ),
+        COALESCE( (SELECT array_agg(a.name      ORDER BY a.bucket_id, a.name) FROM added a), '{}' ),
+        -- arrays for MOVED (src) in stable order
+        COALESCE( (SELECT array_agg(m.bucket_id ORDER BY m.bucket_id, m.name) FROM moved m), '{}' ),
+        COALESCE( (SELECT array_agg(m.name      ORDER BY m.bucket_id, m.name) FROM moved m), '{}' )
+    INTO v_add_bucket_ids, v_add_names, v_src_bucket_ids, v_src_names;
+
+    -- Nothing to do?
+    IF (array_length(v_add_bucket_ids, 1) IS NULL) AND (array_length(v_src_bucket_ids, 1) IS NULL) THEN
+        RETURN NULL;
+    END IF;
+
+    -- 2) Take per-(bucket, top) locks: ALL prefixes in consistent global order to prevent deadlocks
+    DECLARE
+        v_all_bucket_ids text[];
+        v_all_names text[];
+    BEGIN
+        -- Combine source and destination arrays for consistent lock ordering
+        v_all_bucket_ids := COALESCE(v_src_bucket_ids, '{}') || COALESCE(v_add_bucket_ids, '{}');
+        v_all_names := COALESCE(v_src_names, '{}') || COALESCE(v_add_names, '{}');
+
+        -- Single lock call ensures consistent global ordering across all transactions
+        IF array_length(v_all_bucket_ids, 1) IS NOT NULL THEN
+            PERFORM storage.lock_top_prefixes(v_all_bucket_ids, v_all_names);
+        END IF;
+    END;
+
+    -- 3) Create destination prefixes (NEW−OLD) BEFORE pruning sources
+    IF array_length(v_add_bucket_ids, 1) IS NOT NULL THEN
+        WITH candidates AS (
+            SELECT DISTINCT t.bucket_id, unnest(storage.get_prefixes(t.name)) AS name
+            FROM unnest(v_add_bucket_ids, v_add_names) AS t(bucket_id, name)
+            WHERE name <> ''
+        )
+        INSERT INTO storage.prefixes (bucket_id, name)
+        SELECT c.bucket_id, c.name
+        FROM candidates c
+        ON CONFLICT DO NOTHING;
+    END IF;
+
+    -- 4) Prune source prefixes bottom-up for OLD−NEW
+    IF array_length(v_src_bucket_ids, 1) IS NOT NULL THEN
+        -- re-entrancy guard so DELETE on prefixes won't recurse
+        IF current_setting('storage.gc.prefixes', true) <> '1' THEN
+            PERFORM set_config('storage.gc.prefixes', '1', true);
+        END IF;
+
+        PERFORM storage.delete_leaf_prefixes(v_src_bucket_ids, v_src_names);
+    END IF;
+
+    RETURN NULL;
+END;
+$$;
+
+
+ALTER FUNCTION storage.objects_update_cleanup() OWNER TO supabase_storage_admin;
+
+--
+-- Name: objects_update_level_trigger(); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE FUNCTION storage.objects_update_level_trigger() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Ensure this is an update operation and the name has changed
+    IF TG_OP = 'UPDATE' AND (NEW."name" <> OLD."name" OR NEW."bucket_id" <> OLD."bucket_id") THEN
+        -- Set the new level
+        NEW."level" := "storage"."get_level"(NEW."name");
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION storage.objects_update_level_trigger() OWNER TO supabase_storage_admin;
 
 --
 -- Name: objects_update_prefix_trigger(); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
@@ -2300,6 +2540,39 @@ $$;
 
 
 ALTER FUNCTION storage.operation() OWNER TO supabase_storage_admin;
+
+--
+-- Name: prefixes_delete_cleanup(); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE FUNCTION storage.prefixes_delete_cleanup() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+DECLARE
+    v_bucket_ids text[];
+    v_names      text[];
+BEGIN
+    IF current_setting('storage.gc.prefixes', true) = '1' THEN
+        RETURN NULL;
+    END IF;
+
+    PERFORM set_config('storage.gc.prefixes', '1', true);
+
+    SELECT COALESCE(array_agg(d.bucket_id), '{}'),
+           COALESCE(array_agg(d.name), '{}')
+    INTO v_bucket_ids, v_names
+    FROM deleted AS d
+    WHERE d.name <> '';
+
+    PERFORM storage.lock_top_prefixes(v_bucket_ids, v_names);
+    PERFORM storage.delete_leaf_prefixes(v_bucket_ids, v_names);
+
+    RETURN NULL;
+END;
+$$;
+
+
+ALTER FUNCTION storage.prefixes_delete_cleanup() OWNER TO supabase_storage_admin;
 
 --
 -- Name: prefixes_insert_trigger(); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
@@ -2485,53 +2758,102 @@ $_$;
 ALTER FUNCTION storage.search_v1_optimised(prefix text, bucketname text, limits integer, levels integer, offsets integer, search text, sortcolumn text, sortorder text) OWNER TO supabase_storage_admin;
 
 --
--- Name: search_v2(text, text, integer, integer, text); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
+-- Name: search_v2(text, text, integer, integer, text, text, text, text); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
 --
 
-CREATE FUNCTION storage.search_v2(prefix text, bucket_name text, limits integer DEFAULT 100, levels integer DEFAULT 1, start_after text DEFAULT ''::text) RETURNS TABLE(key text, name text, id uuid, updated_at timestamp with time zone, created_at timestamp with time zone, metadata jsonb)
+CREATE FUNCTION storage.search_v2(prefix text, bucket_name text, limits integer DEFAULT 100, levels integer DEFAULT 1, start_after text DEFAULT ''::text, sort_order text DEFAULT 'asc'::text, sort_column text DEFAULT 'name'::text, sort_column_after text DEFAULT ''::text) RETURNS TABLE(key text, name text, id uuid, updated_at timestamp with time zone, created_at timestamp with time zone, last_accessed_at timestamp with time zone, metadata jsonb)
     LANGUAGE plpgsql STABLE
     AS $_$
+DECLARE
+    sort_col text;
+    sort_ord text;
+    cursor_op text;
+    cursor_expr text;
+    sort_expr text;
 BEGIN
-    RETURN query EXECUTE
+    -- Validate sort_order
+    sort_ord := lower(sort_order);
+    IF sort_ord NOT IN ('asc', 'desc') THEN
+        sort_ord := 'asc';
+    END IF;
+
+    -- Determine cursor comparison operator
+    IF sort_ord = 'asc' THEN
+        cursor_op := '>';
+    ELSE
+        cursor_op := '<';
+    END IF;
+    
+    sort_col := lower(sort_column);
+    -- Validate sort column  
+    IF sort_col IN ('updated_at', 'created_at') THEN
+        cursor_expr := format(
+            '($5 = '''' OR ROW(date_trunc(''milliseconds'', %I), name COLLATE "C") %s ROW(COALESCE(NULLIF($6, '''')::timestamptz, ''epoch''::timestamptz), $5))',
+            sort_col, cursor_op
+        );
+        sort_expr := format(
+            'COALESCE(date_trunc(''milliseconds'', %I), ''epoch''::timestamptz) %s, name COLLATE "C" %s',
+            sort_col, sort_ord, sort_ord
+        );
+    ELSE
+        cursor_expr := format('($5 = '''' OR name COLLATE "C" %s $5)', cursor_op);
+        sort_expr := format('name COLLATE "C" %s', sort_ord);
+    END IF;
+
+    RETURN QUERY EXECUTE format(
         $sql$
         SELECT * FROM (
             (
                 SELECT
                     split_part(name, '/', $4) AS key,
-                    name || '/' AS name,
+                    name,
                     NULL::uuid AS id,
-                    NULL::timestamptz AS updated_at,
-                    NULL::timestamptz AS created_at,
+                    updated_at,
+                    created_at,
+                    NULL::timestamptz AS last_accessed_at,
                     NULL::jsonb AS metadata
                 FROM storage.prefixes
-                WHERE name COLLATE "C" LIKE $1 || '%'
-                AND bucket_id = $2
-                AND level = $4
-                AND name COLLATE "C" > $5
-                ORDER BY prefixes.name COLLATE "C" LIMIT $3
+                WHERE name COLLATE "C" LIKE $1 || '%%'
+                    AND bucket_id = $2
+                    AND level = $4
+                    AND %s
+                ORDER BY %s
+                LIMIT $3
             )
             UNION ALL
-            (SELECT split_part(name, '/', $4) AS key,
-                name,
-                id,
-                updated_at,
-                created_at,
-                metadata
-            FROM storage.objects
-            WHERE name COLLATE "C" LIKE $1 || '%'
-                AND bucket_id = $2
-                AND level = $4
-                AND name COLLATE "C" > $5
-            ORDER BY name COLLATE "C" LIMIT $3)
+            (
+                SELECT
+                    split_part(name, '/', $4) AS key,
+                    name,
+                    id,
+                    updated_at,
+                    created_at,
+                    last_accessed_at,
+                    metadata
+                FROM storage.objects
+                WHERE name COLLATE "C" LIKE $1 || '%%'
+                    AND bucket_id = $2
+                    AND level = $4
+                    AND %s
+                ORDER BY %s
+                LIMIT $3
+            )
         ) obj
-        ORDER BY name COLLATE "C" LIMIT $3;
-        $sql$
-        USING prefix, bucket_name, limits, levels, start_after;
+        ORDER BY %s
+        LIMIT $3
+        $sql$,
+        cursor_expr,    -- prefixes WHERE
+        sort_expr,      -- prefixes ORDER BY
+        cursor_expr,    -- objects WHERE
+        sort_expr,      -- objects ORDER BY
+        sort_expr       -- final ORDER BY
+    )
+    USING prefix, bucket_name, limits, levels, start_after, sort_column_after;
 END;
 $_$;
 
 
-ALTER FUNCTION storage.search_v2(prefix text, bucket_name text, limits integer, levels integer, start_after text) OWNER TO supabase_storage_admin;
+ALTER FUNCTION storage.search_v2(prefix text, bucket_name text, limits integer, levels integer, start_after text, sort_order text, sort_column text, sort_column_after text) OWNER TO supabase_storage_admin;
 
 --
 -- Name: update_updated_at_column(); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
@@ -3077,6 +3399,22 @@ CREATE TABLE public.bookings (
 
 
 ALTER TABLE public.bookings OWNER TO postgres;
+
+--
+-- Name: contact_messages; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.contact_messages (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(255) NOT NULL,
+    email character varying(255) NOT NULL,
+    message text NOT NULL,
+    is_read boolean DEFAULT false,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.contact_messages OWNER TO postgres;
 
 --
 -- Name: credit_transactions; Type: TABLE; Schema: public; Owner: postgres
@@ -4214,6 +4552,90 @@ COPY auth.audit_log_entries (instance_id, id, payload, created_at, ip_address) F
 00000000-0000-0000-0000-000000000000	184ee83a-51ab-4be8-92b5-8585a1111f9b	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 15:55:28.269339+00	
 00000000-0000-0000-0000-000000000000	113ecfdc-c92b-4736-b56d-90fa0b200a37	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 15:55:35.932021+00	
 00000000-0000-0000-0000-000000000000	906a15c1-47be-49c4-88f4-b451ad15a2c2	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 15:55:41.511883+00	
+00000000-0000-0000-0000-000000000000	f2181244-b12d-4b93-ab73-aa312e9fcffd	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 16:12:03.748105+00	
+00000000-0000-0000-0000-000000000000	10b4585c-6591-4526-9ae1-900bdc882c31	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 16:12:08.232862+00	
+00000000-0000-0000-0000-000000000000	af105ca1-2a4f-4a51-b761-ccd9a63aa296	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 16:44:34.614083+00	
+00000000-0000-0000-0000-000000000000	ddce43f1-1c7f-4259-a926-d643d4ef27cc	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 16:48:31.63596+00	
+00000000-0000-0000-0000-000000000000	dc778bd0-6e2e-42a3-a40c-646e47b12e0d	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 16:49:43.069365+00	
+00000000-0000-0000-0000-000000000000	ac1187b9-d1db-4793-a8a9-f923c3523cb1	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 16:49:48.470195+00	
+00000000-0000-0000-0000-000000000000	7b8c78f4-a65e-4b46-9dc1-82d6538740c9	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 16:49:56.051362+00	
+00000000-0000-0000-0000-000000000000	99647cdd-7c8c-402d-ad02-2e8c7da7aaef	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 17:43:21.441628+00	
+00000000-0000-0000-0000-000000000000	346c7233-eac7-46d6-af69-b171c96de2ad	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 17:43:29.73877+00	
+00000000-0000-0000-0000-000000000000	6ea415ca-a79a-4fb8-9123-71eb60d7acf0	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 17:45:18.509904+00	
+00000000-0000-0000-0000-000000000000	e1971b94-b4c7-4c36-809a-6d9ab517ba72	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 17:45:24.320432+00	
+00000000-0000-0000-0000-000000000000	48f880a6-9228-45ec-9628-d184c03db0be	{"action":"token_refreshed","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-22 17:50:15.217156+00	
+00000000-0000-0000-0000-000000000000	8bb01492-e519-4858-97e0-1c64f810e1e4	{"action":"token_revoked","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-22 17:50:15.220603+00	
+00000000-0000-0000-0000-000000000000	66f9159e-5deb-447b-b913-560a5713da2a	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 17:53:17.159252+00	
+00000000-0000-0000-0000-000000000000	2c8d68cb-bd8e-4b0f-8cf4-a352306e3cc5	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 17:53:23.351921+00	
+00000000-0000-0000-0000-000000000000	a2b4e6bf-d921-4c09-b04a-fc4803b753bf	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 17:53:43.893756+00	
+00000000-0000-0000-0000-000000000000	1b61261f-b1ce-41e5-99a2-7de7c24101de	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 17:53:49.076275+00	
+00000000-0000-0000-0000-000000000000	b81238a1-6eee-4778-96bd-27d060fac8a1	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 17:54:08.017057+00	
+00000000-0000-0000-0000-000000000000	86d5753c-2afc-451f-a100-48408c2f0594	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 17:54:13.198437+00	
+00000000-0000-0000-0000-000000000000	bbac5b81-ca1f-45ea-b658-a8fa88198cda	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 17:54:33.212208+00	
+00000000-0000-0000-0000-000000000000	43ca24b8-ed73-455c-84fa-96f75f826f05	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 17:54:40.361117+00	
+00000000-0000-0000-0000-000000000000	600ed24e-48fc-40be-8835-464f060e582b	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 17:55:17.605629+00	
+00000000-0000-0000-0000-000000000000	b0c4ced9-5c25-4ba8-9cda-bcfd3b192186	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 17:55:21.933672+00	
+00000000-0000-0000-0000-000000000000	e065b6fb-8d38-4dbf-be9b-c0cf1d3352e3	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 18:05:52.279592+00	
+00000000-0000-0000-0000-000000000000	196ddae0-b9df-4709-ac9d-5faceba1ec7d	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 18:06:09.964453+00	
+00000000-0000-0000-0000-000000000000	b021bfe5-cd52-4f41-8a9b-717d91ac4edf	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 18:07:52.748451+00	
+00000000-0000-0000-0000-000000000000	633c1a36-e710-46a6-bcc8-fb65437c8051	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-22 18:23:03.905325+00	
+00000000-0000-0000-0000-000000000000	6700b8dc-aa9c-452b-86f3-c646b9a54178	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-22 18:30:13.919195+00	
+00000000-0000-0000-0000-000000000000	98447601-d062-4d2a-ae0c-4727331b24bf	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-23 10:22:52.155402+00	
+00000000-0000-0000-0000-000000000000	92adc892-2766-4191-a567-5ee4f1e4d8a0	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-23 11:00:03.037832+00	
+00000000-0000-0000-0000-000000000000	68399280-558e-4536-af2b-52ba04095e51	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-23 11:00:24.843114+00	
+00000000-0000-0000-0000-000000000000	3d738f92-f642-4bdb-9714-0025d1af4133	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-23 11:08:50.311507+00	
+00000000-0000-0000-0000-000000000000	0999ad91-6ded-4098-8636-5214c78e76df	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-23 11:09:48.729491+00	
+00000000-0000-0000-0000-000000000000	3e749631-3f24-46a2-98fe-dac59840ddcf	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-23 11:21:45.817711+00	
+00000000-0000-0000-0000-000000000000	e28d4c0e-6e70-47c9-94aa-a928e78e75ab	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-23 11:22:04.483192+00	
+00000000-0000-0000-0000-000000000000	11064d9b-1855-4c2d-9019-64efaa3b9c3c	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-23 11:23:08.625515+00	
+00000000-0000-0000-0000-000000000000	c67ebb07-d1f1-47de-aa9c-5d6b9941dca0	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-23 11:40:24.218233+00	
+00000000-0000-0000-0000-000000000000	21ccfa61-e1e7-4a41-a74e-c78f73ce4968	{"action":"token_refreshed","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-23 14:01:40.271144+00	
+00000000-0000-0000-0000-000000000000	58b7bd34-6c0d-4a71-8dca-7eebdd0d883a	{"action":"token_revoked","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-23 14:01:40.303477+00	
+00000000-0000-0000-0000-000000000000	dfbc4f83-95cb-4e56-9405-29c6048dd51d	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-23 14:02:52.58678+00	
+00000000-0000-0000-0000-000000000000	71a6e130-b4b0-4c96-85d4-c50a3e9d1830	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-23 14:05:07.759886+00	
+00000000-0000-0000-0000-000000000000	8f6f74ca-0be9-4ff2-bb43-c9adc8580f8e	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-23 14:17:53.385721+00	
+00000000-0000-0000-0000-000000000000	9498acc7-a1e7-433a-bff3-3caef2f4ce26	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-23 14:58:38.877178+00	
+00000000-0000-0000-0000-000000000000	a2ecad93-db05-4ed7-9ec2-6d34f15844f0	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-23 15:03:50.283836+00	
+00000000-0000-0000-0000-000000000000	df1ca6a7-c549-40c6-88cb-7c18b0888b2d	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-23 15:39:22.378758+00	
+00000000-0000-0000-0000-000000000000	5b96e009-9c4c-46b7-b69a-0c3ad4ce5e68	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-23 15:52:51.153262+00	
+00000000-0000-0000-0000-000000000000	363cb95e-86b5-428f-a26c-05c2f99b0fe1	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-23 16:45:36.358134+00	
+00000000-0000-0000-0000-000000000000	e4243abc-1d34-4e45-bfbe-efe4c7e93540	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-23 16:45:58.851845+00	
+00000000-0000-0000-0000-000000000000	30acca55-ae0e-4ee9-8927-c06b80408bec	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-23 16:46:07.811544+00	
+00000000-0000-0000-0000-000000000000	8d3f09df-5411-4e0e-8641-3bde090f765e	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-23 17:25:27.181265+00	
+00000000-0000-0000-0000-000000000000	84c44d60-52fa-45ed-8cf0-ae2eba16ca81	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-23 17:26:01.921429+00	
+00000000-0000-0000-0000-000000000000	ba99473a-352b-48a2-9bb3-f8fcff4c72ff	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-23 17:29:18.890567+00	
+00000000-0000-0000-0000-000000000000	c117539a-8349-4a86-8ad1-4486abd55d65	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-24 06:49:43.258606+00	
+00000000-0000-0000-0000-000000000000	7325b358-3af8-4a33-8d85-14c81e6d3800	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-24 08:45:48.839774+00	
+00000000-0000-0000-0000-000000000000	04dca8be-30ff-42d0-9c3b-cd71f61734fb	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-24 08:48:25.545841+00	
+00000000-0000-0000-0000-000000000000	6d9f7352-ad03-4ac5-81f4-91fda579e4db	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-24 08:48:29.555542+00	
+00000000-0000-0000-0000-000000000000	b9d1f4fe-f7d8-40c6-b3d4-44bcb3adf04b	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-24 14:05:20.489395+00	
+00000000-0000-0000-0000-000000000000	4bdefef9-4f17-4f25-b5fa-889768a0f829	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-24 14:06:18.547508+00	
+00000000-0000-0000-0000-000000000000	1442927a-8a99-477b-a5a6-af1c85d6d022	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-24 14:06:25.589655+00	
+00000000-0000-0000-0000-000000000000	41064c3c-7f94-4453-ad19-7604c4e6b438	{"action":"token_refreshed","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-24 16:35:07.55059+00	
+00000000-0000-0000-0000-000000000000	1bd3c4e6-4af0-4c16-adda-613c6e1e889b	{"action":"token_revoked","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-09-24 16:35:07.579584+00	
+00000000-0000-0000-0000-000000000000	5940c0ba-c15b-44f6-bcd6-875171faca39	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-24 16:35:29.738796+00	
+00000000-0000-0000-0000-000000000000	efac17b9-ed53-4fb4-b966-4e2588b1aef5	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-24 16:59:16.343415+00	
+00000000-0000-0000-0000-000000000000	9ddc983d-e310-445e-9500-3a89e43a4c4a	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-24 16:59:20.55255+00	
+00000000-0000-0000-0000-000000000000	f346466f-f164-470e-b6c4-ac86384fde21	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-24 18:37:11.603211+00	
+00000000-0000-0000-0000-000000000000	63ec8176-e8cc-40b0-b5e2-cddd5feea32b	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-24 18:37:15.702414+00	
+00000000-0000-0000-0000-000000000000	192bb097-36a3-4ba7-bf87-229a79531b89	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-25 15:59:15.076014+00	
+00000000-0000-0000-0000-000000000000	2b1a34d6-bc99-4f4b-8bda-5ed91188481e	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-09-25 15:59:21.394107+00	
+00000000-0000-0000-0000-000000000000	93386545-12d5-44e4-a227-11edfb31cf2c	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-26 11:05:42.160071+00	
+00000000-0000-0000-0000-000000000000	be5d5cfd-8fc4-4ba1-bf20-ae7e9be77882	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-26 11:06:22.911958+00	
+00000000-0000-0000-0000-000000000000	0f77621d-49cb-41a3-a158-ccdbac06beae	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-26 11:06:28.209891+00	
+00000000-0000-0000-0000-000000000000	12905f40-1e16-4ff3-94dd-2e8120c78e68	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-26 11:06:44.649284+00	
+00000000-0000-0000-0000-000000000000	17c83f07-af13-40f3-9119-2a4b2b3c2bee	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-26 11:06:49.699699+00	
+00000000-0000-0000-0000-000000000000	5beea4f7-2cfb-4089-93c1-63dddec69461	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-26 11:07:12.685131+00	
+00000000-0000-0000-0000-000000000000	950a6ffe-8366-4fa7-a77a-a7229bccf321	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-26 11:07:21.595663+00	
+00000000-0000-0000-0000-000000000000	669f0a9f-148e-4237-9d85-a43682ee195e	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-26 11:08:03.9152+00	
+00000000-0000-0000-0000-000000000000	4cfc10ee-6b2f-4669-a55d-16830261dc0a	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-26 14:31:51.254223+00	
+00000000-0000-0000-0000-000000000000	cff7a941-dbdf-4d0c-a0a8-d784245feb30	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-26 14:34:15.304342+00	
+00000000-0000-0000-0000-000000000000	dec2d2fc-4830-497f-866e-d943ad1ab0c4	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-26 14:34:52.00187+00	
+00000000-0000-0000-0000-000000000000	90a164fb-a71c-436f-8ecb-eae8d79234c8	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-26 14:34:54.855942+00	
+00000000-0000-0000-0000-000000000000	f4f2b701-6bd7-47db-ae34-cc3c53e09bc7	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-09-26 15:19:33.931079+00	
+00000000-0000-0000-0000-000000000000	cfc44895-1e5d-466d-b6b5-27491b26fc06	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-09-26 15:23:21.279937+00	
+00000000-0000-0000-0000-000000000000	b8f0576c-fd3f-4766-bf28-681d68712132	{"action":"token_refreshed","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"token"}	2025-09-26 17:24:59.024701+00	
+00000000-0000-0000-0000-000000000000	ec652dca-98b1-49b1-b6a0-30202494d510	{"action":"token_revoked","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"token"}	2025-09-26 17:24:59.052893+00	
 \.
 
 
@@ -4252,8 +4674,7 @@ COPY auth.instances (id, uuid, raw_base_config, created_at, updated_at) FROM std
 --
 
 COPY auth.mfa_amr_claims (session_id, created_at, updated_at, authentication_method, id) FROM stdin;
-c4622113-b578-4cdb-8a5a-dc2b7458c826	2025-09-22 14:41:08.221481+00	2025-09-22 14:41:08.221481+00	password	c509315e-e651-43b5-b77c-2259541b5d73
-f1bbcb02-c827-4dba-83f7-0ac5935f6154	2025-09-22 15:55:41.518997+00	2025-09-22 15:55:41.518997+00	password	8f1a49ec-0b8c-4da9-a36e-0d498a2b0fbe
+c7bb1de6-293b-42ea-94b1-87bf2058cac1	2025-09-26 15:23:21.343506+00	2025-09-26 15:23:21.343506+00	password	3406039f-544a-460f-b199-6052f83d9466
 \.
 
 
@@ -4294,8 +4715,8 @@ COPY auth.one_time_tokens (id, user_id, token_type, token_hash, relates_to, crea
 --
 
 COPY auth.refresh_tokens (instance_id, id, token, user_id, revoked, created_at, updated_at, parent, session_id) FROM stdin;
-00000000-0000-0000-0000-000000000000	358	cnn2gzjf7l5b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f	2025-09-22 15:55:41.517125+00	2025-09-22 15:55:41.517125+00	\N	f1bbcb02-c827-4dba-83f7-0ac5935f6154
-00000000-0000-0000-0000-000000000000	352	tbtn4jkcvtky	e86f726e-9210-47ca-8dc7-c84d46cc55e2	f	2025-09-22 14:41:08.220106+00	2025-09-22 14:41:08.220106+00	\N	c4622113-b578-4cdb-8a5a-dc2b7458c826
+00000000-0000-0000-0000-000000000000	402	4bmpyuca6z2n	e86f726e-9210-47ca-8dc7-c84d46cc55e2	t	2025-09-26 15:23:21.316964+00	2025-09-26 17:24:59.056116+00	\N	c7bb1de6-293b-42ea-94b1-87bf2058cac1
+00000000-0000-0000-0000-000000000000	403	ie3bocqsjzt6	e86f726e-9210-47ca-8dc7-c84d46cc55e2	f	2025-09-26 17:24:59.078135+00	2025-09-26 17:24:59.078135+00	4bmpyuca6z2n	c7bb1de6-293b-42ea-94b1-87bf2058cac1
 \.
 
 
@@ -4391,8 +4812,7 @@ COPY auth.schema_migrations (version) FROM stdin;
 --
 
 COPY auth.sessions (id, user_id, created_at, updated_at, factor_id, aal, not_after, refreshed_at, user_agent, ip, tag) FROM stdin;
-c4622113-b578-4cdb-8a5a-dc2b7458c826	e86f726e-9210-47ca-8dc7-c84d46cc55e2	2025-09-22 14:41:08.219295+00	2025-09-22 14:41:08.219295+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0	152.59.35.239	\N
-f1bbcb02-c827-4dba-83f7-0ac5935f6154	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2025-09-22 15:55:41.515662+00	2025-09-22 15:55:41.515662+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0	49.36.89.104	\N
+c7bb1de6-293b-42ea-94b1-87bf2058cac1	e86f726e-9210-47ca-8dc7-c84d46cc55e2	2025-09-26 15:23:21.301826+00	2025-09-26 17:24:59.111443+00	\N	aal1	\N	2025-09-26 17:24:59.110153	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0	49.36.91.254	\N
 \.
 
 
@@ -4417,11 +4837,11 @@ COPY auth.sso_providers (id, resource_id, created_at, updated_at, disabled) FROM
 --
 
 COPY auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, invited_at, confirmation_token, confirmation_sent_at, recovery_token, recovery_sent_at, email_change_token_new, email_change, email_change_sent_at, last_sign_in_at, raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at, phone, phone_confirmed_at, phone_change, phone_change_token, phone_change_sent_at, email_change_token_current, email_change_confirm_status, banned_until, reauthentication_token, reauthentication_sent_at, is_sso_user, deleted_at, is_anonymous) FROM stdin;
-00000000-0000-0000-0000-000000000000	e86f726e-9210-47ca-8dc7-c84d46cc55e2	authenticated	authenticated	admin@playnation.com	$2a$10$Odpx/MPYwsSsCf4Uiywd1OgDxHtZ8IXE7531egy3pILZ0da.1sAMu	2025-08-10 08:50:46.562958+00	\N		\N		\N			\N	2025-09-22 14:41:08.21922+00	{"provider": "email", "providers": ["email"]}	{"email_verified": true}	\N	2025-08-10 08:50:46.541627+00	2025-09-22 14:41:08.221071+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	e86f726e-9210-47ca-8dc7-c84d46cc55e2	authenticated	authenticated	admin@playnation.com	$2a$10$Odpx/MPYwsSsCf4Uiywd1OgDxHtZ8IXE7531egy3pILZ0da.1sAMu	2025-08-10 08:50:46.562958+00	\N		\N		\N			\N	2025-09-26 15:23:21.300805+00	{"provider": "email", "providers": ["email"]}	{"email_verified": true}	\N	2025-08-10 08:50:46.541627+00	2025-09-26 17:24:59.096366+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	541b69e6-5c6e-4ad7-8764-7aa01c435021	authenticated	authenticated	tony@gmail.com	$2a$10$D3cuPIvLg3OVQT9vm7cH4eWn2ugrH3maLfmNj7jEXdGDEKFvzUiqe	2025-09-14 08:58:39.726361+00	\N		\N		\N			\N	2025-09-21 22:33:19.703382+00	{"provider": "email", "providers": ["email"]}	{"sub": "541b69e6-5c6e-4ad7-8764-7aa01c435021", "role": "player", "email": "tony@gmail.com", "username": "ironman", "last_name": "stark", "first_name": "tony", "phone_number": "8624753159", "email_verified": true, "phone_verified": false}	\N	2025-09-14 08:58:39.635641+00	2025-09-21 22:33:19.727342+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	073c625c-eb02-45e8-9c67-50acbdc72cd6	authenticated	authenticated	harsh@gmail.com	$2a$10$4KK/J4ROUoG4YacY/9oQluMayEemAbAWOSoXzXwIOg53cosk3zCLm	2025-08-10 08:14:37.525903+00	\N		\N		\N			\N	2025-09-21 20:43:34.897308+00	{"provider": "email", "providers": ["email"]}	{"sub": "073c625c-eb02-45e8-9c67-50acbdc72cd6", "email": "harsh@gmail.com", "last_name": "shah", "first_name": "harsh", "email_verified": true, "phone_verified": false}	\N	2025-08-10 08:14:37.499555+00	2025-09-21 20:43:34.901325+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-09-22 15:55:28.273932+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-09-22 15:55:28.299873+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$5OQTogzTdkUQwaRy2whPiuCSeaewK04JQwRzGPlqEiB6mljixeMyq	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-09-22 15:55:41.514953+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-09-22 15:55:41.518678+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$5OQTogzTdkUQwaRy2whPiuCSeaewK04JQwRzGPlqEiB6mljixeMyq	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-09-26 11:07:21.596756+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-09-26 11:07:21.599954+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-09-26 14:34:54.857922+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-09-26 14:34:54.861584+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	7ef72ca4-3e98-4324-9bef-abcb5b40252e	authenticated	authenticated	het@gmail.com	$2a$10$LVfhJb8ZSyyafNyv1/csx.3pqiJs7XGStWnW0D0ZkxGbyZGHjsOkq	2025-08-22 07:28:04.473533+00	\N		\N		\N			\N	2025-08-22 07:28:04.486778+00	{"provider": "email", "providers": ["email"]}	{"sub": "7ef72ca4-3e98-4324-9bef-abcb5b40252e", "email": "het@gmail.com", "email_verified": true, "phone_verified": false}	\N	2025-08-22 07:28:04.350922+00	2025-08-22 07:28:04.524049+00	\N	\N			\N		0	\N		\N	f	\N	f
 \.
 
@@ -4452,7 +4872,6 @@ COPY public.bookings (booking_id, user_id, facility_id, slot_id, booking_date, s
 0ca591e8-9fb0-4057-b240-b62b6af015fd	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	23d5c51a-24e9-4ff4-b6fd-02c55a6ab5f6	2025-08-21 17:32:02.769+00	2025-08-22 07:00:00+00	2025-08-22 08:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
 68b0541e-e90a-43d8-a483-dfd364a4f649	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	23d5c51a-24e9-4ff4-b6fd-02c55a6ab5f6	2025-08-21 17:38:05.281+00	2025-08-22 07:00:00+00	2025-08-22 08:00:00+00	1200.00	confirmed	paid	\N	\N	f
 14fbf7a5-3fb2-427c-a640-5336474cb3c3	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	7e0778c0-1638-4e0e-9aa7-c5e89fd0e39b	2025-08-21 17:39:47.433+00	2025-08-22 08:00:00+00	2025-08-22 09:00:00+00	1500.00	confirmed	paid	\N	\N	f
-e1040e9d-71e5-4e5a-b1e5-e589f7535108	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	58746a32-e0c9-4e53-8708-0c2b5a09db9c	2025-09-20 16:12:57.043+00	2025-09-21 07:00:00+00	2025-09-21 08:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
 f037d151-9a1f-4bba-a434-13fe714c351f	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	58746a32-e0c9-4e53-8708-0c2b5a09db9c	2025-09-20 16:19:05.339+00	2025-09-21 07:00:00+00	2025-09-21 08:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
 4dd90a04-5b9b-4daf-9909-5635a61d7072	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	360bbeb1-6b6f-49ba-9436-61a2d9a96778	2025-08-22 07:31:54.861+00	2025-08-22 14:00:00+00	2025-08-22 15:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
 5f8cb269-8d2f-4d76-97e5-41feca4955a8	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	0ef67817-04a4-4861-b847-78269cb355b3	2025-08-30 17:20:18.4+00	2025-08-31 21:00:00+00	2025-08-31 22:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
@@ -4476,6 +4895,16 @@ ed061e46-3edb-4941-b215-be9b45a479f8	541b69e6-5c6e-4ad7-8764-7aa01c435021	f3f3f3
 486c0c83-7056-42b6-9c13-7881a6f5c010	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	8d52b683-62e1-41d6-be6f-8caa046dc602	2025-09-21 12:33:23.055+00	2025-09-21 16:00:00+00	2025-09-21 17:00:00+00	1200.00	confirmed	paid	\N	\N	f
 8161d4b7-49a0-4951-a0ab-ea4f3c756d4b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	3588ca97-6e46-4528-96e2-9fd64d5ce51e	2025-09-20 16:26:59.662+00	2025-09-21 08:00:00+00	2025-09-21 09:00:00+00	1200.00	cancelled	paid	Cancelled by user	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
 82004ff0-02a4-4fd5-b140-f1f7ac2fe59d	541b69e6-5c6e-4ad7-8764-7aa01c435021	63c23c7e-cd1b-4d60-a700-e4d7ed7397e6	2b21aa8f-1eb3-4bd0-8677-e09cd70bac8d	2025-09-21 20:45:40.517+00	2025-09-22 10:00:00+00	2025-09-22 11:00:00+00	1000.00	confirmed	paid	\N	\N	f
+e1040e9d-71e5-4e5a-b1e5-e589f7535108	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	58746a32-e0c9-4e53-8708-0c2b5a09db9c	2025-09-20 16:12:57.043+00	2025-09-21 07:00:00+00	2025-09-21 08:00:00+00	1200.00	cancelled	refunded	\N	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f
+f45f20fa-8df3-48d4-8452-a0182f075797	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f3f3f3f3-3333-41d4-a7f6-000000000003	5ef98817-2843-4fc5-bb3a-aead2978f10a	2025-09-26 11:07:48.565+00	2025-09-26 12:00:00+00	2025-09-26 13:00:00+00	1200.00	confirmed	paid	\N	\N	f
+\.
+
+
+--
+-- Data for Name: contact_messages; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.contact_messages (id, name, email, message, is_read, created_at) FROM stdin;
 \.
 
 
@@ -4506,6 +4935,7 @@ b57c0dcf-9340-4858-8682-e909c300f10f	7d4edf26-9237-4e33-bcd1-b01041832278	550e84
 d923f08e-8d15-46bc-b0be-6ed4380b73c0	d2800a9a-2e21-44f2-acbc-578f598dac03	550e8400-e29b-41d4-a716-446655440005	court1	\N	3	300.00	t
 b4dbc735-39a7-4a45-9f83-5f6069bb64ff	47582fd3-e63e-43f5-9409-f505be69220e	550e8400-e29b-41d4-a716-446655440001	Court 1	\N	16	1500.00	t
 63c23c7e-cd1b-4d60-a700-e4d7ed7397e6	a1a1a1a1-1111-41d4-a7f6-000000000001	550e8400-e29b-41d4-a716-446655440004	Tennis		4	1000.00	t
+b3f2f62d-d107-4dc3-9ffd-a7474cfe4d91	b2b2b2b2-2222-41d4-a7f6-000000000002	550e8400-e29b-41d4-a716-446655440005	Court 2		12	600.00	t
 \.
 
 
@@ -4753,6 +5183,33 @@ d9c45fd6-9df4-4c34-8a01-8454911ba9fe	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-0
 8d52b683-62e1-41d6-be6f-8caa046dc602	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-21 16:00:00+00	2025-09-21 17:00:00+00	f	\N	\N
 dd11feec-8ad9-4b10-878d-6cb8741c6fd9	63c23c7e-cd1b-4d60-a700-e4d7ed7397e6	2025-09-22 11:00:00+00	2025-09-22 12:00:00+00	t	\N	\N
 2b21aa8f-1eb3-4bd0-8677-e09cd70bac8d	63c23c7e-cd1b-4d60-a700-e4d7ed7397e6	2025-09-22 10:00:00+00	2025-09-22 11:00:00+00	f	\N	\N
+f0d03531-fd03-4787-964b-72094becad12	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-09-26 09:00:00+00	2025-09-26 10:00:00+00	t	\N	\N
+8eeb6633-8730-4b04-a44d-6307334529a0	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-09-26 10:00:00+00	2025-09-26 11:00:00+00	t	\N	\N
+c5f2bc65-fc90-44f6-84ea-5c42bdfaad41	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-09-26 11:00:00+00	2025-09-26 12:00:00+00	t	\N	\N
+f94319ac-f503-4605-8463-cfb01f3b45f7	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-09-26 12:00:00+00	2025-09-26 13:00:00+00	t	\N	\N
+32e9e5db-2a9d-422e-9ccb-e231f93ba297	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-09-26 13:00:00+00	2025-09-26 14:00:00+00	t	\N	\N
+89897b5e-8aa0-4423-8779-b9580264b5b9	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-09-26 14:00:00+00	2025-09-26 15:00:00+00	t	\N	\N
+14674af9-af56-4813-b9ce-0294bd2fd2b2	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-09-26 15:00:00+00	2025-09-26 16:00:00+00	t	\N	\N
+8a7b833b-c9c4-400b-8b50-b7e32f6cc850	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-09-26 16:00:00+00	2025-09-26 17:00:00+00	t	\N	\N
+e25cc2d6-f7c8-41e5-8a02-9a4958b71b8e	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-09-26 17:00:00+00	2025-09-26 18:00:00+00	t	\N	\N
+01c98595-f0cc-46a7-8f9d-5d3a2b343775	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-09-26 18:00:00+00	2025-09-26 19:00:00+00	t	\N	\N
+14187fd4-0f56-4cef-b0bc-9150b8d7d76d	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-09-26 19:00:00+00	2025-09-26 20:00:00+00	t	\N	\N
+0a6fd68e-c51a-44f4-90ac-0ec2058552e6	f4f4f4f4-4444-41d4-a7f6-000000000004	2025-09-26 20:00:00+00	2025-09-26 21:00:00+00	t	\N	\N
+0496bd4c-2dfa-4bca-9bac-c813940637c2	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 07:00:00+00	2025-09-26 08:00:00+00	t	\N	\N
+b1e1b16b-836d-4c50-95bf-ed10f4e7bfca	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 08:00:00+00	2025-09-26 09:00:00+00	t	\N	\N
+3f70b478-2cf0-487d-bef9-b3aa360a0a61	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 09:00:00+00	2025-09-26 10:00:00+00	t	\N	\N
+2c949ff8-eb8f-4a1b-9e5f-b23bfc09f80f	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 10:00:00+00	2025-09-26 11:00:00+00	t	\N	\N
+f0b7080b-7c81-48d0-b5d9-71d5816324ff	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 11:00:00+00	2025-09-26 12:00:00+00	t	\N	\N
+644785f8-f5ec-4d50-ad71-69ca158a5917	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 13:00:00+00	2025-09-26 14:00:00+00	t	\N	\N
+14a3da40-186e-4269-b029-75d2ac995801	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 14:00:00+00	2025-09-26 15:00:00+00	t	\N	\N
+61568643-daee-402e-8e94-965be42d686c	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 15:00:00+00	2025-09-26 16:00:00+00	t	\N	\N
+babb50b1-d0d1-4a33-998a-de9872d07141	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 16:00:00+00	2025-09-26 17:00:00+00	t	\N	\N
+b69e1371-2632-4343-a0ce-3bfdefc44259	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 17:00:00+00	2025-09-26 18:00:00+00	t	\N	\N
+302cfe3f-008f-4bd4-a9f3-84633cbe42ba	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 18:00:00+00	2025-09-26 19:00:00+00	t	\N	\N
+d8ea1d1f-561a-4580-83cc-0e43ed699479	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 19:00:00+00	2025-09-26 20:00:00+00	t	\N	\N
+de5f0c9c-d93c-4638-ae16-28e9e7c40eb2	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 20:00:00+00	2025-09-26 21:00:00+00	t	\N	\N
+a9e4588b-e9d6-49f5-823f-f585e1dfa314	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 21:00:00+00	2025-09-26 22:00:00+00	t	\N	\N
+5ef98817-2843-4fc5-bb3a-aead2978f10a	f3f3f3f3-3333-41d4-a7f6-000000000003	2025-09-26 12:00:00+00	2025-09-26 13:00:00+00	f	\N	\N
 \.
 
 
@@ -4774,15 +5231,15 @@ bb3e7bae-8aed-4e6c-bb71-bd644eff5402	swayam	otherswayam@gmail.com	swayam	shah	63
 --
 
 COPY public.venues (venue_id, owner_id, name, address, city, state, zip_code, description, contact_email, contact_phone, latitude, longitude, opening_time, closing_time, is_approved, created_at, updated_at, image_url, rejection_reason) FROM stdin;
-1dde8e3f-b39d-446a-b8b1-cd1b958804a6	073c625c-eb02-45e8-9c67-50acbdc72cd6	Pool & Snooker	Adajan	surat	gujarat	395007	Step into the ultimate haven for snooker enthusiasts. With tournament-grade tables, ambient lighting, and a relaxed lounge atmosphere, CuePoint offers the perfect blend of competition and camaraderie. Whether you're a seasoned player or just picking up a cue, our club is your go-to destination for precision, passion, and play.	ps@gmail.com	08888888888	\N	\N	06:00:00	23:00:00	f	\N	\N	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-turf.jpg	poor amenities facility
-b2b2b2b2-2222-41d4-a7f6-000000000002	c90139a0-2de3-4237-89b8-032367f73a37	Champion Turf	700 VIP road, Vesu	Surat	Gujarat	395007	Premium 5-a-side football turf with excellent drainage.	championturf@gmail.com	8753214569	\N	\N	07:00:00	22:00:00	t	2025-08-09 10:10:50.930041+00	2025-08-09 10:10:50.930041+00	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-pickleball.jpg	\N
-852d97ba-f482-4a73-8a0f-0b9fe003b7a7	c90139a0-2de3-4237-89b8-032367f73a37	GameZONE	Amroli	Surat	Gujarat	394107	make your play-time fantastic.	surbhiroy780@gmail.com	07984261806	\N	\N	09:00:00	23:00:00	f	\N	\N	\N	bla bla bla
-d2800a9a-2e21-44f2-acbc-578f598dac03	c90139a0-2de3-4237-89b8-032367f73a37	let's-play	citylight	Surat	Gujarat	394107	make your play-time fantastic.	surbhiroy780@gmail.com	07984261806	\N	\N	06:00:00	23:00:00	f	\N	\N	\N	\N
-c3c3c3c3-3333-41d4-a7f6-000000000003	c90139a0-2de3-4237-89b8-032367f73a37	Adajan Badminton Club	789 Ghod Dod Road	Surat	Gujarat	395001	Professional wooden courts for badminton enthusiasts.	badmintonclub@gmail.com	08523654821	\N	\N	09:00:00	21:00:00	f	2025-08-09 10:10:50.930041+00	2025-08-09 10:10:50.930041+00	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-snooker.jpg	poor safety standards
-7d4edf26-9237-4e33-bcd1-b01041832278	c90139a0-2de3-4237-89b8-032367f73a37	khelo-Area	Parvat-patiya	Surat	Gujarat	394107	make your play-time fantastic.	surbhiroy780@gmail.com	07984261806	\N	\N	09:00:00	23:00:00	t	\N	\N	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1757949218183-20240511_112006.jpg	\N
-47582fd3-e63e-43f5-9409-f505be69220e	c90139a0-2de3-4237-89b8-032367f73a37	Fun strike	vesu	Surat	Gujarat	394107	a great place to enjoy	surbhiroy780@gmail.com	07984261806	\N	\N	10:00:00	23:00:00	t	\N	\N	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1757949433233-20240515_163801.jpg	\N
-a1a1a1a1-1111-41d4-a7f6-000000000001	073c625c-eb02-45e8-9c67-50acbdc72cd6	Elite Sports Arena	VIP Road	Surat	Gujarat	395007	State-of-the-art multi-sport facility with floodlights.		8765876587	\N	\N	10:00:00	12:00:00	t	2025-08-09 10:10:50.930041+00	2025-08-09 10:10:50.930041+00	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/hero-playnation.jpg	\N
-16a86a6d-c300-4cda-bebf-9bc74ddfb8cc	c90139a0-2de3-4237-89b8-032367f73a37	Fun & Play	pal	surat	gujarat	395007	come and enjoy	fun@gmail.com	08532658412	\N	\N	10:00:00	23:00:00	f	\N	\N	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue_16a86a6d-c300-4cda-bebf-9bc74ddfb8cc_1756483481340.jpg	due to some safety reasons
+a1a1a1a1-1111-41d4-a7f6-000000000001	073c625c-eb02-45e8-9c67-50acbdc72cd6	Elite Sports Arena	VIP Road	Surat	Gujarat	395007	State-of-the-art multi-sport facility with floodlights.		8765876587	\N	\N	10:00:00	12:00:00	t	2025-08-09 10:10:50.930041+00	2025-08-09 10:10:50.930041+00	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/hero-playnation.jpg}	\N
+c3c3c3c3-3333-41d4-a7f6-000000000003	c90139a0-2de3-4237-89b8-032367f73a37	Adajan Badminton Club	789 Ghod Dod Road	Surat	Gujarat	395001	Professional wooden courts for badminton enthusiasts.	badmintonclub@gmail.com	08523654821	\N	\N	09:00:00	21:00:00	f	2025-08-09 10:10:50.930041+00	2025-08-09 10:10:50.930041+00	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-snooker.jpg}	poor safety standards
+1dde8e3f-b39d-446a-b8b1-cd1b958804a6	073c625c-eb02-45e8-9c67-50acbdc72cd6	Pool & Snooker	Adajan	surat	gujarat	395007	Step into the ultimate haven for snooker enthusiasts. With tournament-grade tables, ambient lighting, and a relaxed lounge atmosphere, CuePoint offers the perfect blend of competition and camaraderie. Whether you're a seasoned player or just picking up a cue, our club is your go-to destination for precision, passion, and play.	ps@gmail.com	08888888888	\N	\N	06:00:00	23:00:00	f	\N	\N	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-turf.jpg}	poor amenities facility
+7d4edf26-9237-4e33-bcd1-b01041832278	c90139a0-2de3-4237-89b8-032367f73a37	khelo-Area	Parvat-patiya	Surat	Gujarat	394107	make your play-time fantastic.	surbhiroy780@gmail.com	07984261806	\N	\N	09:00:00	23:00:00	t	\N	\N	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1757949218183-20240511_112006.jpg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1758625730089-The-Turf-Arena-Box-cricket-and-Football-1.jpeg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/8f127ad3-925b-4fa3-a03b-43b27eb16d75.webp,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/3a6d2dc1-a00e-493f-9ff4-ba1e2c7131bb.jpeg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/0c3f11fa-5a87-43b7-a29f-f36a9afb7f86.jpeg}	\N
+d2800a9a-2e21-44f2-acbc-578f598dac03	c90139a0-2de3-4237-89b8-032367f73a37	let's-play	citylight	Surat	Gujarat	394107	make your play-time fantastic.	surbhiroy780@gmail.com	07984261806	\N	\N	06:00:00	23:00:00	f	\N	\N	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1758626118899-bcd.jpg}	\N
+47582fd3-e63e-43f5-9409-f505be69220e	c90139a0-2de3-4237-89b8-032367f73a37	Fun strike	vesu	Surat	Gujarat	394107	a great place to enjoy	surbhiroy780@gmail.com	07984261806	\N	\N	10:00:00	23:00:00	t	\N	\N	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1757949433233-20240515_163801.jpg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1758637000060-xyz.avif}	\N
+16a86a6d-c300-4cda-bebf-9bc74ddfb8cc	c90139a0-2de3-4237-89b8-032367f73a37	Fun & Play	pal	surat	gujarat	395007	come and enjoy	fun@gmail.com	08532658412	\N	\N	10:00:00	23:00:00	f	\N	\N	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue_16a86a6d-c300-4cda-bebf-9bc74ddfb8cc_1756483481340.jpg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1758637114153-mno.jpg}	due to some safety reasons
+b2b2b2b2-2222-41d4-a7f6-000000000002	c90139a0-2de3-4237-89b8-032367f73a37	Champion Turf	700 VIP road, Vesu	Surat	Gujarat	395007	Premium 5-a-side football turf with excellent drainage.	championturf@gmail.com	8753214569	\N	\N	07:00:00	22:00:00	t	2025-08-09 10:10:50.930041+00	2025-08-09 10:10:50.930041+00	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1758647582437-20240516_212233.jpg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1758647650153-20240517_150704(0).jpg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1758647651536-20240518_163002.jpg}	\N
+852d97ba-f482-4a73-8a0f-0b9fe003b7a7	c90139a0-2de3-4237-89b8-032367f73a37	GameZONE	Amroli	Surat	Gujarat	394107	make your play-time fantastic.	surbhiroy780@gmail.com	07984261806	\N	\N	09:00:00	23:00:00	f	\N	\N	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/b12cf2e8-c90b-4349-b71f-4419e3a9c411.jpg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/842e2a23-bef4-409a-8320-c4b133f13a6d.jpg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/c69de97e-cee1-4675-a989-e83f3d075e42.jpg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/d7794a00-53d2-4ee2-a23d-44a17ef4dbde.webp,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/24b3641f-a027-4f08-920f-0cdd472ed954.webp,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/f1776469-a03f-40c2-80b9-62272c14605c.jpeg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/e85e6084-af8a-4674-999c-8151784c9a07.jpeg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/d07da7d5-9a0d-4334-abe6-f40de6f6890e.jpeg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/2910c0bd-8c82-410b-a49e-0b1581016e25.jpeg}	bla bla bla
 \.
 
 
@@ -4854,6 +5311,7 @@ COPY realtime.schema_migrations (version, inserted_at) FROM stdin;
 20250506224012	2025-08-05 19:09:55
 20250523164012	2025-08-05 19:09:56
 20250714121412	2025-08-05 19:09:56
+20250905041441	2025-09-26 15:35:56
 \.
 
 
@@ -4928,6 +5386,11 @@ COPY storage.migrations (id, name, hash, executed_at) FROM stdin;
 36	optimise-existing-functions	81cf92eb0c36612865a18016a38496c530443899	2025-08-09 17:34:42.638782
 37	add-bucket-name-length-trigger	3944135b4e3e8b22d6d4cbb568fe3b0b51df15c1	2025-08-09 17:34:42.750831
 38	iceberg-catalog-flag-on-buckets	19a8bd89d5dfa69af7f222a46c726b7c41e462c5	2025-08-09 17:34:42.756
+39	add-search-v2-sort-support	39cf7d1e6bf515f4b02e41237aba845a7b492853	2025-09-23 10:18:45.481983
+40	fix-prefix-race-conditions-optimized	fd02297e1c67df25a9fc110bf8c8a9af7fb06d1f	2025-09-23 10:18:45.594847
+41	add-object-level-update-trigger	44c22478bf01744b2129efc480cd2edc9a7d60e9	2025-09-25 15:59:30.547767
+42	rollback-prefix-triggers	f2ab4f526ab7f979541082992593938c05ee4b47	2025-09-25 15:59:30.641176
+43	fix-object-level	ab837ad8f1c7d00cc0b7310e989a23388ff29fc6	2025-09-25 15:59:30.666214
 \.
 
 
@@ -4939,12 +5402,45 @@ COPY storage.objects (id, bucket_id, name, owner, created_at, updated_at, last_a
 4e2341a3-5cd0-444e-a667-2d471e6f9377	venue-images	venue_16a86a6d-c300-4cda-bebf-9bc74ddfb8cc_1756483481340.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-08-29 16:05:40.358138+00	2025-08-29 16:05:40.358138+00	2025-08-29 16:05:40.358138+00	{"eTag": "\\"bfc033f61e35d8ac08528516dd38272e\\"", "size": 4479036, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-08-29T16:05:41.000Z", "contentLength": 4479036, "httpStatusCode": 200}	05515afa-7f76-4c3e-b608-389e07ec78bc	c90139a0-2de3-4237-89b8-032367f73a37	{}	1
 405798bd-3acb-4e07-87bd-e95286d56634	venue-images	hero-playnation.jpg	\N	2025-08-09 11:51:04.245245+00	2025-08-09 17:34:41.540568+00	2025-08-09 11:51:04.245245+00	{"eTag": "\\"c13a5713e1463941e160cce15dcaabe7-1\\"", "size": 42571, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-08-09T11:51:04.000Z", "contentLength": 42571, "httpStatusCode": 200}	c742db23-7d40-477d-9227-44d6e1133f3a	\N	\N	1
 7d839e27-6dc5-44c2-81ce-818caa9ece1b	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1757949433233-20240515_163801.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-15 15:17:25.330092+00	2025-09-15 15:17:25.330092+00	2025-09-15 15:17:25.330092+00	{"eTag": "\\"a410c3259680bcd1d0ec75fcf399a8d9\\"", "size": 3095858, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-15T15:17:26.000Z", "contentLength": 3095858, "httpStatusCode": 200}	c721ba4e-8678-455c-adb8-e1f9f0281328	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+78b8a1ae-1696-4f0f-9fa2-0c529a002867	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758565634985-tt-1716560931882.webp	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-22 18:26:08.723371+00	2025-09-22 18:26:08.723371+00	2025-09-22 18:26:08.723371+00	{"eTag": "\\"938d55498e8f993a73312c6464665fd6\\"", "size": 226292, "mimetype": "image/webp", "cacheControl": "max-age=3600", "lastModified": "2025-09-22T18:26:09.000Z", "contentLength": 226292, "httpStatusCode": 200}	df7c71fc-94f0-47dd-822f-f0a85e1697fd	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+640a6f95-c200-4a7e-a12c-41ca581a40f8	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758565657834-The-Turf-Arena-Box-cricket-and-Football-1.jpeg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-22 18:26:30.703296+00	2025-09-22 18:26:30.703296+00	2025-09-22 18:26:30.703296+00	{"eTag": "\\"055b127a6cc04dffa150e543e65f725e\\"", "size": 136470, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-22T18:26:31.000Z", "contentLength": 136470, "httpStatusCode": 200}	29fe95a8-551c-4f9b-9642-96fe87d1b635	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+3dc12229-a1dd-47cf-8154-70ad38cd93d9	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758626527096-terrace.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 11:21:01.411655+00	2025-09-23 11:21:01.411655+00	2025-09-23 11:21:01.411655+00	{"eTag": "\\"a681d532c9eba37ebdba6e420c2ba209\\"", "size": 249884, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T11:21:02.000Z", "contentLength": 249884, "httpStatusCode": 200}	1b583fd6-5ac0-4edd-ba3b-53298887b22d	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+214ecd58-a73b-41b1-90b2-d49d05130c07	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758637114153-mno.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 14:17:27.168647+00	2025-09-23 14:17:27.168647+00	2025-09-23 14:17:27.168647+00	{"eTag": "\\"f96a490b1524433fcc484008f400c140\\"", "size": 118981, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T14:17:28.000Z", "contentLength": 118981, "httpStatusCode": 200}	30290cfe-1e70-43c5-ab21-257f86ae0f7f	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+fe9f9ec4-0534-4805-bdb2-b8ca25e97038	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/b2995af0-624d-4a1f-a641-f0773a73d0ac.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 16:45:17.254997+00	2025-09-23 16:45:17.254997+00	2025-09-23 16:45:17.254997+00	{"eTag": "\\"f96a490b1524433fcc484008f400c140\\"", "size": 118981, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T16:45:18.000Z", "contentLength": 118981, "httpStatusCode": 200}	82a280d1-bc5d-4bed-b510-7195642c3c76	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+e8102975-ac0c-4727-83c9-9d32bd741aa4	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758647582437-20240516_212233.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:13:13.476413+00	2025-09-23 17:13:13.476413+00	2025-09-23 17:13:13.476413+00	{"eTag": "\\"bfc033f61e35d8ac08528516dd38272e\\"", "size": 4479036, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:13:14.000Z", "contentLength": 4479036, "httpStatusCode": 200}	fe1c065f-9e1a-4ee8-a6aa-68496994a88a	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+0a8cd284-215b-4e58-855c-2d3b152c032e	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758647651536-20240518_163002.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:14:23.05169+00	2025-09-23 17:14:23.05169+00	2025-09-23 17:14:23.05169+00	{"eTag": "\\"7a6832f1dc453e72bdc724d130c0812b-2\\"", "size": 6730830, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:14:23.000Z", "contentLength": 6730830, "httpStatusCode": 200}	3eccdcb0-98af-48b9-ad24-d1c6b5fa202e	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+f63cfca0-3ff9-4524-9a75-f9589b403f11	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758647726252-20240520_185020.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:15:36.507403+00	2025-09-23 17:15:36.507403+00	2025-09-23 17:15:36.507403+00	{"eTag": "\\"7c49175ba688474c28d481addf3bfbfa\\"", "size": 3585772, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:15:37.000Z", "contentLength": 3585772, "httpStatusCode": 200}	a43449e1-d23d-4e85-bc0e-df46236bb1eb	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+702cdfca-e97b-4fe0-91e5-1bb205294993	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758647728267-20240522_212442.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:15:38.839386+00	2025-09-23 17:15:38.839386+00	2025-09-23 17:15:38.839386+00	{"eTag": "\\"fe7f85a475821a19dda45e296d2fe778\\"", "size": 3972225, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:15:39.000Z", "contentLength": 3972225, "httpStatusCode": 200}	38be3f4a-e0ac-4006-baac-4e809166ab09	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
 8a687f37-aae0-4d04-8db6-77ce26ed450b	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1757949218183-20240511_112006.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-15 15:13:49.956205+00	2025-09-15 15:13:49.956205+00	2025-09-15 15:13:49.956205+00	{"eTag": "\\"295e3920bbafda00fe134f6d2b3b65be\\"", "size": 3686349, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-15T15:13:50.000Z", "contentLength": 3686349, "httpStatusCode": 200}	27947250-0e79-4735-af7e-6fa3f47b2f0f	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
 5baa4251-4710-4e41-ba70-45d12286ddc1	offer-backgrounds	default-offer-bg.png	\N	2025-09-21 13:01:18.419984+00	2025-09-21 13:01:18.419984+00	2025-09-21 13:01:18.419984+00	{"eTag": "\\"973aaf46ed35975fd5696ab469260f0b-1\\"", "size": 912705, "mimetype": "image/png", "cacheControl": "max-age=3600", "lastModified": "2025-09-21T13:01:18.000Z", "contentLength": 912705, "httpStatusCode": 200}	0fc88769-0132-4726-9ce1-3007aaae339a	\N	\N	1
+9ae2e349-4225-42f6-ba8e-c9d667e9e087	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758623153873-tt-1716560931882.webp	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 10:24:46.599581+00	2025-09-23 10:24:46.599581+00	2025-09-23 10:24:46.599581+00	{"eTag": "\\"938d55498e8f993a73312c6464665fd6\\"", "size": 226292, "mimetype": "image/webp", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T10:24:47.000Z", "contentLength": 226292, "httpStatusCode": 200}	dc2873c0-2f74-4336-8d29-04497b702331	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
 af5bf9e9-1a75-46ff-88c9-4573f3cbab82	venue-images	venue-pickleball.jpg	\N	2025-08-09 11:51:04.24646+00	2025-08-09 17:34:41.540568+00	2025-08-09 11:51:04.24646+00	{"eTag": "\\"70f5359a0bb7c9fb35ae894d2e6c52e2-1\\"", "size": 81937, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-08-09T11:51:04.000Z", "contentLength": 81937, "httpStatusCode": 200}	dc3fca7a-57bf-4500-979b-2fd71bba29b3	\N	\N	1
 475337b8-d9ca-49ce-9ba8-247f50798d18	venue-images	venue-snooker.jpg	\N	2025-08-09 11:51:04.233952+00	2025-08-09 17:34:41.540568+00	2025-08-09 11:51:04.233952+00	{"eTag": "\\"1429a8b25a618567ffadf1d6c721c084-1\\"", "size": 78274, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-08-09T11:51:04.000Z", "contentLength": 78274, "httpStatusCode": 200}	c9c19d51-2070-47b9-a509-826fcf56d479	\N	\N	1
 b2875b73-888a-463e-b9bc-a4c948ffbb9f	venue-images	venue-turf.jpg	\N	2025-08-09 11:51:04.179971+00	2025-08-09 17:34:41.540568+00	2025-08-09 11:51:04.179971+00	{"eTag": "\\"781b462416c485ca3678feb05a51882c-1\\"", "size": 129525, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-08-09T11:51:04.000Z", "contentLength": 129525, "httpStatusCode": 200}	447d1447-810a-4596-96ff-343ec9203830	\N	\N	1
+acc49073-c5da-432a-be3d-91470d3a2e69	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758623401856-tt-1716560931882.webp	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 10:28:55.333497+00	2025-09-23 10:28:55.333497+00	2025-09-23 10:28:55.333497+00	{"eTag": "\\"938d55498e8f993a73312c6464665fd6\\"", "size": 226292, "mimetype": "image/webp", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T10:28:56.000Z", "contentLength": 226292, "httpStatusCode": 200}	7538fa7a-9319-492b-9bb2-1b185acb93b2	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+538687c1-4e74-43af-b176-2136e9289d5b	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758625730089-The-Turf-Arena-Box-cricket-and-Football-1.jpeg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 11:07:42.96002+00	2025-09-23 11:07:42.96002+00	2025-09-23 11:07:42.96002+00	{"eTag": "\\"055b127a6cc04dffa150e543e65f725e\\"", "size": 136470, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T11:07:43.000Z", "contentLength": 136470, "httpStatusCode": 200}	420f9ca7-78af-4a81-87d1-c537c2b230c7	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+e7a69a53-73da-4ea4-bc61-919707efe816	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758626118899-bcd.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 11:14:11.68452+00	2025-09-23 11:14:11.68452+00	2025-09-23 11:14:11.68452+00	{"eTag": "\\"38467053b1b6acbcfd5b6961207a8da6\\"", "size": 44851, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T11:14:12.000Z", "contentLength": 44851, "httpStatusCode": 200}	175676b6-c4ec-4bf4-ad90-b471e26e7434	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+88950849-0ff3-460f-83ee-1fd2eb6ba076	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758637000060-xyz.avif	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 14:15:32.010756+00	2025-09-23 14:15:32.010756+00	2025-09-23 14:15:32.010756+00	{"eTag": "\\"c523348f724b305adb46d5a97d2ff82a\\"", "size": 89690, "mimetype": "image/avif", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T14:15:32.000Z", "contentLength": 89690, "httpStatusCode": 200}	db7722ea-25ab-4c88-b1cf-84fff5246cc8	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+f40183f7-df4a-472f-ae90-30daba1eeb63	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758644555222-bcd.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 16:21:27.667909+00	2025-09-23 16:21:27.667909+00	2025-09-23 16:21:27.667909+00	{"eTag": "\\"38467053b1b6acbcfd5b6961207a8da6\\"", "size": 44851, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T16:21:28.000Z", "contentLength": 44851, "httpStatusCode": 200}	539ef29c-daef-4228-b92f-952a6a70fb3f	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+ad96849b-3bef-4445-9301-791d67259aa5	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758647650153-20240517_150704(0).jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:14:19.772912+00	2025-09-23 17:14:19.772912+00	2025-09-23 17:14:19.772912+00	{"eTag": "\\"64065f171a0b98869a3f73243f7bc055\\"", "size": 1050905, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:14:20.000Z", "contentLength": 1050905, "httpStatusCode": 200}	7d606f52-9664-4141-ace5-3e04d0ff051a	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
 c972b7cd-6061-41d7-8174-eac0b3f63309	venue-images	venue_16a86a6d-c300-4cda-bebf-9bc74ddfb8cc_1756483332071.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-08-29 16:02:54.025559+00	2025-08-29 16:02:54.025559+00	2025-08-29 16:02:54.025559+00	{"eTag": "\\"697829300ee6229fedd4b4c638afe641\\"", "size": 2886572, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-08-29T16:02:54.000Z", "contentLength": 2886572, "httpStatusCode": 200}	529e4ace-d1bf-4591-a93f-40ba8efd8cc6	c90139a0-2de3-4237-89b8-032367f73a37	{}	1
+a908b4d8-466f-4cc8-b920-d9f54d59df02	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758647730652-20240523_181745.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:15:41.025987+00	2025-09-23 17:15:41.025987+00	2025-09-23 17:15:41.025987+00	{"eTag": "\\"53ea3073d6c8adf3d80c0c1371f6db4b\\"", "size": 4012776, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:15:41.000Z", "contentLength": 4012776, "httpStatusCode": 200}	635f84a6-fa39-49e8-801e-39320d0f4067	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+ab9b2ecc-cea5-4f50-8175-4777af564b22	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/fcc8ce58-4b31-438c-b0c7-274451447775.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:18:33.032943+00	2025-09-23 17:18:33.032943+00	2025-09-23 17:18:33.032943+00	{"eTag": "\\"9b848aac94588568d3dcf1a47afbb600\\"", "size": 9889, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:18:33.000Z", "contentLength": 9889, "httpStatusCode": 200}	bde80336-21a9-47b9-b4a4-5b2eb388d9ff	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+44de0cb2-cebb-434d-b5a3-29660d94a5c7	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/25a9e8aa-bcbb-402c-8f2c-6c9ae0ecc113.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:18:33.406383+00	2025-09-23 17:18:33.406383+00	2025-09-23 17:18:33.406383+00	{"eTag": "\\"7255d76f758b389bf4460735e507111f\\"", "size": 51966, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:18:34.000Z", "contentLength": 51966, "httpStatusCode": 200}	5efe6d5a-5579-4fad-9f92-08c0ecf13333	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+8a87ad86-2e23-4743-a6ca-04362961ee2b	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/116b175f-40dd-489c-be35-a7c653011308.webp	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:18:33.724428+00	2025-09-23 17:18:33.724428+00	2025-09-23 17:18:33.724428+00	{"eTag": "\\"4747b8de5ac3e7d28890165fb462fc3c\\"", "size": 30170, "mimetype": "image/webp", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:18:34.000Z", "contentLength": 30170, "httpStatusCode": 200}	565ea021-6ba7-4b1c-b58f-f021ca1afc25	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+0cf5bd64-a7d9-4757-a080-b7702f946b99	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/6523caf1-0779-4379-a3a4-780673f9a781.jpeg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:18:34.028845+00	2025-09-23 17:18:34.028845+00	2025-09-23 17:18:34.028845+00	{"eTag": "\\"1373c4e2dd3f46791c40daec552c9a58\\"", "size": 4838, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:18:34.000Z", "contentLength": 4838, "httpStatusCode": 200}	e7c11c7b-c978-4ed5-bffd-fcf4c17708ce	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+a9c23803-fc28-464d-9939-504b9bfd6a69	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/b12cf2e8-c90b-4349-b71f-4419e3a9c411.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:24:30.501488+00	2025-09-23 17:24:30.501488+00	2025-09-23 17:24:30.501488+00	{"eTag": "\\"9b848aac94588568d3dcf1a47afbb600\\"", "size": 9889, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:24:31.000Z", "contentLength": 9889, "httpStatusCode": 200}	1c57b5f7-dc56-4e95-9800-8ac80618867c	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+6b85a74b-9250-4451-aa96-d93853e8a383	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/842e2a23-bef4-409a-8320-c4b133f13a6d.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:24:30.951504+00	2025-09-23 17:24:30.951504+00	2025-09-23 17:24:30.951504+00	{"eTag": "\\"9b848aac94588568d3dcf1a47afbb600\\"", "size": 9889, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:24:31.000Z", "contentLength": 9889, "httpStatusCode": 200}	367b8a8b-cb3b-481a-bf91-406fd8369cfd	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+4deaf429-faad-41f6-81aa-a23d8f623adf	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/c69de97e-cee1-4675-a989-e83f3d075e42.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:24:31.82633+00	2025-09-23 17:24:31.82633+00	2025-09-23 17:24:31.82633+00	{"eTag": "\\"7255d76f758b389bf4460735e507111f\\"", "size": 51966, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:24:32.000Z", "contentLength": 51966, "httpStatusCode": 200}	96c45942-0c48-4735-bcd0-589d1052eea7	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+96159015-dcf8-48a9-8963-a67c30ca8905	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/d7794a00-53d2-4ee2-a23d-44a17ef4dbde.webp	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:24:32.301812+00	2025-09-23 17:24:32.301812+00	2025-09-23 17:24:32.301812+00	{"eTag": "\\"4747b8de5ac3e7d28890165fb462fc3c\\"", "size": 30170, "mimetype": "image/webp", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:24:33.000Z", "contentLength": 30170, "httpStatusCode": 200}	db786015-638a-413e-b1f4-54c8c998d349	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+1b89ee22-637b-49f1-95da-d72912580e3b	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/24b3641f-a027-4f08-920f-0cdd472ed954.webp	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:24:32.76528+00	2025-09-23 17:24:32.76528+00	2025-09-23 17:24:32.76528+00	{"eTag": "\\"5b6cd002be22a5b53d6a177011ffd5c4\\"", "size": 27750, "mimetype": "image/webp", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:24:33.000Z", "contentLength": 27750, "httpStatusCode": 200}	e2fad94b-5586-4a80-9816-d200fad627ee	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+acc1d4ad-ccd0-4ea1-99e3-2aedd13e28b4	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/f1776469-a03f-40c2-80b9-62272c14605c.jpeg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:24:33.297266+00	2025-09-23 17:24:33.297266+00	2025-09-23 17:24:33.297266+00	{"eTag": "\\"1373c4e2dd3f46791c40daec552c9a58\\"", "size": 4838, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:24:34.000Z", "contentLength": 4838, "httpStatusCode": 200}	56a9aa55-b80a-4d7e-b4ea-bb0e3dd460b7	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+5d189282-0235-47f9-a04e-8f8639ea9466	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/e85e6084-af8a-4674-999c-8151784c9a07.jpeg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:24:33.703622+00	2025-09-23 17:24:33.703622+00	2025-09-23 17:24:33.703622+00	{"eTag": "\\"abda8b4adfae0588c0488464791d8f1f\\"", "size": 6280, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:24:34.000Z", "contentLength": 6280, "httpStatusCode": 200}	4f4be3b9-b044-436b-96ba-896a0ba8233d	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+d021cadf-8014-4169-a1eb-b9000974d1ca	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/d07da7d5-9a0d-4334-abe6-f40de6f6890e.jpeg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:24:34.260036+00	2025-09-23 17:24:34.260036+00	2025-09-23 17:24:34.260036+00	{"eTag": "\\"b66864c2e733426e56b99d264469681d\\"", "size": 8020, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:24:35.000Z", "contentLength": 8020, "httpStatusCode": 200}	18c428d3-d3ed-4b27-917f-1d1249790b76	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+b4f71420-2c00-4035-a07e-530834b061f9	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/2910c0bd-8c82-410b-a49e-0b1581016e25.jpeg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:24:34.72774+00	2025-09-23 17:24:34.72774+00	2025-09-23 17:24:34.72774+00	{"eTag": "\\"3aa570d6da356250ff56b269aca11224\\"", "size": 7254, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:24:35.000Z", "contentLength": 7254, "httpStatusCode": 200}	efe0f77b-779a-499a-ad4d-44bf97e12a32	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+5c82cb5e-2eec-44e7-a08e-6d10f2098285	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/8f127ad3-925b-4fa3-a03b-43b27eb16d75.webp	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:29:08.282924+00	2025-09-23 17:29:08.282924+00	2025-09-23 17:29:08.282924+00	{"eTag": "\\"5b6cd002be22a5b53d6a177011ffd5c4\\"", "size": 27750, "mimetype": "image/webp", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:29:09.000Z", "contentLength": 27750, "httpStatusCode": 200}	3e187901-7f84-4a3f-be37-1b7821e8e172	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+bd3f0f88-33d7-4da4-9647-d78e95c37ee4	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/3a6d2dc1-a00e-493f-9ff4-ba1e2c7131bb.jpeg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:29:08.621504+00	2025-09-23 17:29:08.621504+00	2025-09-23 17:29:08.621504+00	{"eTag": "\\"1373c4e2dd3f46791c40daec552c9a58\\"", "size": 4838, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:29:09.000Z", "contentLength": 4838, "httpStatusCode": 200}	88753344-5894-4ad0-9d24-3fc090e71d2f	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+af225183-5271-47c5-95fa-e2394890fed1	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/0c3f11fa-5a87-43b7-a29f-f36a9afb7f86.jpeg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:29:09.512173+00	2025-09-23 17:29:09.512173+00	2025-09-23 17:29:09.512173+00	{"eTag": "\\"abda8b4adfae0588c0488464791d8f1f\\"", "size": 6280, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:29:10.000Z", "contentLength": 6280, "httpStatusCode": 200}	9b180d04-f649-4a69-a29c-7af3b04d4144	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
 \.
 
 
@@ -4954,6 +5450,8 @@ c972b7cd-6061-41d7-8174-eac0b3f63309	venue-images	venue_16a86a6d-c300-4cda-bebf-
 
 COPY storage.prefixes (bucket_id, name, created_at, updated_at) FROM stdin;
 venue-images	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-15 15:13:49.956205+00	2025-09-15 15:13:49.956205+00
+venue-images	venue-images	2025-09-23 16:45:17.254997+00	2025-09-23 16:45:17.254997+00
+venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 16:45:17.254997+00	2025-09-23 16:45:17.254997+00
 \.
 
 
@@ -4985,7 +5483,7 @@ COPY vault.secrets (id, name, description, secret, key_id, nonce, created_at, up
 -- Name: refresh_tokens_id_seq; Type: SEQUENCE SET; Schema: auth; Owner: supabase_auth_admin
 --
 
-SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 358, true);
+SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 403, true);
 
 
 --
@@ -5209,6 +5707,14 @@ ALTER TABLE ONLY public.amenities
 
 ALTER TABLE ONLY public.bookings
     ADD CONSTRAINT bookings_pkey PRIMARY KEY (booking_id);
+
+
+--
+-- Name: contact_messages contact_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.contact_messages
+    ADD CONSTRAINT contact_messages_pkey PRIMARY KEY (id);
 
 
 --
@@ -5805,6 +6311,13 @@ CREATE INDEX ix_realtime_subscription_entity ON realtime.subscription USING btre
 
 
 --
+-- Name: messages_inserted_at_topic_index; Type: INDEX; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+CREATE INDEX messages_inserted_at_topic_index ON ONLY realtime.messages USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+
+--
 -- Name: subscription_subscription_id_entity_filters_key; Type: INDEX; Schema: realtime; Owner: supabase_admin
 --
 
@@ -6389,6 +6902,17 @@ CREATE POLICY "Admins and Owners can manage offers" ON public.offers USING (((( 
 
 
 --
+-- Name: contact_messages Admins full access on contact messages; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Admins full access on contact messages" ON public.contact_messages USING ((( SELECT users.role
+   FROM public.users
+  WHERE (users.user_id = auth.uid())) = 'admin'::text)) WITH CHECK ((( SELECT users.role
+   FROM public.users
+  WHERE (users.user_id = auth.uid())) = 'admin'::text));
+
+
+--
 -- Name: bookings All: Read own bookings or bookings in own venues; Type: POLICY; Schema: public; Owner: postgres
 --
 
@@ -6406,6 +6930,13 @@ CREATE POLICY "Allow owners to update bookings in their venues" ON public.bookin
    FROM (public.venues v
      JOIN public.facilities f ON ((v.venue_id = f.venue_id)))
   WHERE (f.facility_id = bookings.facility_id)) = auth.uid()));
+
+
+--
+-- Name: contact_messages Allow public insert for contact messages; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Allow public insert for contact messages" ON public.contact_messages FOR INSERT TO authenticated, anon WITH CHECK (true);
 
 
 --
@@ -6577,6 +7108,12 @@ CREATE POLICY "Users can view their own favorites" ON public.favorites FOR SELEC
 
 
 --
+-- Name: contact_messages; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.contact_messages ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: favorites; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -6617,6 +7154,13 @@ ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
 --
 
 CREATE POLICY "Allow authenticated users to delete venue images" ON storage.objects FOR DELETE USING (((bucket_id = 'venue-images'::text) AND (auth.role() = 'authenticated'::text)));
+
+
+--
+-- Name: objects Allow authenticated users to update venue images; Type: POLICY; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE POLICY "Allow authenticated users to update venue images" ON storage.objects FOR UPDATE USING ((auth.uid() = owner)) WITH CHECK ((bucket_id = 'venue-images'::text));
 
 
 --
@@ -7782,6 +8326,15 @@ GRANT ALL ON TABLE public.amenities TO service_role;
 GRANT ALL ON TABLE public.bookings TO anon;
 GRANT ALL ON TABLE public.bookings TO authenticated;
 GRANT ALL ON TABLE public.bookings TO service_role;
+
+
+--
+-- Name: TABLE contact_messages; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.contact_messages TO anon;
+GRANT ALL ON TABLE public.contact_messages TO authenticated;
+GRANT ALL ON TABLE public.contact_messages TO service_role;
 
 
 --

@@ -33,12 +33,6 @@ function BookingPage() {
     }, [navigate]);
     return null;
   }
-  if (!venue || !facility || !slot || price === undefined) {
-    React.useEffect(() => {
-      navigate("/explore");
-    }, [navigate]);
-    return null;
-  }
 
   const totalAmount = price;
 
@@ -55,49 +49,25 @@ function BookingPage() {
     setLoading(true);
     setError(null);
     try {
-      // 1. ATOMIC CHECK & RESERVE: Attempt to mark the slot as unavailable.
-      // This is the CRITICAL STEP: it only succeeds if 'is_available' is TRUE, 
-      // preventing concurrent bookings (race conditions).
-      const { data: slotUpdateData, error: slotError } = await supabase
-        .from("time_slots")
-        .update({ is_available: false })
-        .eq("slot_id", slot.slot_id)
-        .eq("is_available", true) // <-- Concurrency Lock check
-        .select();
-
-      if (slotError) {
-        throw slotError;
-      }
-      
-      // If slotUpdateData is null or empty, another user beat us to the lock.
-      if (!slotUpdateData || slotUpdateData.length === 0) {
-        throw new Error("This slot has just been taken by another user. Please choose a different time slot.");
-      }
-
-      // 2. CREATE BOOKING: If the lock was successful, insert the booking.
-      const { data: bookingData, error: bookingError } = await supabase
-        .from("bookings")
-        .insert({
-          user_id: user.id,
+      // Securely call the Edge Function to create the booking
+      const { error: functionError } = await supabase.functions.invoke('create-booking', {
+        body: {
           facility_id: facility.facility_id,
           slot_id: slot.slot_id,
-          booking_date: new Date(),
-          start_time: slot.start_time,
-          end_time: slot.end_time,
           total_amount: totalAmount,
-          status: "confirmed",
-          payment_status: "paid",
-        })
-        .select()
-        .single();
+        },
+      });
 
-      if (bookingError) {
-        // IMPORTANT ROLLBACK: If booking fails after reserving the slot, free the slot immediately.
-        await supabase.from("time_slots").update({ is_available: true }).eq("slot_id", slot.slot_id);
-        throw bookingError;
+      if (functionError) {
+        // The Edge Function will return a specific error message if the slot is already taken
+        if (functionError.message.includes("Slot is not available") || functionError.message.includes("This slot has just been taken")) {
+          throw new Error("This slot has just been taken by another user. Please choose a different time slot.");
+        }
+        throw functionError;
       }
 
-      // 3. SUCCESS NOTIFICATION AND REDIRECTION
+      // If the function call is successful, the booking is created.
+      // Now, you can show the success modal and navigate the user.
       await showModal({
         title: "Success!",
         message: `Your slot at ${venue.name} has been successfully reserved.`,
