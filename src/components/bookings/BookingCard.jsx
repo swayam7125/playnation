@@ -1,68 +1,109 @@
-import React from 'react';
-import { FaCalendarAlt, FaClock, FaTag, FaEdit, FaCheckCircle } from 'react-icons/fa';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { FaMapMarkerAlt, FaCalendarAlt, FaClock, FaEdit, FaCheckCircle } from 'react-icons/fa';
+import { format } from 'date-fns';
+import ReviewForm from '../reviews/ReviewForm';
 
-const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-US', {
-  weekday: 'long', month: 'long', day: 'numeric'
-});
-const formatTime = (dateString) => new Date(dateString).toLocaleTimeString('en-US', {
-  hour: 'numeric', minute: '2-digit', hour12: true
-});
+const BookingCard = ({ booking, onReviewSubmitted, onCancelBooking }) => {
+    const [showReviewForm, setShowReviewForm] = useState(false);
+    const [isCancelling, setIsCancelling] = useState(false);
 
-function BookingCard({ booking, isUpcoming = false, onCancel, onLeaveReview }) {
-  const { facilities, start_time, end_time, total_amount, status, has_been_reviewed } = booking;
-  const venueName = facilities?.venues?.name || 'Venue Not Found';
-  const facilityName = facilities?.name || 'Facility Not Found';
-  const sportName = facilities?.sports?.name || 'Sport Not Found';
+    if (!booking || !booking.facilities || !booking.facilities.venues) {
+        return (
+            <div className="bg-card-bg rounded-xl shadow-md p-6 border border-border-color-light text-center">
+                <p className="text-medium-text">Booking information is currently unavailable.</p>
+            </div>
+        );
+    }
 
-  const statusClasses = {
-    confirmed: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
-    pending: 'bg-yellow-100 text-yellow-800',
-  };
+    const { facilities, start_time, end_time, total_amount, status, has_been_reviewed } = booking;
+    const { venues, name: facilityName, sports } = facilities;
+    const sportName = sports?.name || 'Sport';
 
-  const statusClass = `booking-status ${statusClasses[status] || 'bg-gray-100 text-gray-800'}`;
-  
-  const canReview = !isUpcoming && status === 'completed' && !has_been_reviewed;
+    const handleCancel = async () => {
+        if (window.confirm('Are you sure you want to cancel this booking?')) {
+            setIsCancelling(true);
+            await onCancelBooking(booking.booking_id);
+            setIsCancelling(false);
+        }
+    };
+    
+    const isPastBooking = new Date(start_time) < new Date();
+    const canReview = status === 'completed' && !has_been_reviewed;
 
-  return (
-    <div className={`bg-card-bg border border-border-color rounded-xl shadow-sm transition-all duration-300 ${status === 'cancelled' ? 'opacity-70' : 'hover:shadow-lg'}`}>
-      <div className="booking-card-header p-4 border-b border-border-color flex justify-between items-center">
-        <h4 className="font-bold text-lg text-dark-text">{venueName}</h4>
-        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${statusClass}`}>
-          {status}
-        </span>
-      </div>
-      <div className="booking-card-body p-6 space-y-3">
-        <p className="flex items-center gap-3 text-medium-text"><FaTag className="text-primary-green"/> <strong>{facilityName}</strong> ({sportName})</p>
-        <p className="flex items-center gap-3 text-medium-text"><FaCalendarAlt className="text-primary-green"/> {formatDate(start_time)}</p>
-        <p className="flex items-center gap-3 text-medium-text"><FaClock className="text-primary-green"/> {formatTime(start_time)} - {formatTime(end_time)}</p>
-      </div>
-      <div className="booking-card-footer p-4 bg-hover-bg border-t border-border-color flex justify-between items-center">
-        <div>
-          {isUpcoming && (
-            <button onClick={onCancel} className="text-sm font-semibold text-red-600 hover:text-red-800 transition">
-              Cancel Booking
-            </button>
-          )}
-          {canReview && (
-            <button onClick={onLeaveReview} className="flex items-center gap-2 text-sm font-semibold text-primary-green hover:text-primary-green-dark transition">
-              <FaEdit /> Leave a Review
-            </button>
-          )}
-          {has_been_reviewed && (
-            <p className="flex items-center gap-2 text-sm font-semibold text-green-600">
-              <FaCheckCircle /> Review Submitted
-            </p>
-          )}
-        </div>
-        <div className="text-right">
-          <span className="block text-xs text-light-text">Total Amount</span>
-          <strong className="text-lg text-dark-text">₹{total_amount}</strong>
-        </div>
-      </div>
-    </div>
-  );
-}
+    const statusClasses = {
+        confirmed: 'bg-blue-100 text-blue-800',
+        completed: 'bg-green-100 text-green-800',
+        cancelled: 'bg-red-100 text-red-800',
+        pending: 'bg-yellow-100 text-yellow-800',
+    };
+
+    return (
+        <>
+            <div className="bg-card-bg rounded-xl shadow-md overflow-hidden transform transition-all hover:shadow-lg hover:-translate-y-1 w-full border border-border-color-light">
+                <div className="md:flex">
+                    <div className="md:flex-shrink-0">
+                        <img className="h-48 w-full object-cover md:w-48" src={venues.image_url?.[0] || 'https://via.placeholder.com/150'} alt={venues.name} />
+                    </div>
+                    <div className="p-6 flex-grow flex flex-col justify-between">
+                        <div>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="uppercase tracking-wide text-sm text-primary-green font-semibold">{facilityName} ({sportName})</p>
+                                    <Link to={`/venue/${venues.venue_id}`} className="block mt-1 text-lg leading-tight font-bold text-dark-text hover:underline">{venues.name}</Link>
+                                    <p className="mt-2 text-sm text-medium-text flex items-center gap-2"><FaMapMarkerAlt /> {venues.address}, {venues.city}</p>
+                                </div>
+                                <span className={`px-3 py-1 text-xs font-semibold rounded-full capitalize ${statusClasses[status] || 'bg-gray-100 text-gray-800'}`}>
+                                    {status}
+                                </span>
+                            </div>
+                            <div className="mt-4 flex flex-col gap-2 text-sm text-medium-text">
+                                <p className="flex items-center gap-2"><FaCalendarAlt className="text-primary-green" /> {format(new Date(start_time), 'EEE, dd MMM yyyy')}</p>
+                                <p className="flex items-center gap-2"><FaClock className="text-primary-green" /> {format(new Date(start_time), 'p')} - {format(new Date(end_time), 'p')}</p>
+                            </div>
+                        </div>
+                        <div className="mt-4 border-t border-border-color-light pt-4 flex justify-between items-center">
+                            <p className="text-xl font-bold text-dark-text">₹{total_amount}</p>
+                            <div className="flex items-center gap-3">
+                                {status === 'confirmed' && !isPastBooking && (
+                                    <button
+                                        onClick={handleCancel}
+                                        disabled={isCancelling}
+                                        className="py-2 px-4 rounded-lg font-semibold text-sm bg-red-500 text-white hover:bg-red-600 disabled:bg-gray-400"
+                                    >
+                                        {isCancelling ? 'Cancelling...' : 'Cancel'}
+                                    </button>
+                                )}
+                                {canReview && (
+                                    <button
+                                        onClick={() => setShowReviewForm(true)}
+                                        className="py-2 px-4 rounded-lg font-semibold text-sm bg-primary-green text-white shadow-sm hover:bg-primary-green-dark flex items-center gap-2"
+                                    >
+                                        <FaEdit /> Leave a Review
+                                    </button>
+                                )}
+                                {has_been_reviewed && (
+                                    <p className="flex items-center gap-2 text-sm font-semibold text-green-600">
+                                      <FaCheckCircle /> Review Submitted
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {showReviewForm && (
+                <ReviewForm
+                    booking={booking}
+                    onClose={() => setShowReviewForm(false)}
+                    onReviewSubmitted={() => {
+                        setShowReviewForm(false);
+                        onReviewSubmitted(); // This refreshes the booking list
+                    }}
+                />
+            )}
+        </>
+    );
+};
 
 export default BookingCard;

@@ -31,9 +31,15 @@ function ReviewForm({ booking, onClose, onReviewSubmitted }) {
                     comment: comment,
                 });
 
-            if (insertError) throw insertError;
+            if (insertError) {
+                // This handles the case where the database rejects the review because one already exists for this booking
+                if (insertError.code === '23505') { 
+                    throw new Error('You have already submitted a review for this booking.');
+                }
+                throw insertError;
+            }
 
-            // Mark the booking as reviewed
+            // After successfully inserting, mark the booking as reviewed
             const { error: updateError } = await supabase
                 .from('bookings')
                 .update({ has_been_reviewed: true })
@@ -41,8 +47,8 @@ function ReviewForm({ booking, onClose, onReviewSubmitted }) {
             
             if (updateError) throw updateError;
             
-            onReviewSubmitted(); // This will refresh the bookings list in MyBookingsPage
-            onClose(); // Close the modal
+            onReviewSubmitted();
+            onClose();
 
         } catch (err) {
             setError(err.message);

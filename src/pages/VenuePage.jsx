@@ -5,11 +5,9 @@ import { FaClock, FaStar, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import StarRating from "../components/reviews/StarRating";
 import OfferCard from "../components/offers/OfferCard";
 
-// Import Swiper React components and modules
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Autoplay } from 'swiper/modules';
 
-// Import Swiper styles
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
@@ -41,13 +39,13 @@ function VenuePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedDate, setSelectedDate] = useState(getTodayString());
+  const [visibleReviews, setVisibleReviews] = useState(5);
 
   useEffect(() => {
     const fetchVenueData = async () => {
       setLoading(true);
       setError(null);
       try {
-        // Fetch venue details
         const { data: venueData, error: venueError } = await supabase
           .from("venues")
           .select(
@@ -61,7 +59,6 @@ function VenuePage() {
           setSelectedFacilityId(venueData.facilities[0].facility_id);
         }
 
-        // Fetch reviews for the venue
         const { data: reviewData, error: reviewError } = await supabase
           .from("reviews")
           .select(`*, users (username, first_name, last_name)`)
@@ -70,7 +67,6 @@ function VenuePage() {
         if (reviewError) throw reviewError;
         setReviews(reviewData || []);
 
-        // Fetch venue-specific offers
         const { data: offerData, error: offerError } = await supabase
           .from("offers")
           .select("*")
@@ -95,7 +91,6 @@ function VenuePage() {
 
   const filteredTimeSlots = useMemo(() => {
     if (!selectedFacility) return [];
-
     return selectedFacility.time_slots
       .filter((slot) => {
         const slotDate = new Date(slot.start_time).toISOString().split("T")[0];
@@ -111,43 +106,36 @@ function VenuePage() {
     return (total / reviews.length).toFixed(1);
   }, [reviews]);
 
-  // Process venue images for carousel
   const venueImages = useMemo(() => {
     if (!venue?.image_url) return [placeholderImage];
-    
-    // If image_url is an array with multiple images
     if (Array.isArray(venue.image_url) && venue.image_url.length > 0) {
       return venue.image_url;
     }
-    
-    // If image_url is a single string
     if (typeof venue.image_url === 'string') {
       return [venue.image_url];
     }
-    
     return [placeholderImage];
   }, [venue]);
-
+  
   const getImageUrl = (url) => {
     if (!url) return placeholderImage;
     return url.includes('supabase.co') 
       ? `${url}?width=800&height=400&resize=cover`
       : url;
   };
-
+  
   const handleFacilityChange = (facility) => {
     setSelectedFacilityId(facility.facility_id);
     setSelectedSlot(null);
   };
-
+  
   const handleSlotSelect = (slot) => {
     setSelectedSlot(slot);
   };
-
+  
   const handleProceedToBook = () => {
     if (!selectedSlot || !selectedFacility) return;
-    const finalPrice =
-      selectedSlot.price_override ?? selectedFacility.hourly_rate;
+    const finalPrice = selectedSlot.price_override ?? selectedFacility.hourly_rate;
     navigate("/booking", {
       state: {
         venue,
@@ -168,147 +156,84 @@ function VenuePage() {
     ),
   ];
   
-  const displayPrice =
-    selectedSlot?.price_override ?? selectedFacility?.hourly_rate;
+  const displayPrice = selectedSlot?.price_override ?? selectedFacility?.hourly_rate;
 
-  if (loading)
-    return (
-      <p className="container mx-auto text-center p-12">
-        Loading venue details...
-      </p>
-    );
-  if (error)
-    return (
-      <p className="container mx-auto text-center text-red-600 p-12">
-        Error: {error}
-      </p>
-    );
-  if (!venue)
-    return (
-      <p className="container mx-auto text-center p-12">Venue not found.</p>
-    );
+  if (loading) return <p className="container mx-auto text-center p-12">Loading venue details...</p>;
+  if (error) return <p className="container mx-auto text-center text-red-600 p-12">Error: {error}</p>;
+  if (!venue) return <p className="container mx-auto text-center p-12">Venue not found.</p>;
 
   return (
     <div className="bg-background">
       <div className="container mx-auto px-4 py-12">
         <div className="bg-card-bg rounded-2xl shadow-lg border border-border-color-light overflow-hidden">
           
-          {/* Image Carousel Section */}
           <div className="relative w-full h-80 md:h-96 overflow-hidden">
             {venueImages.length > 1 ? (
               <Swiper
                 modules={[Navigation, Pagination, Autoplay]}
                 spaceBetween={0}
                 slidesPerView={1}
-                navigation={{
-                  prevEl: '.venue-swiper-button-prev',
-                  nextEl: '.venue-swiper-button-next',
-                }}
-                pagination={{ 
-                  clickable: true,
-                  el: '.venue-swiper-pagination'
-                }}
-                autoplay={{ 
-                  delay: 4000, 
-                  disableOnInteraction: false 
-                }}
+                navigation={{ prevEl: '.venue-swiper-button-prev', nextEl: '.venue-swiper-button-next' }}
+                pagination={{ clickable: true, el: '.venue-swiper-pagination' }}
+                autoplay={{ delay: 4000, disableOnInteraction: false }}
                 loop={true}
                 className="w-full h-full venue-image-swiper"
               >
                 {venueImages.map((image, index) => (
                   <SwiperSlide key={index}>
-                    <img 
-                      src={getImageUrl(image)} 
-                      alt={`${venue.name} - Image ${index + 1}`} 
-                      className="w-full h-full object-cover"
-                      onError={(e) => { e.target.src = placeholderImage; }}
-                    />
+                    <img src={getImageUrl(image)} alt={`${venue.name} - Image ${index + 1}`} className="w-full h-full object-cover" onError={(e) => { e.target.src = placeholderImage; }} />
                   </SwiperSlide>
                 ))}
                 
-                {/* Custom Navigation Buttons */}
-                <button className="venue-swiper-button-prev absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all duration-200">
-                  <FaChevronLeft />
-                </button>
-                <button className="venue-swiper-button-next absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all duration-200">
-                  <FaChevronRight />
-                </button>
-                
-                {/* Custom Pagination */}
+                <button className="venue-swiper-button-prev absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all duration-200"><FaChevronLeft /></button>
+                <button className="venue-swiper-button-next absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all duration-200"><FaChevronRight /></button>
                 <div className="venue-swiper-pagination absolute bottom-4 left-1/2 -translate-x-1/2 z-10"></div>
               </Swiper>
             ) : (
-              <img 
-                src={getImageUrl(venueImages[0])} 
-                alt={venue.name} 
-                className="w-full h-full object-cover"
-                onError={(e) => { e.target.src = placeholderImage; }}
-              />
+              <img src={getImageUrl(venueImages[0])} alt={venue.name} className="w-full h-full object-cover" onError={(e) => { e.target.src = placeholderImage; }}/>
             )}
             
-            {/* Venue name overlay */}
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6">
-              <h1 className="text-4xl font-bold text-white mb-2">
-                {venue.name}
-              </h1>
+              <h1 className="text-4xl font-bold text-white mb-2">{venue.name}</h1>
               {reviews.length > 0 && (
                 <div className="flex items-center gap-2">
                   <StarRating rating={averageRating} />
-                  <span className="font-bold text-white">
-                    {averageRating}
-                  </span>
-                  <span className="text-white/80">
-                    ({reviews.length} reviews)
-                  </span>
+                  <span className="font-bold text-white">{averageRating}</span>
+                  <span className="text-white/80">({reviews.length} reviews)</span>
                 </div>
               )}
             </div>
           </div>
 
           <div className="p-8">
-            {/* Venue Details */}
             <div className="venue-header mb-8">
-              <p className="text-lg text-medium-text mb-4">
-                {venue.address}, {venue.city}, {venue.state}
-              </p>
-              <p className="text-light-text max-w-3xl">
-                {venue.description}
-              </p>
+              <p className="text-lg text-medium-text mb-4">{venue.address}, {venue.city}, {venue.state}</p>
+              <p className="text-light-text max-w-3xl">{venue.description}</p>
               
-              {/* Amenities */}
               {uniqueAmenities.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-lg font-semibold text-dark-text mb-3">Amenities</h3>
                   <div className="flex flex-wrap gap-2">
                     {uniqueAmenities.map(amenity => (
-                      <span key={amenity} className="bg-light-green-bg text-emerald-800 py-1 px-3 rounded-full text-sm font-medium border border-emerald-200">
-                        {amenity}
-                      </span>
+                      <span key={amenity} className="bg-light-green-bg text-emerald-800 py-1 px-3 rounded-full text-sm font-medium border border-emerald-200">{amenity}</span>
                     ))}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* OFFERS SECTION */}
             {offers.length > 0 && (
               <div className="offers-section mb-8">
-                <h2 className="text-2xl font-semibold text-dark-text mb-4">
-                  Special Offers
-                </h2>
+                <h2 className="text-2xl font-semibold text-dark-text mb-4">Special Offers</h2>
                 <div className="space-y-4">
-                  {offers.map((offer) => (
-                    <OfferCard key={offer.offer_id} offer={offer} />
-                  ))}
+                  {offers.map((offer) => <OfferCard key={offer.offer_id} offer={offer} />)}
                 </div>
               </div>
             )}
 
             <div className="facility-tabs flex flex-wrap gap-4 mb-8 border-y border-border-color py-6">
               {venue.facilities.map((facility) => (
-                <button
-                  key={facility.facility_id}
-                  onClick={() => handleFacilityChange(facility)}
+                <button key={facility.facility_id} onClick={() => handleFacilityChange(facility)}
                   className={`px-5 py-2.5 font-semibold text-sm rounded-full transition duration-300 ${
                     selectedFacilityId === facility.facility_id
                       ? "bg-primary-green text-white shadow-md"
@@ -321,24 +246,16 @@ function VenuePage() {
             </div>
 
             <div className="time-slots-section mb-8">
-              <h2 className="text-2xl font-semibold text-dark-text mb-4">
-                Available Time Slots
-              </h2>
+              <h2 className="text-2xl font-semibold text-dark-text mb-4">Available Time Slots</h2>
               <div className="max-w-xs mb-6">
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  min={getTodayString()}
+                <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} min={getTodayString()}
                   className="w-full px-4 py-3 bg-hover-bg border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green"
                 />
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {filteredTimeSlots.length > 0 ? (
                   filteredTimeSlots.map((slot) => (
-                    <button
-                      key={slot.slot_id}
-                      onClick={() => handleSlotSelect(slot)}
+                    <button key={slot.slot_id} onClick={() => handleSlotSelect(slot)}
                       className={`p-4 font-semibold rounded-lg transition-all duration-200 border-2 ${
                         selectedSlot?.slot_id === slot.slot_id
                           ? "bg-primary-green text-white border-primary-green-dark"
@@ -350,41 +267,39 @@ function VenuePage() {
                     </button>
                   ))
                 ) : (
-                  <p className="col-span-full text-medium-text">
-                    No available slots for the selected date.
-                  </p>
+                  <p className="col-span-full text-medium-text">No available slots for the selected date.</p>
                 )}
               </div>
             </div>
 
             <div className="reviews-section border-t border-border-color pt-8">
-              <h2 className="text-2xl font-semibold text-dark-text mb-6">
-                What Players Are Saying
-              </h2>
+              <h2 className="text-2xl font-semibold text-dark-text mb-6">What Players Are Saying</h2>
               {reviews.length > 0 ? (
-                <div className="space-y-6">
-                  {reviews.map((review) => (
-                    <div
-                      key={review.review_id}
-                      className="border-b border-border-color-light pb-6"
-                    >
-                      <div className="flex items-center mb-2">
-                        <StarRating rating={review.rating} />
-                        <span className="ml-4 font-bold text-dark-text">
-                          {review.users?.first_name || review.users?.username}
-                        </span>
+                <>
+                  <div className="space-y-6">
+                    {reviews.slice(0, visibleReviews).map((review) => (
+                      <div key={review.review_id} className="border-b border-border-color-light pb-6">
+                        <div className="flex items-center mb-2">
+                          <StarRating rating={review.rating} />
+                          <span className="ml-4 font-bold text-dark-text">{review.users?.first_name || review.users?.username}</span>
+                        </div>
+                        <p className="text-medium-text">{review.comment}</p>
+                        <p className="text-xs text-light-text mt-2">{new Date(review.created_at).toLocaleDateString()}</p>
                       </div>
-                      <p className="text-medium-text">{review.comment}</p>
-                      <p className="text-xs text-light-text mt-2">
-                        {new Date(review.created_at).toLocaleDateString()}
-                      </p>
+                    ))}
+                  </div>
+                  {reviews.length > visibleReviews && (
+                    <div className="text-center mt-6">
+                      <button onClick={() => setVisibleReviews(prev => prev + 5)}
+                        className="py-2 px-6 rounded-lg font-semibold bg-primary-green text-white hover:bg-primary-green-dark transition-all"
+                      >
+                        Load More Reviews
+                      </button>
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               ) : (
-                <p className="text-medium-text">
-                  Be the first to leave a review for this venue!
-                </p>
+                <p className="text-medium-text">Be the first to leave a review for this venue!</p>
               )}
             </div>
           </div>
@@ -397,8 +312,7 @@ function VenuePage() {
             <div>
               <p className="text-medium-text">Selected Slot:</p>
               <p className="font-bold text-dark-text">
-                {formatTime(selectedSlot.start_time)} -{" "}
-                {formatTime(selectedSlot.end_time)}
+                {formatTime(selectedSlot.start_time)} - {formatTime(selectedSlot.end_time)}
               </p>
             </div>
             <button

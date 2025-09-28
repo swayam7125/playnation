@@ -1,150 +1,129 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
 import BookingCard from '../../components/bookings/BookingCard';
-import ReviewForm from '../../components/reviews/ReviewForm';
-import { useModal } from '../../ModalContext';
+// CORRECTED IMPORT: Import the specific named components.
+import { LoadingSpinner, ErrorState } from '../../components/common/LoadingAndError';
 
 function MyBookingsPage() {
-  const { user } = useAuth();
-  const { showModal } = useModal();
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('upcoming');
-  const [showReviewModal, setShowReviewModal] = useState(false);
-  const [selectedBookingForReview, setSelectedBookingForReview] = useState(null);
+    const { user } = useAuth();
+    const [bookings, setBookings] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [view, setView] = useState('upcoming');
+    const [refreshKey, setRefreshKey] = useState(0);
 
-  const fetchBookings = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select(`*, facilities (*, sports (name), venues (*))`)
-        .eq('user_id', user.id)
-        .order('start_time', { ascending: false });
-      if (error) throw error;
-      setBookings(data || []);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchBookings = useCallback(async () => {
+        if (!user) return;
+        setLoading(true);
+        setError(null);
 
-  useEffect(() => {
-    fetchBookings();
-  }, [user]);
+        try {
+            const { data, error } = await supabase
+                .from('bookings')
+                .select(`
+                    booking_id, start_time, end_time, total_amount, status, has_been_reviewed,
+                    facilities ( name, venues ( venue_id, name, address, city, image_url ), sports ( name ) )
+                `)
+                .eq('user_id', user.id)
+                .order('start_time', { ascending: view === 'upcoming' });
 
-  const handleCancelBooking = async (booking) => {
-    const isConfirmed = await showModal({
-      title: "Confirm Cancellation",
-      message: "Are you sure you want to cancel this booking?",
-      confirmText: "Yes, Cancel",
-      confirmStyle: "danger"
-    });
+            if (error) throw error;
 
-    if (isConfirmed) {
-      try {
-        // --- START OF ATOMIC SOLUTION ---
-        // 1. Call the PostgreSQL RPC function to perform the cancellation transaction.
-        const { error: rpcError } = await supabase.rpc('cancel_booking_transaction', {
-          p_booking_id: booking.booking_id,
-          p_user_id: user.id
-        });
+            const now = new Date();
+            const processedBookings = data.map(b => ({
+                ...b,
+                status: b.status === 'confirmed' && new Date(b.start_time) < now ? 'completed' : b.status,
+            }));
 
-        if (rpcError) throw rpcError;
-        // --- END OF ATOMIC SOLUTION ---
+            const filteredBookings = processedBookings.filter(b => {
+                const isPast = new Date(b.start_time) < now;
+                return view === 'upcoming' ? !isPast : isPast;
+            });
 
-        // 2. Success Notification and Refresh
-        await showModal({ 
-            title: "Success", 
-            message: "Booking cancelled successfully. The slot is now available." 
-        });
-        
-        // Re-fetch all bookings to guarantee component state is consistent with the database.
+            setBookings(filteredBookings);
+        } catch (err) {
+            setError('Failed to fetch bookings. Please try again.');
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    }, [user, view, refreshKey]);
+
+    useEffect(() => {
         fetchBookings();
-        
-      } catch (error) {
-        // Handle error message from the database function
-        showModal({ 
-            title: "Cancellation Failed", 
-            message: `Error: ${error.message}. Please check your booking status.` 
-        });
-      }
-    }
-  };
+    }, [fetchBookings]);
+    
+    const handleReviewSubmitted = () => {
+        setRefreshKey(prevKey => prevKey + 1);
+    };
 
-  const handleOpenReviewModal = (booking) => {
-    setSelectedBookingForReview(booking);
-    setShowReviewModal(true);
-  };
+    const handleCancelBooking = async (bookingId) => {
+        try {
+            const { error } = await supabase.rpc('cancel_booking_transaction', {
+                p_booking_id: bookingId,
+                p_user_id: user.id
+            });
+            if (error) throw error;
+            setRefreshKey(prevKey => prevKey + 1);
+        } catch (error) {
+            console.error('Cancellation failed:', error);
+            alert(`Failed to cancel booking: ${error.message}`);
+        }
+    };
 
-  const now = new Date();
-  const upcomingBookings = bookings.filter(b => new Date(b.start_time) >= now && b.status === 'confirmed');
-  const pastBookings = bookings.filter(b => new Date(b.start_time) < now || b.status !== 'confirmed');
+    // Helper function to render the main content
+    const renderContent = () => {
+        if (loading) {
+            return <LoadingSpinner />;
+        }
+        if (error) {
+            return <ErrorState error={error} onRetry={fetchBookings} />;
+        }
+        if (bookings.length > 0) {
+            return (
+                <div className="space-y-6">
+                    {bookings.map(booking => (
+                        <BookingCard
+                            key={booking.booking_id}
+                            booking={booking}
+                            onReviewSubmitted={handleReviewSubmitted}
+                            onCancelBooking={handleCancelBooking}
+                        />
+                    ))}
+                </div>
+            );
+        }
+        return (
+            <div className="text-center py-16 bg-card-bg rounded-lg">
+                <p className="text-medium-text">You have no {view} bookings.</p>
+            </div>
+        );
+    };
 
-  if (loading) return <p className="container mx-auto text-center p-12">Loading your bookings...</p>;
-  if (error) return <p className="container mx-auto text-center text-red-600 p-12">Error: {error}</p>;
-  if (!user) return <p className="container mx-auto text-center p-12">Please log in to see your bookings.</p>;
+    return (
+        <div className="container mx-auto px-4 py-12">
+            <h1 className="text-4xl font-bold text-dark-text mb-8">My Bookings</h1>
 
-  return (
-    <>
-      <div className="container mx-auto px-4 py-12">
-        <h1 className="text-center text-3xl font-bold mb-8 text-dark-text">My Bookings</h1>
-        <div className="flex justify-center gap-4 mb-12 border-b border-border-color">
-          <button 
-            onClick={() => setActiveTab('upcoming')} 
-            className={`py-4 px-6 font-semibold text-base border-b-4 transition duration-300 ${activeTab === 'upcoming' ? 'border-primary-green text-primary-green' : 'border-transparent text-light-text hover:text-dark-text'}`}
-          >
-            Upcoming
-          </button>
-          <button 
-            onClick={() => setActiveTab('past')} 
-            className={`py-4 px-6 font-semibold text-base border-b-4 transition duration-300 ${activeTab === 'past' ? 'border-primary-green text-primary-green' : 'border-transparent text-light-text hover:text-dark-text'}`}
-          >
-            History
-          </button>
+            <div className="flex justify-center mb-8 border-b border-border-color">
+                <button
+                    onClick={() => setView('upcoming')}
+                    className={`px-6 py-3 font-semibold transition ${view === 'upcoming' ? 'text-primary-green border-b-2 border-primary-green' : 'text-medium-text'}`}
+                >
+                    Upcoming
+                </button>
+                <button
+                    onClick={() => setView('past')}
+                    className={`px-6 py-3 font-semibold transition ${view === 'past' ? 'text-primary-green border-b-2 border-primary-green' : 'text-medium-text'}`}
+                >
+                    Past
+                </button>
+            </div>
+
+            {/* CORRECTED RENDER LOGIC: Call the helper function */}
+            {renderContent()}
         </div>
-        <div className="max-w-3xl mx-auto grid gap-8">
-          {activeTab === 'upcoming' && (
-            upcomingBookings.length > 0
-              ? upcomingBookings.map(booking => (
-                  <BookingCard 
-                    key={booking.booking_id} 
-                    booking={booking} 
-                    isUpcoming={true} 
-                    onCancel={() => handleCancelBooking(booking)} 
-                  />
-                ))
-              : <p className="text-center text-light-text">You have no upcoming bookings.</p>
-          )}
-          {activeTab === 'past' && (
-            pastBookings.length > 0
-              ? pastBookings.map(booking => (
-                  <BookingCard 
-                    key={booking.booking_id} 
-                    booking={booking}
-                    onLeaveReview={() => handleOpenReviewModal(booking)}
-                  />
-                ))
-              : <p className="text-center text-light-text">You have no past bookings.</p>
-          )}
-        </div>
-      </div>
-      {showReviewModal && selectedBookingForReview && (
-        <ReviewForm 
-          booking={selectedBookingForReview} 
-          onClose={() => setShowReviewModal(false)}
-          onReviewSubmitted={fetchBookings}
-        />
-      )}
-    </>
-  );
+    );
 }
 
 export default MyBookingsPage;
