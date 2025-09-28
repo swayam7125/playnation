@@ -80,7 +80,7 @@ function AboutUsPage() {
                 Harsh Shah
               </h3>
               <p className="text-primary-green text-lg font-medium mb-4">
-                Founder
+                co-founder
               </p>
               <p className="text-medium-text text-sm leading-relaxed">
                 As a lifelong sports enthusiast, Harsh envisioned a platform that would simplify the process of playing, making it accessible to everyone.
