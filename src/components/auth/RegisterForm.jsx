@@ -1,4 +1,5 @@
 // src/components/auth/RegisterForm.jsx
+
 import React, { useState } from "react";
 import { supabase } from "../../supabaseClient";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -11,7 +12,7 @@ function RegisterForm() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    confirm_password: "", // Added for confirmation
+    confirm_password: "",
     username: "",
     first_name: "",
     last_name: "",
@@ -31,7 +32,6 @@ function RegisterForm() {
     e.preventDefault();
     setError(null);
 
-    // --- VALIDATION LOGIC ---
     if (formData.password.length < 6) {
       setError("Password must be at least 6 characters long.");
       return;
@@ -40,11 +40,11 @@ function RegisterForm() {
       setError("Passwords do not match.");
       return;
     }
-    // --- END VALIDATION LOGIC ---
 
     setLoading(true);
 
     try {
+      // ... (rest of the logic is the same)
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -80,18 +80,18 @@ function RegisterForm() {
   };
 
   const inputStyles =
-    "w-full py-3 px-4 border border-border-color rounded-lg text-sm bg-card-bg text-dark-text transition duration-300 focus:outline-none focus:border-primary-green focus:ring-2 focus:ring-primary-green/20";
-  const labelStyles = "font-semibold text-sm text-dark-text";
+    "w-full py-2 px-3 bg-background border-2 border-border-color rounded-lg text-sm text-dark-text transition duration-300 focus:outline-none focus:border-primary-green focus:ring-2 focus:ring-primary-green/20"; // Smaller padding
+  const labelStyles = "font-semibold text-xs text-dark-text mb-1 block"; // Smaller font and margin
 
   return (
-    <form onSubmit={handleRegister} className="flex flex-col">
+    <form onSubmit={handleRegister} className="space-y-3"> {/* Reduced spacing */}
       {error && (
-        <p className="bg-red-100 text-red-700 p-4 rounded-lg text-center text-sm border border-red-300 mb-6 col-span-2">
+        <p className="bg-red-100 text-red-700 p-2 rounded-md text-center text-xs border border-red-200 col-span-2"> {/* Smaller padding */}
           {error}
         </p>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-6">
-        <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2"> {/* Reduced gaps */}
+        <div>
           <label htmlFor="first_name" className={labelStyles}>
             First Name
           </label>
@@ -103,9 +103,10 @@ function RegisterForm() {
             onChange={handleChange}
             required
             className={inputStyles}
+            placeholder="John"
           />
         </div>
-        <div className="flex flex-col gap-2">
+        <div>
           <label htmlFor="last_name" className={labelStyles}>
             Last Name
           </label>
@@ -117,9 +118,10 @@ function RegisterForm() {
             onChange={handleChange}
             required
             className={inputStyles}
+            placeholder="Doe"
           />
         </div>
-        <div className="flex flex-col gap-2 col-span-2">
+        <div className="md:col-span-2">
           <label htmlFor="username" className={labelStyles}>
             Username
           </label>
@@ -131,9 +133,10 @@ function RegisterForm() {
             onChange={handleChange}
             required
             className={inputStyles}
+            placeholder="johndoe"
           />
         </div>
-        <div className="flex flex-col gap-2 col-span-2">
+        <div className="md:col-span-2">
           <label htmlFor="email" className={labelStyles}>
             Email Address
           </label>
@@ -145,10 +148,10 @@ function RegisterForm() {
             onChange={handleChange}
             required
             className={inputStyles}
+            placeholder="you@example.com"
           />
         </div>
-        {/* Password Fields */}
-        <div className="flex flex-col gap-2">
+        <div>
           <label htmlFor="password" className={labelStyles}>
             Password
           </label>
@@ -161,9 +164,10 @@ function RegisterForm() {
             onChange={handleChange}
             required
             className={inputStyles}
+            placeholder="Min. 6 characters"
           />
         </div>
-        <div className="flex flex-col gap-2">
+        <div>
           <label htmlFor="confirm_password" className={labelStyles}>
             Confirm Password
           </label>
@@ -176,22 +180,10 @@ function RegisterForm() {
             onChange={handleChange}
             required
             className={inputStyles}
+            placeholder="Re-enter password"
           />
         </div>
-        <div className="flex flex-col gap-2">
-          <label htmlFor="phone_number" className={labelStyles}>
-            Phone Number
-          </label>
-          <input
-            id="phone_number"
-            name="phone_number"
-            type="tel"
-            value={formData.phone_number}
-            onChange={handleChange}
-            className={inputStyles}
-          />
-        </div>
-        <div className="flex flex-col gap-2">
+         <div className="md:col-span-2">
           <label htmlFor="role" className={labelStyles}>
             I am a...
           </label>
@@ -209,10 +201,10 @@ function RegisterForm() {
       </div>
       <button
         type="submit"
-        className="bg-primary-green text-white p-4 rounded-lg text-base font-bold cursor-pointer transition duration-300 mt-4 hover:bg-primary-green-dark hover:-translate-y-px hover:shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none"
+        className="w-full bg-primary-green text-white py-2.5 rounded-lg text-sm font-bold transition duration-300 hover:bg-primary-green-dark hover:-translate-y-0.5 transform disabled:opacity-50 disabled:transform-none shadow-md hover:shadow-primary-green/30 !mt-4" // Smaller padding and specific margin
         disabled={loading}
       >
-        {loading ? "Registering..." : "Create Account"}
+        {loading ? "Creating Account..." : "Create Account"}
       </button>
     </form>
   );

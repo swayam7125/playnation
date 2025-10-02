@@ -1,7 +1,10 @@
+// src/components/auth/LoginForm.jsx
+
 import React, { useState } from "react";
 import { supabase } from "../../supabaseClient";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
+import { FaGoogle, FaFacebook } from "react-icons/fa";
 
 function LoginForm() {
   const navigate = useNavigate();
@@ -28,17 +31,14 @@ function LoginForm() {
 
       const userProfile = await updateUser();
 
-      // Redirect based on role
       if (userProfile?.role === "venue_owner") {
         navigate("/owner/dashboard");
       } else if (userProfile?.role === "admin") {
         navigate("/admin/venues");
       } else if (from) {
-        // If there was a page they were trying to access before login
         navigate(from.pathname, { state: from.state, replace: true });
       } else {
-        // Default redirect for players
-        navigate("/");
+        navigate("/explore");
       }
     } catch (error) {
       setError(error.message);
@@ -48,18 +48,18 @@ function LoginForm() {
   };
 
   const inputStyles =
-    "w-full py-3 px-4 border border-border-color rounded-lg text-sm bg-card-bg text-dark-text transition duration-300 focus:outline-none focus:border-primary-green focus:ring-2 focus:ring-primary-green/20";
-  const labelStyles = "font-semibold text-sm text-dark-text";
+    "w-full py-2 px-3 bg-background border-2 border-border-color rounded-lg text-sm text-dark-text transition duration-300 focus:outline-none focus:border-primary-green focus:ring-2 focus:ring-primary-green/20"; // Smaller padding
+  const labelStyles = "font-semibold text-xs text-dark-text mb-1 block"; // Smaller font and margin
 
   return (
-    <form onSubmit={handleLogin} className="flex flex-col">
-      {error && (
-        <p className="bg-red-100 text-red-700 p-4 rounded-lg text-center text-sm border border-red-300 mb-6">
-          {error}
-        </p>
-      )}
-      <div className="flex flex-col gap-4 mb-6">
-        <div className="flex flex-col gap-2">
+    <div className="space-y-4">
+      <form onSubmit={handleLogin} className="space-y-3">
+        {error && (
+          <p className="bg-red-100 text-red-700 p-2 rounded-md text-center text-xs border border-red-200"> {/* Smaller padding */}
+            {error}
+          </p>
+        )}
+        <div>
           <label htmlFor="email" className={labelStyles}>
             Email Address
           </label>
@@ -73,29 +73,49 @@ function LoginForm() {
             className={inputStyles}
           />
         </div>
-        <div className="flex flex-col gap-2">
+        <div>
           <label htmlFor="password" className={labelStyles}>
             Password
           </label>
           <input
             id="password"
             type="password"
-            placeholder="Your password"
+            placeholder="Enter your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             className={inputStyles}
           />
         </div>
+        <button
+          type="submit"
+          className="w-full bg-primary-green text-white py-2.5 rounded-lg text-sm font-bold transition duration-300 hover:bg-primary-green-dark hover:-translate-y-0.5 transform disabled:opacity-50 disabled:transform-none shadow-md hover:shadow-primary-green/30" // Smaller padding and font
+          disabled={loading}
+        >
+          {loading ? "Signing In..." : "Sign In"}
+        </button>
+      </form>
+
+      <div className="relative my-4">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-border-color"></div>
+        </div>
+        <div className="relative flex justify-center text-xs"> {/* Smaller text */}
+          <span className="bg-card-bg px-2 text-medium-text">Or continue with</span>
+        </div>
       </div>
-      <button
-        type="submit"
-        className="bg-primary-green text-white p-4 rounded-lg text-base font-bold cursor-pointer transition duration-300 mt-4 hover:bg-primary-green-dark hover:-translate-y-px hover:shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none"
-        disabled={loading}
-      >
-        {loading ? "Logging in..." : "Login"}
-      </button>
-    </form>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button className="flex items-center justify-center gap-2 w-full py-2 px-4 border-2 border-border-color rounded-lg hover:bg-hover-bg transition duration-300">
+          <FaGoogle className="text-red-500" />
+          <span className="font-semibold text-xs text-dark-text">Google</span>
+        </button>
+        <button className="flex items-center justify-center gap-2 w-full py-2 px-4 border-2 border-border-color rounded-lg hover:bg-hover-bg transition duration-300">
+          <FaFacebook className="text-blue-600" />
+          <span className="font-semibold text-xs text-dark-text">Facebook</span>
+        </button>
+      </div>
+    </div>
   );
 }
 

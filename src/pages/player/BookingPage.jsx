@@ -1,3 +1,5 @@
+// src/pages/player/BookingPage.jsx
+
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../../supabaseClient";
@@ -49,8 +51,7 @@ function BookingPage() {
     setLoading(true);
     setError(null);
     try {
-      // Securely call the Edge Function to create the booking
-      const { error: functionError } = await supabase.functions.invoke('create-booking', {
+      const { data, error: functionError } = await supabase.functions.invoke('create-booking', {
         body: {
           facility_id: facility.facility_id,
           slot_id: slot.slot_id,
@@ -59,31 +60,36 @@ function BookingPage() {
       });
 
       if (functionError) {
-        // The Edge Function will return a specific error message if the slot is already taken
-        if (functionError.message.includes("Slot is not available") || functionError.message.includes("This slot has just been taken")) {
-          throw new Error("This slot has just been taken by another user. Please choose a different time slot.");
-        }
+        // This will now catch errors like "Slot is already taken"
         throw functionError;
       }
 
-      // If the function call is successful, the booking is created.
-      // Now, you can show the success modal and navigate the user.
+      // If successful, show the confirmation modal
       await showModal({
         title: "Success!",
-        message: `Your slot at ${venue.name} has been successfully reserved.`,
+        message: data.message || `Your slot at ${venue.name} has been reserved.`,
         confirmText: "Go to My Bookings",
-        onConfirm: true, // Resolves the promise
       });
 
-      // Navigate after the modal is closed/confirmed
       navigate("/my-bookings"); 
       
     } catch (err) {
-      // Handle the generic error case, including the concurrency error
-      setError(err.message);
+      // Try to parse a meaningful error message from the function's response
+      let errorMessage = err.message;
+      try {
+        const parsedError = JSON.parse(err.context?.responseText || '{}');
+        if (parsedError.error) {
+          errorMessage = parsedError.error;
+        }
+      } catch (e) {
+        // Fallback to the default error message if parsing fails
+        console.error("Could not parse error response:", err.message);
+      }
+
+      setError(errorMessage);
       showModal({
         title: "Booking Failed",
-        message: `An error occurred: ${err.message}`,
+        message: errorMessage,
         confirmText: "Close",
         confirmStyle: "danger",
       });

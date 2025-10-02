@@ -62,7 +62,7 @@ function OwnerDashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState(initialStats);
   const [loading, setLoading] = useState(true);
-  const [timeframe, setTimeframe] = useState("30days");
+  const [timeframe, setTimeframe] = useState("7days");
 
   useEffect(() => {
     const fetchDashboardStats = async () => {

@@ -115,3 +115,18 @@
     display: none;
 }
 
+/* For WebKit-based browsers (Chrome, Safari, Edge, etc.) */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent; /* Make scrollbar transparent */
+}
+
+/* For Firefox */
+html {
+  scrollbar-width: none;
+}
+
+/* For Internet Explorer and older Edge */
+body {
+  -ms-overflow-style: none;
+}
