@@ -378,7 +378,7 @@ function AdminBookingsPage() {
           .select(
             `
                     *, 
-                    users (username, email, phone_number), 
+                    users:user_id (username, email, phone_number), 
                     facilities(*, venues(*))
                 `
           )

@@ -2,13 +2,38 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
 import { FaCheckCircle, FaTimesCircle, FaExclamationTriangle, FaSearch, FaFilter, FaBuilding, FaUser, FaMapMarkerAlt, FaClock, FaEye } from 'react-icons/fa';
 import { useModal } from '../../ModalContext';
-import StatsCard from '../../components/common/StatsCard';
+
+const ClickableStatsCard = ({ title, count, icon: Icon, color, isActive, onClick }) => {
+    return (
+        <div
+            onClick={onClick}
+            className={`bg-card-bg rounded-xl shadow-sm border p-5 cursor-pointer transition-all duration-200 ${
+                isActive 
+                    ? 'border-primary-green shadow-md' 
+                    : 'border-border-color-light hover:border-primary-green/40 hover:shadow'
+            }`}
+        >
+            <div className="flex items-center justify-between">
+                <div className="flex-1">
+                    <p className={`text-sm font-medium mb-1 ${isActive ? 'text-primary-green' : 'text-medium-text'}`}>
+                        {title}
+                    </p>
+                    <p className={`text-3xl font-bold ${isActive ? 'text-primary-green-dark' : 'text-dark-text'}`}>
+                        {count}
+                    </p>
+                </div>
+                <div className={`${color} w-12 h-12 rounded-lg flex items-center justify-center ${
+                    isActive ? 'shadow-lg' : ''
+                }`}>
+                    <Icon className="text-white text-xl" />
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const VenueCard = ({ venue, onApprove, onDecline }) => {
-    // 🛑 CORRECTED LINE: Access owner data from the 'owner_id' property 
-    // as renamed in the fetch query to resolve FK ambiguity.
     const owner = venue.owner_id;
-
     const isApproved = venue.is_approved;
     const isDeclined = !isApproved && venue.rejection_reason;
 
@@ -25,7 +50,6 @@ const VenueCard = ({ venue, onApprove, onDecline }) => {
                     <div className="flex-1">
                         <h3 className="text-xl font-semibold text-dark-text mb-2 group-hover:text-primary-green-dark transition-colors">{venue.name}</h3>
                         <div className="flex items-center gap-4 text-sm text-medium-text mb-3">
-                            {/* 🛑 CORRECTED LINE: Use 'owner' variable (which holds venue.owner_id data) */}
                             <div className="flex items-center gap-2"><FaUser className="text-xs" /><span>{owner?.username || owner?.email}</span></div>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-light-text"><FaMapMarkerAlt className="text-xs" /><span>{venue.address}, {venue.city}</span></div>
@@ -108,8 +132,6 @@ function AdminVenueManagementPage() {
         setLoading(true);
         setError(null);
         try {
-            // 🛑 CORRECTED LINE: Using 'owner_id' as the embedded relationship name 
-            // to uniquely select the owner user data.
             const { data, error } = await supabase.from('venues').select(`*, owner_id (username, email)`).order('created_at', { ascending: false });
             if (error) throw error;
             setVenues(data || []);
@@ -162,7 +184,6 @@ function AdminVenueManagementPage() {
         if (!searchTerm) return venueList;
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
         return venueList.filter(v => 
-            // 🛑 CORRECTED LINE: Search against 'owner_id' properties
             `${v.name} ${v.city} ${v.address} ${v.owner_id?.username || ''} ${v.owner_id?.email || ''}`.toLowerCase().includes(lowerCaseSearchTerm)
         );
     };
@@ -174,15 +195,9 @@ function AdminVenueManagementPage() {
     const currentVenues = { pending: pendingVenues, approved: approvedVenues, rejected: rejectedVenues }[activeTab] || [];
     
     const statsData = [
-        { title: "Pending Review", count: pendingVenues.length, icon: FaClock, color: "bg-yellow-500" },
-        { title: "Approved Venues", count: approvedVenues.length, icon: FaCheckCircle, color: "bg-primary-green" },
-        { title: "Restricted Venues", count: rejectedVenues.length, icon: FaTimesCircle, color: "bg-red-500" },
-    ];
-
-    const tabData = [
-        { key: 'pending', label: 'Pending Review', count: pendingVenues.length },
-        { key: 'approved', label: 'Approved', count: approvedVenues.length },
-        { key: 'rejected', label: 'Restricted', count: rejectedVenues.length }
+        { key: 'pending', title: "Pending Review", count: pendingVenues.length, icon: FaClock, color: "bg-yellow-500" },
+        { key: 'approved', title: "Approved Venues", count: approvedVenues.length, icon: FaCheckCircle, color: "bg-primary-green" },
+        { key: 'rejected', title: "Restricted Venues", count: rejectedVenues.length, icon: FaTimesCircle, color: "bg-red-500" },
     ];
 
     if (loading) return (
@@ -214,7 +229,14 @@ function AdminVenueManagementPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    {statsData.map(stat => <StatsCard key={stat.title} {...stat} bgColor="bg-card-bg" />)}
+                    {statsData.map(stat => (
+                        <ClickableStatsCard 
+                            key={stat.key} 
+                            {...stat} 
+                            isActive={activeTab === stat.key}
+                            onClick={() => setActiveTab(stat.key)}
+                        />
+                    ))}
                 </div>
 
                 <div className="bg-card-bg rounded-2xl shadow-sm border border-border-color-light p-6 mb-8">
@@ -228,18 +250,6 @@ function AdminVenueManagementPage() {
                             />
                         </div>
                         <div className="flex items-center gap-2 text-sm text-medium-text"><FaFilter /><span>Showing {currentVenues.length} venues</span></div>
-                    </div>
-                </div>
-
-                <div className="mb-8">
-                    <div className="flex space-x-1 bg-card-bg p-1 rounded-2xl border border-border-color-light shadow-sm">
-                        {tabData.map(tab => (
-                            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-                                className={`flex-1 px-6 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${activeTab === tab.key ? 'bg-primary-green text-white shadow-sm' : 'text-medium-text hover:text-dark-text hover:bg-hover-bg'}`}
-                            >
-                                {tab.label} ({tab.count})
-                            </button>
-                        ))}
                     </div>
                 </div>
 

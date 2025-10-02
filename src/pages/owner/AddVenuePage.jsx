@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useModal } from "../../ModalContext.jsx";
 import {
@@ -7,6 +7,7 @@ import {
   FaClock,
   FaPhone,
   FaEnvelope,
+  FaTrash,
 } from "react-icons/fa";
 
 function AddVenuePage() {
@@ -32,20 +33,38 @@ function AddVenuePage() {
   const [venueImageFiles, setVenueImageFiles] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
 
+  // Cleanup object URLs on component unmount
+  useEffect(() => {
+    return () => {
+      imagePreviews.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [imagePreviews]);
+
   const handleVenueChange = (e) =>
     setVenueDetails({ ...venueDetails, [e.target.name]: e.target.value });
 
+  // THE FIX: This function now appends images instead of replacing them
   const handleImageChange = (e) => {
-    const files = Array.from(e.target.files);
-    setVenueImageFiles(files);
-    imagePreviews.forEach(url => URL.revokeObjectURL(url));
-    const previewUrls = files.map((file) => URL.createObjectURL(file));
-    setImagePreviews(previewUrls);
+    const newFiles = Array.from(e.target.files);
+    if (newFiles.length === 0) return;
+
+    // Append new files to the existing array
+    setVenueImageFiles(prevFiles => [...prevFiles, ...newFiles]);
+
+    // Create new preview URLs and append them to the existing previews
+    const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
+    setImagePreviews(prevPreviews => [...prevPreviews, ...newPreviewUrls]);
   };
+  
+  const clearImages = () => {
+      imagePreviews.forEach(url => URL.revokeObjectURL(url));
+      setImagePreviews([]);
+      setVenueImageFiles([]);
+  }
 
   const handleNextStep = (e) => {
     e.preventDefault();
-    if (venueImageFiles.length === 0 && imagePreviews.length === 0) {
+    if (venueImageFiles.length === 0) {
       showModal({
         title: "Images Required",
         message: "Please upload at least one image for the venue.",
@@ -63,52 +82,61 @@ function AddVenuePage() {
 
   return (
     <div className="min-h-screen bg-background p-4">
-      <div className="max-w-3xl mx-auto"> {/* Reduced max-width */}
-        <div className="text-center mb-4"> {/* Reduced margin */}
-          <div className="bg-primary-green rounded-2xl shadow-lg p-4 relative overflow-hidden"> {/* Reduced padding and rounding */}
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center mb-4">
+          <div className="bg-primary-green rounded-2xl shadow-lg p-4 relative overflow-hidden">
             <div className="absolute -top-8 -left-8 w-24 h-24 border-4 border-white/10 rounded-full"></div>
             <div className="absolute -bottom-8 -right-8 w-24 h-24 border-4 border-white/10 rounded-full"></div>
-            <h1 className="text-2xl font-bold text-white mb-1 relative z-10"> {/* Reduced font size and margin */}
+            <h1 className="text-2xl font-bold text-white mb-1 relative z-10">
               Step 1: Create Your Venue
             </h1>
-            <p className="text-white/80 text-sm relative z-10"> {/* Reduced font size */}
+            <p className="text-white/80 text-sm relative z-10">
               Add your venue's details to get started.
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleNextStep} className="space-y-4"> {/* Reduced spacing */}
+        <form onSubmit={handleNextStep} className="space-y-4">
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden">
-            <div className="bg-primary-green p-3 relative overflow-hidden"> {/* Reduced padding */}
+            <div className="bg-primary-green p-3 relative overflow-hidden">
               <div className="absolute -top-8 -right-8 w-24 h-24 border-4 border-white/10 rounded-full"></div>
-              <h2 className="text-lg font-bold text-white flex items-center gap-2 relative z-10"> {/* Reduced font size */}
+              <h2 className="text-lg font-bold text-white flex items-center gap-2 relative z-10">
                 <FaMapMarkerAlt /> Venue Information
               </h2>
             </div>
 
-            <div className="p-4 space-y-3"> {/* Reduced padding and spacing */}
+            <div className="p-4 space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5"> {/* Reduced font size and margin */}
-                  Venue Images <span className="text-red-500">*</span>
-                </label>
+                <div className="flex justify-between items-center mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Venue Images <span className="text-red-500">*</span>
+                    </label>
+                    {imagePreviews.length > 0 && (
+                        <button type="button" onClick={clearImages} className="text-xs text-red-500 font-semibold flex items-center gap-1">
+                            <FaTrash /> Clear All
+                        </button>
+                    )}
+                </div>
+                
                 {imagePreviews.length > 0 && (
-                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-2"> {/* Smaller gaps */}
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-2">
                     {imagePreviews.map((preview, index) => (
                       <div key={index} className="relative">
-                        <img src={preview} alt={`Preview ${index}`} className="w-full h-16 object-cover rounded-md" /> {/* Smaller height */}
+                        <img src={preview} alt={`Preview ${index}`} className="w-full h-16 object-cover rounded-md" />
                       </div>
                     ))}
                   </div>
                 )}
-                <div className="relative border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:border-primary-green transition-colors"> {/* Reduced padding */}
-                  <FaImages className="mx-auto text-2xl text-slate-400 mb-1" /> {/* Smaller icon */}
-                  <p className="text-sm text-slate-600">Upload Images</p>
+
+                <div className="relative border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:border-primary-green transition-colors">
+                  <FaImages className="mx-auto text-2xl text-slate-400 mb-1" />
+                  <p className="text-sm text-slate-600">Add More Images</p>
                   <p className="text-xs text-slate-500 mt-1">(Re-select if you go back)</p>
                   <input type="file" onChange={handleImageChange} multiple className="absolute inset-0 w-full h-full opacity-0" />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3"> {/* Smaller gap */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <input name="name" type="text" value={venueDetails.name} onChange={handleVenueChange} required className="w-full py-2 px-3 bg-white/50 border rounded-lg text-sm" placeholder="Venue Name *" />
                 <input name="address" type="text" value={venueDetails.address} onChange={handleVenueChange} required className="w-full py-2 px-3 bg-white/50 border rounded-lg text-sm" placeholder="Full Address *" />
                 <input name="city" type="text" value={venueDetails.city} onChange={handleVenueChange} required className="w-full py-2 px-3 bg-white/50 border rounded-lg text-sm" placeholder="City *" />

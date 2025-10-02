@@ -1,4 +1,3 @@
-// src/pages/admin/AdminUserManagementPage.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../supabaseClient";
 import { useModal } from "../../ModalContext";
@@ -11,7 +10,6 @@ import {
   FaFilter,
   FaEnvelope,
   FaCalendarAlt,
-  FaEdit,
   FaTrash,
   FaBan,
   FaCheck,
@@ -19,8 +17,8 @@ import {
 } from "react-icons/fa";
 import StatsCard from "../../components/common/StatsCard";
 
-// UserCard and EmptyState components remain the same...
-const UserCard = ({ user, onRoleChange, onDeleteUser, onToggleStatus }) => {
+// UserCard component updated to remove "Make Admin" button
+const UserCard = ({ user, currentUser, onRoleChange, onDeleteUser, onToggleStatus }) => {
   const getRoleConfig = (role) => {
     switch (role) {
       case "player":
@@ -57,6 +55,9 @@ const UserCard = ({ user, onRoleChange, onDeleteUser, onToggleStatus }) => {
   const roleConfig = getRoleConfig(user.role);
   const RoleIcon = roleConfig.icon;
   const isActive = user.status !== "suspended";
+  
+  const isProtectedAdmin = user.role === 'admin';
+  const isSelf = currentUser && currentUser.id === user.user_id;
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 hover:shadow-lg hover:border-green-300 transition-all duration-300 group overflow-hidden">
@@ -69,6 +70,7 @@ const UserCard = ({ user, onRoleChange, onDeleteUser, onToggleStatus }) => {
             <div className="flex-1 min-w-0">
               <h3 className="text-xl font-semibold text-gray-900 mb-1 truncate group-hover:text-green-700 transition-colors">
                 {user.username || "No Username"}
+                {isSelf && <span className="text-sm text-gray-500 ml-2">(You)</span>}
               </h3>
               <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
                 <FaEnvelope className="text-xs" />
@@ -105,70 +107,44 @@ const UserCard = ({ user, onRoleChange, onDeleteUser, onToggleStatus }) => {
             </div>
           </div>
         </div>
-
-        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <div className="w-4 h-4 bg-green-200 rounded-full flex items-center justify-center">
-              <span className="text-xs font-bold text-green-700">ID</span>
-            </div>
-            <span>#{user.user_id.substring(0, 8)}...</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <FaUsers className="text-green-600" />
-            <span>{user.role?.replace("_", " ") || "No Role"}</span>
-          </div>
-        </div>
       </div>
 
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-        <div className="flex gap-2 flex-wrap">
-          {user.role !== "player" && (
-            <button
-              onClick={() => onRoleChange(user.user_id, "player")}
-              className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-medium rounded-lg transition-all duration-200 hover:shadow-sm"
-            >
-              Make Player
-            </button>
-          )}
-          {user.role !== "venue_owner" && (
-            <button
-              onClick={() => onRoleChange(user.user_id, "venue_owner")}
-              className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-800 text-xs font-medium rounded-lg transition-all duration-200 hover:shadow-sm"
-            >
-              Make Owner
-            </button>
-          )}
-          {user.role !== "admin" && (
-            <button
-              onClick={() => onRoleChange(user.user_id, "admin")}
-              className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-800 text-xs font-medium rounded-lg transition-all duration-200 hover:shadow-sm"
-            >
-              Make Admin
-            </button>
-          )}
-          <button
-            onClick={() =>
-              onToggleStatus(user.user_id, isActive ? "suspended" : "active")
-            }
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 hover:shadow-sm ${
-              isActive
-                ? "bg-red-100 hover:bg-red-200 text-red-800"
-                : "bg-green-100 hover:bg-green-200 text-green-800"
-            }`}
-          >
-            {isActive ? (
-              <>
-                <FaBan className="inline mr-1" />
-                Suspend
-              </>
-            ) : (
-              <>
-                <FaCheck className="inline mr-1" />
-                Activate
-              </>
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 min-h-[68px]">
+        { !isProtectedAdmin ? (
+          <div className="flex gap-2 flex-wrap">
+            {user.role !== "player" && (
+              <button
+                onClick={() => onRoleChange(user.user_id, "player")}
+                className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-medium rounded-lg transition-all duration-200 hover:shadow-sm"
+              >
+                Make Player
+              </button>
             )}
-          </button>
-          {user.role !== "admin" && (
+            {user.role !== "venue_owner" && (
+              <button
+                onClick={() => onRoleChange(user.user_id, "venue_owner")}
+                className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-800 text-xs font-medium rounded-lg transition-all duration-200 hover:shadow-sm"
+              >
+                Make Owner
+              </button>
+            )}
+            {/* "Make Admin" button has been permanently removed */}
+            <button
+              onClick={() =>
+                onToggleStatus(user.user_id, isActive ? "suspended" : "active")
+              }
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 hover:shadow-sm ${
+                isActive
+                  ? "bg-red-100 hover:bg-red-200 text-red-800"
+                  : "bg-green-100 hover:bg-green-200 text-green-800"
+              }`}
+            >
+              {isActive ? (
+                <><FaBan className="inline mr-1" /> Suspend</>
+              ) : (
+                <><FaCheck className="inline mr-1" /> Activate</>
+              )}
+            </button>
             <button
               onClick={() => onDeleteUser(user.user_id)}
               className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 text-xs font-medium rounded-lg transition-all duration-200 hover:shadow-sm ml-auto"
@@ -176,15 +152,19 @@ const UserCard = ({ user, onRoleChange, onDeleteUser, onToggleStatus }) => {
               <FaTrash className="inline mr-1" />
               Delete
             </button>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full">
+             <p className="text-xs text-gray-500 font-semibold">ADMIN ACTIONS DISABLED</p>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
+
 const EmptyState = ({ activeTab }) => {
-  // ... (This component remains the same)
   const config = {
     all: {
       icon: FaUsers,
@@ -246,7 +226,16 @@ function AdminUserManagementPage() {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentUser, setCurrentUser] = useState(null);
   const { showModal } = useModal();
+
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        setCurrentUser(user);
+    };
+    fetchCurrentUser();
+  }, []);
 
   const fetchUsers = useCallback(async (currentSearchTerm) => {
     setLoading(true);
@@ -269,7 +258,9 @@ function AdminUserManagementPage() {
       if (error) throw error;
       setUsers(data || []);
     } catch (err) {
-      setError(err.message);
+      setError(
+        "Could not fetch users. Please ensure the correct RLS policies are active for the 'users' table in your Supabase dashboard."
+      );
       console.error("Error fetching users:", err);
     } finally {
       setLoading(false);
@@ -285,8 +276,7 @@ function AdminUserManagementPage() {
   }, [searchTerm, fetchUsers]);
 
   const refetch = () => fetchUsers(searchTerm);
-
-  // ... (handleRoleChange, handleToggleStatus, handleDeleteUser remain the same)
+  
   const handleRoleChange = async (userId, newRole) => {
     const confirmed = await showModal({
       title: "Change User Role",
@@ -397,18 +387,14 @@ function AdminUserManagementPage() {
     }
   };
 
-  // --- MODIFICATION: Simplified filtering logic ---
   const filteredUsers = useMemo(() => {
-    // The `users` state is already filtered by search term on the server.
-    // We only need to apply the tab filter client-side.
     if (activeTab === "all") return users;
     if (activeTab === "suspended")
       return users.filter((u) => u.status === "suspended");
-    return users.filter((u) => u.role === activeTab.replace("_", " "));
+    return users.filter((u) => u.role === activeTab);
   }, [users, activeTab]);
-  // --- END MODIFICATION ---
 
-  const statsData = [
+  const statsData = useMemo(() => [
     {
       title: "Total Users",
       count: users.length,
@@ -437,22 +423,22 @@ function AdminUserManagementPage() {
       color: "bg-purple-500",
       bgColor: "bg-white",
     },
-  ];
+  ], [users]);
 
-  const tabData = [
+  const tabData = useMemo(() => [
     { key: "all", label: "All Users", count: users.length },
     {
-      key: "players",
+      key: "player",
       label: "Players",
       count: users.filter((u) => u.role === "player").length,
     },
     {
-      key: "venue_owners",
+      key: "venue_owner",
       label: "Venue Owners",
       count: users.filter((u) => u.role === "venue_owner").length,
     },
     {
-      key: "admins",
+      key: "admin",
       label: "Admins",
       count: users.filter((u) => u.role === "admin").length,
     },
@@ -461,15 +447,14 @@ function AdminUserManagementPage() {
       label: "Suspended",
       count: users.filter((u) => u.status === "suspended").length,
     },
-  ];
+  ], [users]);
 
-  // ... (Rest of the component's JSX remains the same, but now uses `filteredUsers`)
-  if (loading)
+  if (loading || !currentUser)
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading users...</p>
+          <p className="text-gray-600 text-lg">Loading user data...</p>
         </div>
       </div>
     );
@@ -556,6 +541,7 @@ function AdminUserManagementPage() {
               <UserCard
                 key={user.user_id}
                 user={user}
+                currentUser={currentUser}
                 onRoleChange={handleRoleChange}
                 onDeleteUser={handleDeleteUser}
                 onToggleStatus={handleToggleStatus}
