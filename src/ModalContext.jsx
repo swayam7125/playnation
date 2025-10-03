@@ -1,37 +1,40 @@
-import React, { createContext, useState, useContext, useCallback } from 'react';
-import Modal from './components/common/Modal';
+import React, { createContext, useState, useContext, useCallback } from "react";
+import Modal from "./components/common/Modal";
 
 const ModalContext = createContext();
 
 export const useModal = () => useContext(ModalContext);
 
 export const ModalProvider = ({ children }) => {
-  const [modalState, setModalState] = useState(null);
+  const [modalQueue, setModalQueue] = useState([]);
 
   const showModal = useCallback((options) => {
     return new Promise((resolve) => {
-      setModalState({
+      const modal = {
         ...options,
         onConfirm: (result) => {
-          setModalState(null);
-          resolve(result); // Resolve with the input value or true
+          setModalQueue((q) => q.slice(1)); // Remove the current modal from the queue
+          resolve(result);
         },
         onCancel: () => {
-          setModalState(null);
-          resolve(null); // Resolve with null when cancelled
+          setModalQueue((q) => q.slice(1)); // Remove the current modal from the queue
+          resolve(null);
         },
-      });
+      };
+      setModalQueue((q) => [...q, modal]); // Add the new modal to the end of the queue
     });
   }, []);
 
   const hideModal = useCallback(() => {
-    setModalState(null);
+    setModalQueue((q) => q.slice(1));
   }, []);
+
+  const currentModal = modalQueue[0];
 
   return (
     <ModalContext.Provider value={{ showModal, hideModal }}>
       {children}
-      {modalState && <Modal {...modalState} />}
+      {currentModal && <Modal {...currentModal} />}
     </ModalContext.Provider>
   );
 };

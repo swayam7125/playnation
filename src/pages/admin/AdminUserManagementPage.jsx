@@ -10,15 +10,15 @@ import {
   FaFilter,
   FaEnvelope,
   FaCalendarAlt,
-  FaTrash,
   FaBan,
   FaCheck,
   FaExclamationTriangle,
+  FaEye,
 } from "react-icons/fa";
 import StatsCard from "../../components/common/StatsCard";
+import UserDetailsModal from "./UserDetailsModal";
 
-// UserCard component updated to remove "Make Admin" button
-const UserCard = ({ user, currentUser, onRoleChange, onDeleteUser, onToggleStatus }) => {
+const UserCard = ({ user, currentUser, onToggleStatus, onViewDetails }) => {
   const getRoleConfig = (role) => {
     switch (role) {
       case "player":
@@ -55,8 +55,8 @@ const UserCard = ({ user, currentUser, onRoleChange, onDeleteUser, onToggleStatu
   const roleConfig = getRoleConfig(user.role);
   const RoleIcon = roleConfig.icon;
   const isActive = user.status !== "suspended";
-  
-  const isProtectedAdmin = user.role === 'admin';
+
+  const isProtectedAdmin = user.role === "admin";
   const isSelf = currentUser && currentUser.id === user.user_id;
 
   return (
@@ -70,7 +70,9 @@ const UserCard = ({ user, currentUser, onRoleChange, onDeleteUser, onToggleStatu
             <div className="flex-1 min-w-0">
               <h3 className="text-xl font-semibold text-gray-900 mb-1 truncate group-hover:text-green-700 transition-colors">
                 {user.username || "No Username"}
-                {isSelf && <span className="text-sm text-gray-500 ml-2">(You)</span>}
+                {isSelf && (
+                  <span className="text-sm text-gray-500 ml-2">(You)</span>
+                )}
               </h3>
               <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
                 <FaEnvelope className="text-xs" />
@@ -110,59 +112,46 @@ const UserCard = ({ user, currentUser, onRoleChange, onDeleteUser, onToggleStatu
       </div>
 
       <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 min-h-[68px]">
-        { !isProtectedAdmin ? (
-          <div className="flex gap-2 flex-wrap">
-            {user.role !== "player" && (
-              <button
-                onClick={() => onRoleChange(user.user_id, "player")}
-                className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-medium rounded-lg transition-all duration-200 hover:shadow-sm"
-              >
-                Make Player
-              </button>
-            )}
-            {user.role !== "venue_owner" && (
-              <button
-                onClick={() => onRoleChange(user.user_id, "venue_owner")}
-                className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-800 text-xs font-medium rounded-lg transition-all duration-200 hover:shadow-sm"
-              >
-                Make Owner
-              </button>
-            )}
-            {/* "Make Admin" button has been permanently removed */}
+        {!isProtectedAdmin ? (
+          <div className="flex gap-3">
             <button
               onClick={() =>
-                onToggleStatus(user.user_id, isActive ? "suspended" : "active")
+                onToggleStatus(user, isActive ? "suspended" : "active")
               }
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 hover:shadow-sm ${
+              className={`px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 flex-1 inline-flex items-center justify-center gap-2 ${
                 isActive
-                  ? "bg-red-100 hover:bg-red-200 text-red-800"
-                  : "bg-green-100 hover:bg-green-200 text-green-800"
+                  ? "bg-red-600 hover:bg-red-700 text-white"
+                  : "bg-green-500 hover:bg-green-600 text-white"
               }`}
             >
               {isActive ? (
-                <><FaBan className="inline mr-1" /> Suspend</>
+                <>
+                  <FaBan /> Suspend
+                </>
               ) : (
-                <><FaCheck className="inline mr-1" /> Activate</>
+                <>
+                  <FaCheck /> Activate
+                </>
               )}
             </button>
             <button
-              onClick={() => onDeleteUser(user.user_id)}
-              className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 text-xs font-medium rounded-lg transition-all duration-200 hover:shadow-sm ml-auto"
+              onClick={() => onViewDetails(user)}
+              className="px-4 py-2.5 bg-white hover:bg-gray-100 text-gray-600 text-sm font-medium rounded-xl transition-all duration-200 border border-gray-200"
             >
-              <FaTrash className="inline mr-1" />
-              Delete
+              <FaEye />
             </button>
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">
-             <p className="text-xs text-gray-500 font-semibold">ADMIN ACTIONS DISABLED</p>
+            <p className="text-xs text-gray-500 font-semibold">
+              ADMIN ACTIONS DISABLED
+            </p>
           </div>
         )}
       </div>
     </div>
   );
 };
-
 
 const EmptyState = ({ activeTab }) => {
   const config = {
@@ -172,23 +161,23 @@ const EmptyState = ({ activeTab }) => {
       description: "No users match your current search criteria.",
       color: "text-medium-text",
     },
-    players: {
+    player: {
       icon: FaUserCircle,
       title: "No Players Found",
       description: "No players match your current search criteria.",
       color: "text-blue-500",
     },
-    venue_owners: {
+    venue_owner: {
       icon: FaUserCog,
       title: "No Venue Owners Found",
       description: "No venue owners match your current search criteria.",
       color: "text-green-500",
     },
-    admins: {
+    admin: {
       icon: FaUserShield,
       title: "No Admins Found",
       description: "No admin users match your current search criteria.",
-      color: "purple-500",
+      color: "text-purple-500",
     },
     suspended: {
       icon: FaBan,
@@ -227,33 +216,18 @@ function AdminUserManagementPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isUserDetailsModalOpen, setIsUserDetailsModalOpen] = useState(false);
   const { showModal } = useModal();
 
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        setCurrentUser(user);
-    };
-    fetchCurrentUser();
-  }, []);
-
-  const fetchUsers = useCallback(async (currentSearchTerm) => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from("users")
         .select("*")
         .order("registration_date", { ascending: false });
-
-      if (currentSearchTerm) {
-        const searchPattern = `%${currentSearchTerm.toLowerCase()}%`;
-        query = query.or(
-          `username.ilike.${searchPattern},email.ilike.${searchPattern},role.ilike.${searchPattern},status.ilike.${searchPattern}`
-        );
-      }
-
-      const { data, error } = await query;
 
       if (error) throw error;
       setUsers(data || []);
@@ -268,186 +242,134 @@ function AdminUserManagementPage() {
   }, []);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      fetchUsers(searchTerm);
-    }, 300);
+    fetchUsers();
+    const fetchCurrentUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setCurrentUser(user);
+    };
+    fetchCurrentUser();
+  }, [fetchUsers]);
 
-    return () => clearTimeout(timeout);
-  }, [searchTerm, fetchUsers]);
-
-  const refetch = () => fetchUsers(searchTerm);
-  
-  const handleRoleChange = async (userId, newRole) => {
+  const handleToggleStatus = async (userToUpdate, newStatus) => {
+    const action = newStatus === "suspended" ? "Suspend" : "Activate";
     const confirmed = await showModal({
-      title: "Change User Role",
-      message: `Are you sure you want to change this user's role to "${newRole.replace(
-        "_",
-        " "
-      )}"?`,
-      confirmText: "Yes, Change Role",
-      confirmStyle: "primary",
-    });
-
-    if (confirmed) {
-      try {
-        const { error } = await supabase
-          .from("users")
-          .update({ role: newRole })
-          .eq("user_id", userId);
-
-        if (error) {
-          showModal({
-            title: "Error",
-            message: `Failed to update user role: ${error.message}`,
-          });
-          return;
-        }
-        showModal({
-          title: "Success",
-          message: "User role updated successfully!",
-        });
-        refetch();
-      } catch (err) {
-        showModal({
-          title: "Error",
-          message: `An unexpected error occurred: ${err.message}`,
-        });
-      }
-    }
-  };
-
-  const handleToggleStatus = async (userId, newStatus) => {
-    const action = newStatus === "suspended" ? "suspend" : "activate";
-    const confirmed = await showModal({
-      title: `${action.charAt(0).toUpperCase() + action.slice(1)} User`,
-      message: `Are you sure you want to ${action} this user?`,
-      confirmText: `Yes, ${action.charAt(0).toUpperCase() + action.slice(1)}`,
+      title: `${action} User`,
+      message: `Are you sure you want to ${action.toLowerCase()} this user?`,
+      confirmText: `Yes, ${action}`,
       confirmStyle: newStatus === "suspended" ? "danger" : "primary",
     });
 
-    if (confirmed) {
-      try {
-        const { error } = await supabase
-          .from("users")
-          .update({ status: newStatus })
-          .eq("user_id", userId);
+    if (!confirmed) return;
 
-        if (error) {
-          showModal({
-            title: "Error",
-            message: `Failed to ${action} user: ${error.message}`,
-          });
-          return;
-        }
-        showModal({
-          title: "Success",
-          message: `User ${action}d successfully!`,
-        });
-        refetch();
-      } catch (err) {
-        showModal({
-          title: "Error",
-          message: `An unexpected error occurred: ${err.message}`,
-        });
+    // Optimistic UI update for instant feedback
+    const originalUsers = users;
+    const updatedUser = { ...userToUpdate, status: newStatus };
+    setUsers((currentUsers) =>
+      currentUsers.map((u) =>
+        u.user_id === userToUpdate.user_id ? updatedUser : u
+      )
+    );
+
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ status: newStatus })
+        .eq("user_id", userToUpdate.user_id);
+
+      if (error) {
+        // If there's an error, revert the UI change and show an error modal
+        setUsers(originalUsers);
+        throw error;
       }
+    } catch (err) {
+      showModal({
+        title: "Update Failed",
+        message: `Could not update the user's status. Please check your network connection and Supabase Row Level Security (RLS) policies for the 'users' table. Error: ${err.message}`,
+      });
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    const confirmed = await showModal({
-      title: "Delete User",
-      message:
-        "Are you sure you want to permanently delete this user? This action cannot be undone.",
-      confirmText: "Yes, Delete",
-      confirmStyle: "danger",
-    });
-
-    if (confirmed) {
-      try {
-        const { error } = await supabase
-          .from("users")
-          .delete()
-          .eq("user_id", userId);
-
-        if (error) {
-          showModal({
-            title: "Error",
-            message: `Failed to delete user: ${error.message}`,
-          });
-          return;
-        }
-        showModal({ title: "Success", message: "User deleted successfully!" });
-        refetch();
-      } catch (err) {
-        showModal({
-          title: "Error",
-          message: `An unexpected error occurred: ${err.message}`,
-        });
-      }
-    }
+  const handleViewDetails = (user) => {
+    setSelectedUser(user);
+    setIsUserDetailsModalOpen(true);
   };
 
   const filteredUsers = useMemo(() => {
-    if (activeTab === "all") return users;
+    const lowercasedFilter = searchTerm.toLowerCase();
+    const filtered = users.filter(
+      (user) =>
+        (user.username?.toLowerCase() || "").includes(lowercasedFilter) ||
+        (user.email?.toLowerCase() || "").includes(lowercasedFilter)
+    );
+
+    if (activeTab === "all") return filtered;
     if (activeTab === "suspended")
-      return users.filter((u) => u.status === "suspended");
-    return users.filter((u) => u.role === activeTab);
-  }, [users, activeTab]);
+      return filtered.filter((u) => u.status === "suspended");
+    return filtered.filter((u) => u.role === activeTab);
+  }, [users, activeTab, searchTerm]);
 
-  const statsData = useMemo(() => [
-    {
-      title: "Total Users",
-      count: users.length,
-      icon: FaUsers,
-      color: "bg-blue-500",
-      bgColor: "bg-white",
-    },
-    {
-      title: "Players",
-      count: users.filter((u) => u.role === "player").length,
-      icon: FaUserCircle,
-      color: "bg-blue-500",
-      bgColor: "bg-white",
-    },
-    {
-      title: "Venue Owners",
-      count: users.filter((u) => u.role === "venue_owner").length,
-      icon: FaUserCog,
-      color: "bg-green-500",
-      bgColor: "bg-white",
-    },
-    {
-      title: "Admins",
-      count: users.filter((u) => u.role === "admin").length,
-      icon: FaUserShield,
-      color: "bg-purple-500",
-      bgColor: "bg-white",
-    },
-  ], [users]);
+  const statsData = useMemo(
+    () => [
+      {
+        title: "Total Users",
+        count: users.length,
+        icon: FaUsers,
+        color: "bg-blue-500",
+        bgColor: "bg-white",
+      },
+      {
+        title: "Players",
+        count: users.filter((u) => u.role === "player").length,
+        icon: FaUserCircle,
+        color: "bg-blue-500",
+        bgColor: "bg-white",
+      },
+      {
+        title: "Venue Owners",
+        count: users.filter((u) => u.role === "venue_owner").length,
+        icon: FaUserCog,
+        color: "bg-green-500",
+        bgColor: "bg-white",
+      },
+      {
+        title: "Admins",
+        count: users.filter((u) => u.role === "admin").length,
+        icon: FaUserShield,
+        color: "bg-purple-500",
+        bgColor: "bg-white",
+      },
+    ],
+    [users]
+  );
 
-  const tabData = useMemo(() => [
-    { key: "all", label: "All Users", count: users.length },
-    {
-      key: "player",
-      label: "Players",
-      count: users.filter((u) => u.role === "player").length,
-    },
-    {
-      key: "venue_owner",
-      label: "Venue Owners",
-      count: users.filter((u) => u.role === "venue_owner").length,
-    },
-    {
-      key: "admin",
-      label: "Admins",
-      count: users.filter((u) => u.role === "admin").length,
-    },
-    {
-      key: "suspended",
-      label: "Suspended",
-      count: users.filter((u) => u.status === "suspended").length,
-    },
-  ], [users]);
+  const tabData = useMemo(
+    () => [
+      { key: "all", label: "All Users", count: users.length },
+      {
+        key: "player",
+        label: "Players",
+        count: users.filter((u) => u.role === "player").length,
+      },
+      {
+        key: "venue_owner",
+        label: "Venue Owners",
+        count: users.filter((u) => u.role === "venue_owner").length,
+      },
+      {
+        key: "admin",
+        label: "Admins",
+        count: users.filter((u) => u.role === "admin").length,
+      },
+      {
+        key: "suspended",
+        label: "Suspended",
+        count: users.filter((u) => u.status === "suspended").length,
+      },
+    ],
+    [users]
+  );
 
   if (loading || !currentUser)
     return (
@@ -471,7 +393,7 @@ function AdminUserManagementPage() {
           </h2>
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={() => fetchUsers("")}
+            onClick={fetchUsers}
             className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-xl transition-colors duration-200"
           >
             Try Again
@@ -501,10 +423,10 @@ function AdminUserManagementPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
             <div className="relative flex-1 max-w-md">
-              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm" />
+              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1-2 text-gray-400 text-sm" />
               <input
                 type="text"
-                placeholder="Search users by name, email, or role..."
+                placeholder="Search users by name or email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 placeholder-gray-500"
@@ -542,9 +464,8 @@ function AdminUserManagementPage() {
                 key={user.user_id}
                 user={user}
                 currentUser={currentUser}
-                onRoleChange={handleRoleChange}
-                onDeleteUser={handleDeleteUser}
                 onToggleStatus={handleToggleStatus}
+                onViewDetails={handleViewDetails}
               />
             ))
           ) : (
@@ -552,6 +473,12 @@ function AdminUserManagementPage() {
           )}
         </div>
       </div>
+      {isUserDetailsModalOpen && (
+        <UserDetailsModal
+          user={selectedUser}
+          onClose={() => setIsUserDetailsModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
