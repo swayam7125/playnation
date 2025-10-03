@@ -74,8 +74,14 @@ const OfferForm = ({ offer, onSave, onCancel }) => {
           .from("facilities")
           .select("sports(sport_id, name)")
           .eq("venue_id", formData.venue_id);
-        const sports = data?.map((item) => item.sports).filter(Boolean) || [];
-        setAvailableSports(sports);
+        // Flatten and deduplicate the sports array
+        const uniqueSports = new Map();
+        data?.forEach(item => {
+          if (item.sports) {
+            uniqueSports.set(item.sports.sport_id, item.sports);
+          }
+        });
+        setAvailableSports(Array.from(uniqueSports.values()));
       } else {
         setAvailableSports([]);
       }
