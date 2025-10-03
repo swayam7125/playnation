@@ -21,7 +21,7 @@ function OwnerVenueCard({ venue }) {
     const statusConfig = {
         approved: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700' },
         pending: { label: 'Pending', color: 'bg-amber-100 text-amber-700' },
-        rejected: { label: 'Review', color: 'bg-red-100 text-red-700' }
+        rejected: { label: 'Suspended', color: 'bg-red-100 text-red-700' }
     };
     const currentStatus = statusConfig[cardStatus];
 

@@ -8,7 +8,7 @@ function MyVenuesPage() {
   const { user } = useAuth();
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('approved');
 
   useEffect(() => {
     const fetchOwnerVenues = async () => {
@@ -40,10 +40,10 @@ function MyVenuesPage() {
   });
 
   const tabData = [
-    { key: 'all', label: 'All Venues', count: venues.length },
-    { key: 'pending', label: 'Pending', count: venues.filter(v => !v.is_approved && !v.rejection_reason).length },
     { key: 'approved', label: 'Active', count: venues.filter(v => v.is_approved).length },
-    { key: 'rejected', label: 'Review', count: venues.filter(v => !!v.rejection_reason).length }
+    { key: 'pending', label: 'Pending', count: venues.filter(v => !v.is_approved && !v.rejection_reason).length },
+    { key: 'rejected', label: 'suspended', count: venues.filter(v => !!v.rejection_reason).length },
+    { key: 'all', label: 'All Venues', count: venues.length }
   ];
 
   return (

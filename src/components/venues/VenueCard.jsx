@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { FaTrophy, FaStar, FaMapMarkerAlt } from "react-icons/fa";
+import { FaMapMarkerAlt } from "react-icons/fa";
 
 // Import Swiper React components and modules
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -24,12 +24,11 @@ function VenueCard({ venue, viewMode = "grid" }) {
       : venue.image_url?.[0]
       ? [venue.image_url[0]]
       : [placeholderImage];
-  // This function now requests a smaller, optimized image from Supabase
+
   const getImageUrl = (url) => {
     if (!url) return placeholderImage;
-    // Checks if the URL is a Supabase Storage URL before applying transformations
     return url.includes("supabase.co")
-      ? `${url}?width=300&height=200&resize=cover` // Request a 300x200 cover image
+      ? `${url}?width=600&height=400&resize=cover`
       : url;
   };
 
@@ -52,8 +51,18 @@ function VenueCard({ venue, viewMode = "grid" }) {
       onMouseLeave={() => setIsHovered(false)}
       onClick={handleCardClick}
     >
-      <div className="bg-card-bg rounded-2xl shadow-sm border border-border-color-light hover:shadow-lg hover:border-primary-green/20 transition-all duration-300 group overflow-hidden h-full flex flex-col w-[300px] cursor-pointer">
-        <div className="relative w-full h-48 overflow-hidden">
+      <div
+        className={`bg-card-bg rounded-xl shadow-md border border-border-color-light 
+          hover:shadow-lg hover:border-primary-green/30 transition-all duration-300 
+          group overflow-hidden cursor-pointer
+          ${viewMode === "grid" ? "flex flex-col w-[300px] h-full" : "flex flex-row w-full h-52"}`}
+      >
+        {/* IMAGE */}
+        <div
+          className={`${
+            viewMode === "grid" ? "w-full h-48" : "w-64 h-full"
+          } relative overflow-hidden`}
+        >
           {isHovered && imagesToDisplay.length > 1 ? (
             <Swiper
               modules={[Navigation, Pagination, Autoplay]}
@@ -90,46 +99,48 @@ function VenueCard({ venue, viewMode = "grid" }) {
               }}
             />
           )}
-
-          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 flex items-center justify-center">
-            <div className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <span className="text-sm font-medium">Click to view details</span>
-            </div>
-          </div>
         </div>
 
-        <div className="p-5 flex flex-col flex-grow">
-          <h3 className="text-lg font-bold text-dark-text mb-2 group-hover:text-primary-green-dark transition-colors">
-            {venue.name}
-          </h3>
-          <p className="text-sm text-medium-text mb-4 flex-grow flex items-center">
-            <FaMapMarkerAlt className="mr-1 text-primary-green" />
-            {venue.address}, {venue.city}
-          </p>
-          <div className="mt-auto space-y-3">
-            {availableSports.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {availableSports.slice(0, 3).map((sport) => (
-                  <span
-                    key={sport}
-                    className="bg-light-green-bg text-emerald-800 py-1 px-3 rounded-full text-xs font-semibold border border-emerald-200"
-                  >
-                    {sport}
-                  </span>
-                ))}
-                {availableSports.length > 3 && (
-                  <span className="bg-gray-100 text-gray-600 py-1 px-3 rounded-full text-xs font-semibold border border-gray-200">
-                    +{availableSports.length - 3} more
-                  </span>
-                )}
-              </div>
-            )}
+        {/* INFO */}
+        <div
+          className={`p-5 flex flex-col flex-grow 
+            ${viewMode === "list" ? "justify-between" : ""}`}
+        >
+          {/* Title & Address */}
+          <div>
+            <h3 className="text-xl font-semibold text-dark-text mb-1 group-hover:text-primary-green-dark transition-colors">
+              {venue.name}
+            </h3>
+            <p className="text-sm text-medium-text flex items-center">
+              <FaMapMarkerAlt className="mr-1 text-primary-green" />
+              {venue.address}, {venue.city}
+            </p>
+          </div>
 
-            <div className="pt-2">
-              <div className="text-xs text-primary-green font-semibold group-hover:text-primary-green-dark transition-colors">
-                View Details & Book →
-              </div>
+          {/* Sports Tags */}
+          {availableSports.length > 0 && (
+            <div className="flex gap-2 mt-3 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+              {availableSports.slice(0, 4).map((sport) => (
+                <span
+                  key={sport}
+                  className="bg-light-green-bg text-emerald-800 px-3 py-1 rounded-full text-xs font-medium border border-emerald-200 whitespace-nowrap"
+                >
+                  {sport}
+                </span>
+              ))}
+              {availableSports.length > 4 && (
+                <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-medium border border-gray-200 whitespace-nowrap">
+                  +{availableSports.length - 4} more
+                </span>
+              )}
             </div>
+          )}
+
+          {/* CTA */}
+          <div className="flex justify-end mt-4">
+            <span className="text-sm font-semibold text-primary-green group-hover:text-primary-green-dark transition-colors">
+              View Details & Book →
+            </span>
           </div>
         </div>
       </div>

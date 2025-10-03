@@ -19,29 +19,45 @@ function LoginForm() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
+    setError("");
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
-      });
+      const { data: authData, error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
       if (signInError) throw signInError;
 
-      const userProfile = await updateUser();
+      const user = authData.user;
+      if (user) {
+        const { data: userRole, error: roleError } = await supabase.rpc(
+          "get_user_role"
+        );
 
-      if (userProfile?.role === "venue_owner") {
-        navigate("/owner/dashboard");
-      } else if (userProfile?.role === "admin") {
-        navigate("/admin/venues");
-      } else if (from) {
-        navigate(from.pathname, { state: from.state, replace: true });
-      } else {
-        navigate("/explore");
+        if (roleError) {
+          console.error("Error fetching user role:", roleError);
+          throw new Error("Could not fetch user role.");
+        }
+
+        await updateUser();
+
+      if (userRole === "owner") {
+          navigate("/owner/dashboard");
+        } else if (userRole === "admin") {
+          navigate("/admin/venues");
+        } else {
+          navigate("/");
+        }
       }
     } catch (error) {
-      setError(error.message);
+      console.error("Error during login process:", error);
+      setError(
+        error.message ||
+          "Failed to log in. Please check your credentials."
+      );
     } finally {
       setLoading(false);
     }
