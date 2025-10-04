@@ -39,64 +39,80 @@ function BookingPage() {
   const totalAmount = price;
 
   const handleConfirmBooking = async () => {
-    if (!user) {
-      showModal({
-        title: "Login Required",
-        message: "Please log in to complete your booking.",
-      });
-      navigate("/login", { state: { from: location } });
-      return;
+  if (!user) {
+    showModal({
+      title: "Login Required",
+      message: "Please log in to complete your booking.",
+    });
+    navigate("/login", { state: { from: location } });
+    return;
+  }
+
+  setLoading(true);
+  setError(null);
+  
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error('No valid session found. Please log in again.');
     }
 
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, error: functionError } = await supabase.functions.invoke('create-booking', {
-        body: {
-          facility_id: facility.facility_id,
-          slot_id: slot.slot_id,
-          total_amount: totalAmount,
-        },
-      });
+    const facilityId = facility.facility_id || facility.id;
+    const slotId = slot.slot_id || slot.id;
+    
+    const { data, error: functionError } = await supabase.functions.invoke('create-booking', {
+      body: {
+        facility_id: facilityId,
+        slot_id: slotId,
+        total_amount: totalAmount,
+      },
+    });
 
-      if (functionError) {
-        // This will now catch errors like "Slot is already taken"
-        throw functionError;
-      }
-
-      // If successful, show the confirmation modal
-      await showModal({
-        title: "Success!",
-        message: data.message || `Your slot at ${venue.name} has been reserved.`,
-        confirmText: "Go to My Bookings",
-      });
-
-      navigate("/my-bookings"); 
+    if (functionError) {
+      let errorMessage = 'An error occurred while creating the booking';
       
-    } catch (err) {
-      // Try to parse a meaningful error message from the function's response
-      let errorMessage = err.message;
-      try {
-        const parsedError = JSON.parse(err.context?.responseText || '{}');
-        if (parsedError.error) {
-          errorMessage = parsedError.error;
+      if (functionError.context && typeof functionError.context.text === 'function') {
+        try {
+          const errorText = await functionError.context.text();
+          const errorData = JSON.parse(errorText);
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (e) {
+          // Use default error message
         }
-      } catch (e) {
-        // Fallback to the default error message if parsing fails
-        console.error("Could not parse error response:", err.message);
       }
-
-      setError(errorMessage);
-      showModal({
-        title: "Booking Failed",
-        message: errorMessage,
-        confirmText: "Close",
-        confirmStyle: "danger",
-      });
-    } finally {
-      setLoading(false);
+      
+      throw new Error(errorMessage);
     }
-  };
+
+    if (data?.error) {
+      throw new Error(data.error);
+    }
+
+    await showModal({
+      title: "Success!",
+      message: data?.message || `Your slot at ${venue.name} has been reserved.`,
+      confirmText: "Go to My Bookings",
+    });
+
+    navigate("/my-bookings");
+    
+  } catch (err) {
+    const errorMessage = err.message || "An unexpected error occurred. Please try again.";
+    
+    setError(errorMessage);
+    showModal({
+      title: "Booking Failed",
+      message: errorMessage,
+      confirmText: "Close",
+      confirmStyle: "danger",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">
@@ -207,12 +223,12 @@ function BookingPage() {
                   <span className="text-sm font-medium text-primary-green">
                     Time
                   </span>
-                </div >
+                </div>
                 <p className="text-dark-text font-semibold">
                   {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
                 </p>
-              </div >
-            </div >
+              </div>
+            </div>
 
             {/* Facility Details */}
             <div className="border-t border-border-color-light pt-6">
@@ -225,21 +241,21 @@ function BookingPage() {
                   <span className="font-semibold text-dark-text">
                     {facility.name}
                   </span>
-                </div >
+                </div>
                 <div className="flex justify-between items-center py-3 px-4 bg-hover-bg rounded-lg">
                   <span className="text-medium-text">Sport</span>
                   <span className="font-semibold text-dark-text">
                     {facility.sports.name}
-                  </span >
-                </div >
+                  </span>
+                </div>
                 <div className="flex justify-between items-center py-3 px-4 bg-hover-bg rounded-lg">
                   <span className="text-medium-text">Venue</span>
                   <span className="font-semibold text-dark-text">
                     {venue.name}
-                  </span >
-                </div >
-              </div >
-            </div >
+                  </span>
+                </div>
+              </div>
+            </div>
 
             {/* Payment Summary */}
             <div className="border-t border-border-color-light pt-6">
@@ -250,24 +266,24 @@ function BookingPage() {
                 <div className="flex justify-between items-center py-2">
                   <span className="text-medium-text">Booking Fee</span>
                   <span className="text-dark-text">₹{totalAmount}</span>
-                </div >
+                </div>
                 <div className="flex justify-between items-center py-2">
                   <span className="text-medium-text">Platform Fee</span>
                   <span className="text-dark-text">₹0</span>
-                </div >
+                </div>
                 <div className="border-t border-border-color-light pt-3">
                   <div className="flex justify-between items-center">
                     <span className="text-lg font-semibold text-dark-text">
                       Total Amount
-                    </span >
+                    </span>
                     <span className="text-xl font-bold text-primary-green">
                       ₹{totalAmount}
-                    </span >
-                  </div >
-                </div >
-              </div >
-            </div >
-          </div >
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Action Buttons */}
           <div className="p-6 bg-hover-bg border-t border-border-color-light">
@@ -318,20 +334,20 @@ function BookingPage() {
                   ) : (
                     "Proceed to Pay"
                   )}
-                </div >
+                </div>
               </button>
-            </div >
-          </div >
-        </div >
+            </div>
+          </div>
+        </div>
 
         {/* Security Notice */}
         <div className="mt-6 text-center">
           <p className="text-sm text-light-text">
             🔒 Your payment information is secure and encrypted
           </p>
-        </div >
-      </div >
-    </div >
+        </div>
+      </div>
+    </div>
   );
 }
 
