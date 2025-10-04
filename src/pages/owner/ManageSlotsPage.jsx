@@ -1,442 +1,490 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../../supabaseClient';
-import { useAuth } from '../../AuthContext';
-import { useModal } from '../../ModalContext';
-import { FaTrash, FaPlusCircle, FaTimesCircle, FaEdit, FaBan, FaCheck, FaTimes, FaChevronLeft, FaChevronRight, FaClock, FaCalendarAlt, FaMapMarkerAlt, FaCheckDouble } from 'react-icons/fa';
+// src/pages/owner/ManageSlotsPage.jsx
+import React, { useState, useEffect, useCallback } from "react";
+import { supabase } from "../../supabaseClient";
+import { useAuth } from "../../AuthContext";
+import {
+  FiChevronLeft,
+  FiChevronRight,
+  FiPlus,
+  FiAlertTriangle,
+  FiCheckCircle,
+  FiSettings,
+} from "react-icons/fi";
+import {
+  format,
+  addDays,
+  startOfDay,
+  eachDayOfInterval,
+  parse,
+  addMinutes,
+  isBefore,
+  isSameDay,
+  isToday,
+  startOfMonth,
+  endOfMonth,
+  getDay,
+  subMonths,
+  addMonths,
+} from "date-fns";
+import AddSlotsModal from "../../components/bookings/AddSlotsModal";
 
-// Helper function to get today's date string in local timezone
-const getTodayString = () => new Date().toISOString().split('T')[0];
+// --- Calendar Component ---
+const Calendar = ({
+  currentDate,
+  setCurrentDate,
+  calendarViewDate,
+  setCalendarViewDate,
+}) => {
+  const monthStart = startOfMonth(calendarViewDate);
+  const monthEnd = endOfMonth(calendarViewDate);
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const startingDay = getDay(monthStart);
+  const today = startOfDay(new Date());
 
-// Helper function to create timezone-aware timestamps
-const createTimezoneAwareTimestamp = (dateString, hour) => {
-    const date = new Date(dateString + 'T00:00:00');
-    date.setHours(hour, 0, 0, 0);
-    return date.toISOString();
-};
-
-// Helper function to parse timestamp and get local hour
-const getLocalHourFromTimestamp = (timestamp) => {
-    return new Date(timestamp).getHours();
-};
-
-// Helper function to format timestamp for display
-const formatTimestampForDisplay = (timestamp) => {
-    const date = new Date(timestamp);
-    return {
-        hour: date.getHours(),
-        displayTime: `${date.getHours().toString().padStart(2, '0')}:00 - ${(date.getHours() + 1).toString().padStart(2, '0')}:00`
-    };
-};
-
-// Helper component for form fields in the control panel
-const ControlField = ({ label, icon: Icon, children }) => (
-    <div className="space-y-3">
-        <label className="flex items-center gap-2 font-semibold text-dark-text"><Icon className="text-primary-green" />{label}</label>
-        {children}
+  return (
+    <div className="bg-card-bg p-4 rounded-2xl border border-border-color">
+      <div className="flex justify-between items-center mb-4">
+        <button
+          onClick={() => setCalendarViewDate(subMonths(calendarViewDate, 1))}
+          className="p-2 rounded-full hover:bg-hover-bg"
+        >
+          <FiChevronLeft />
+        </button>
+        <h3 className="font-bold text-dark-text">
+          {format(calendarViewDate, "MMMM yyyy")}
+        </h3>
+        <button
+          onClick={() => setCalendarViewDate(addMonths(calendarViewDate, 1))}
+          className="p-2 rounded-full hover:bg-hover-bg"
+        >
+          <FiChevronRight />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-xs text-light-text mb-2">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+          <div key={day}>{day}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: startingDay }).map((_, i) => (
+          <div key={`empty-${i}`} />
+        ))}
+        {daysInMonth.map((day) => (
+          <button
+            key={day.toString()}
+            onClick={() => setCurrentDate(day)}
+            disabled={isBefore(day, today)}
+            className={`
+                            h-8 w-8 rounded-full text-sm transition-colors
+                            ${
+                              isBefore(day, today)
+                                ? "text-gray-300 cursor-not-allowed"
+                                : ""
+                            }
+                            ${
+                              !isBefore(day, today) &&
+                              !isSameDay(day, currentDate) &&
+                              isToday(day)
+                                ? "text-primary-green font-bold border border-primary-green"
+                                : ""
+                            }
+                            ${
+                              !isBefore(day, today) &&
+                              !isSameDay(day, currentDate)
+                                ? "hover:bg-hover-bg"
+                                : ""
+                            }
+                            ${
+                              isSameDay(day, currentDate)
+                                ? "bg-primary-green text-white"
+                                : ""
+                            }
+                        `}
+          >
+            {format(day, "d")}
+          </button>
+        ))}
+      </div>
+      <button
+        onClick={() => setCurrentDate(today)}
+        className="w-full mt-4 py-2 text-sm font-semibold text-primary-green bg-light-green-bg rounded-lg hover:bg-primary-green hover:text-white transition-colors"
+      >
+        Go to Today
+      </button>
     </div>
-);
-
-// Helper component for rendering each time slot card
-const TimeSlotCard = ({ item, isSelected, facility, actions }) => {
-    const { hour, slot, status, booking_id } = item;
-    const { editingSlot, customPrice } = actions.editState;
-
-    const baseClasses = 'relative rounded-2xl p-6 min-h-[160px] flex flex-col justify-between transition-all duration-300 border-2';
-    const statusClasses = {
-        empty: 'border-border-color-light bg-hover-bg hover:border-primary-green hover:shadow-lg cursor-pointer transform hover:-translate-y-1',
-        selected: 'border-primary-green bg-light-green-bg shadow-lg ring-4 ring-primary-green/20 transform -translate-y-1',
-        available: 'border-primary-green/30 bg-card-bg shadow-md',
-        booked: 'border-red-200 bg-red-50 shadow-md',
-        blocked: 'border-gray-300 bg-gray-100 shadow-md'
-    };
-    const finalClass = `${baseClasses} ${status === 'empty' && isSelected ? statusClasses.selected : statusClasses[status]}`;
-    const stopPropagation = (fn) => (e) => { e.stopPropagation(); fn(); };
-
-    // Format display time for the slot
-    const displayTime = slot ? formatTimestampForDisplay(slot.start_time) : 
-        { hour, displayTime: `${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00` };
-
-    const renderContent = () => {
-        switch (status) {
-            case 'available':
-                return (
-                    <div className="space-y-4">
-                        <div className="text-center">
-                            {editingSlot === slot.slot_id ? (
-                                <div className="space-y-2">
-                                    <input type="number" value={customPrice} onChange={(e) => actions.editState.setCustomPrice(e.target.value)} placeholder={`₹${facility?.hourly_rate}`} className="w-full text-center p-2 rounded-lg border border-border-color text-lg font-bold" />
-                                    <div className="flex justify-center gap-1">
-                                        <button onClick={stopPropagation(() => actions.onSavePrice(slot.slot_id))} className="p-2 bg-primary-green text-white rounded-lg hover:bg-primary-green-dark"><FaCheck className="text-sm" /></button>
-                                        <button onClick={stopPropagation(() => actions.editState.setEditingSlot(null))} className="p-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"><FaTimes className="text-sm" /></button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-center gap-2">
-                                        <span className="text-2xl font-bold text-primary-green">₹{slot.price_override || facility?.hourly_rate}</span>
-                                        <button onClick={stopPropagation(() => actions.onEditPrice(slot))} className="p-1 text-medium-text hover:text-primary-green"><FaEdit /></button>
-                                    </div>
-                                    <div className="inline-block px-3 py-1 bg-primary-green/10 text-primary-green rounded-full text-xs font-medium">Available</div>
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex justify-center gap-2">
-                            <button onClick={stopPropagation(() => actions.onBlock(slot))} className="p-2 bg-yellow-100 text-yellow-600 rounded-lg hover:bg-yellow-200" title="Block this slot"><FaBan /></button>
-                            <button onClick={stopPropagation(() => actions.onDelete(slot.slot_id))} className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200" title="Delete slot"><FaTrash /></button>
-                        </div>
-                    </div>
-                );
-            case 'booked':
-                return (
-                    <div className="text-center space-y-4">
-                        <div className="space-y-2">
-                            <div className="p-3 bg-red-100 rounded-full w-12 h-12 mx-auto flex items-center justify-center"><FaTimesCircle className="text-red-600 text-lg" /></div>
-                            <div className="inline-block px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-bold">BOOKED</div>
-                        </div>
-                        <button onClick={stopPropagation(() => actions.onCancelBooking(booking_id, slot.slot_id))} className="w-full p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium" title="Cancel Booking">Cancel Booking</button>
-                    </div>
-                );
-            case 'blocked':
-                return (
-                    <div className="text-center space-y-4">
-                        <div className="space-y-2">
-                            <div className="p-3 bg-gray-200 rounded-full w-12 h-12 mx-auto flex items-center justify-center"><FaBan className="text-gray-600 text-lg" /></div>
-                            <div className="inline-block px-3 py-1 bg-gray-200 text-gray-800 rounded-full text-xs font-bold">BLOCKED</div>
-                            {slot.block_reason && <p className="text-gray-600 text-xs leading-tight">{slot.block_reason}</p>}
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={stopPropagation(() => actions.onUnblock(slot.slot_id))} className="flex-1 p-2 bg-primary-green text-white rounded-lg hover:bg-primary-green-dark text-sm font-medium" title="Unblock">Unblock</button>
-                            <button onClick={stopPropagation(() => actions.onDelete(slot.slot_id))} className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200" title="Delete slot"><FaTrash /></button>
-                        </div>
-                    </div>
-                );
-            default: // 'empty'
-                return (
-                    <div className="text-center flex-1 flex flex-col justify-center">
-                        <div className="space-y-2">
-                            <div className={`p-3 rounded-full w-12 h-12 mx-auto flex items-center justify-center ${isSelected ? 'bg-primary-green/10' : 'bg-gray-100'}`}>
-                                {isSelected ? <FaCheck className="text-primary-green text-lg" /> : <FaPlusCircle className="text-gray-400 text-lg" />}
-                            </div>
-                            <p className={`font-semibold text-sm ${isSelected ? 'text-primary-green' : 'text-medium-text'}`}>{isSelected ? 'Selected' : 'Click to Add'}</p>
-                        </div>
-                    </div>
-                );
-        }
-    };
-
-    return (
-        <div className={finalClass} onClick={() => status === 'empty' && actions.onToggleSelection(hour)}>
-            <div className="text-center mb-4">
-                <div className="font-bold text-xl text-dark-text mb-1">{displayTime.hour}:00</div>
-                <div className="text-xs text-medium-text">{displayTime.displayTime}</div>
-            </div>
-            {renderContent()}
-        </div>
-    );
+  );
 };
 
-function ManageSlotsPage() {
-    const { user } = useAuth();
-    const { showModal } = useModal();
-    const [venues, setVenues] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [selectedVenueId, setSelectedVenueId] = useState('');
-    const [selectedFacilityId, setSelectedFacilityId] = useState('');
-    const [selectedDate, setSelectedDate] = useState(getTodayString());
-    const [slotsToCreate, setSlotsToCreate] = useState(new Set());
-    // State for modal forms
-    const [editingSlot, setEditingSlot] = useState(null);
-    const [customPrice, setCustomPrice] = useState('');
-    const [slotToBlock, setSlotToBlock] = useState(null);
-    const [blockReason, setBlockReason] = useState('');
+// --- Main Page Component ---
+const ManageSlotsPage = () => {
+  const { user } = useAuth();
+  const [venues, setVenues] = useState([]);
+  const [selectedVenue, setSelectedVenue] = useState(null);
+  const [facilities, setFacilities] = useState([]);
+  const [selectedFacility, setSelectedFacility] = useState(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [slots, setSlots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [bookingWindow, setBookingWindow] = useState(7);
+  const [isSavingWindow, setIsSavingWindow] = useState(false);
+  const [calendarViewDate, setCalendarViewDate] = useState(new Date());
+  const today = startOfDay(new Date());
 
-    const fetchOwnerVenues = async () => {
-        if (!user) { setLoading(false); return; }
-        setLoading(true);
-        try {
-            const { data, error } = await supabase
-                .from('venues')
-                .select(`*, facilities(*, sports(name), time_slots(*, bookings(booking_id, status)))`)
-                .eq('owner_id', user.id)
-                .eq('is_approved', true); // Only fetch approved venues
-            
-            if (error) throw error;
-            setVenues(data || []);
-            if (data?.length > 0 && !selectedVenueId) {
-                setSelectedVenueId(data[0].venue_id);
-                setSelectedFacilityId(data[0].facilities?.[0]?.facility_id || '');
-            }
-        } catch (err) {
-            console.error("Error fetching venues:", err);
-        } finally {
-            setLoading(false);
+  useEffect(() => {
+    setCalendarViewDate(currentDate);
+  }, [currentDate]);
+
+  // Fetch owner's venues and the booking window for the selected one
+  useEffect(() => {
+    const fetchVenues = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("venues")
+        .select("venue_id, name, booking_window_days")
+        .eq("owner_id", user.id)
+        .eq("is_approved", true);
+      if (data) {
+        setVenues(data);
+        if (data.length > 0) {
+          setSelectedVenue(data[0]);
+          setBookingWindow(data[0].booking_window_days || 7);
         }
+      }
     };
+    fetchVenues();
+  }, [user]);
 
-    useEffect(() => { if (user) fetchOwnerVenues(); }, [user]);
-
-    const handleVenueChange = (e) => {
-        const newVenueId = e.target.value;
-        setSelectedVenueId(newVenueId);
-        const venue = venues.find(v => v.venue_id === newVenueId);
-        setSelectedFacilityId(venue?.facilities?.[0]?.facility_id || '');
+  // Fetch facilities when venue changes
+  useEffect(() => {
+    const fetchFacilities = async () => {
+      if (!selectedVenue) return;
+      const { data } = await supabase
+        .from("facilities")
+        .select("facility_id, name")
+        .eq("venue_id", selectedVenue.venue_id)
+        .eq("is_active", true);
+      setFacilities(data || []);
+      setSelectedFacility(data && data.length > 0 ? data[0] : null);
+      // Update booking window display when venue changes
+      const currentVenueData = venues.find(
+        (v) => v.venue_id === selectedVenue.venue_id
+      );
+      if (currentVenueData)
+        setBookingWindow(currentVenueData.booking_window_days || 7);
     };
-    
-    const runSupabaseAction = async (action, successMsg, errorMsgPrefix) => {
-        try {
-            const { error } = await action();
-            if (error) throw error;
-            await showModal({ title: "Success", message: successMsg });
-            fetchOwnerVenues();
-        } catch (error) {
-            await showModal({ title: "Error", message: `${errorMsgPrefix}: ${error.message}` });
-        }
-    };
+    fetchFacilities();
+  }, [selectedVenue, venues]);
 
-    const handleDeleteSlot = async (slotId) => {
-        const isConfirmed = await showModal({
-            title: "Delete Slot",
-            message: "Delete this available slot?",
-            confirmText: "Delete",
-            confirmStyle: "danger"
+  const fetchSlots = useCallback(async () => {
+    if (!selectedFacility) {
+      setSlots([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const dayStart = startOfDay(currentDate);
+    const dayEnd = addDays(dayStart, 1);
+
+    const { data: slotData, error } = await supabase
+      .from("time_slots")
+      .select(`*, bookings(booking_id)`)
+      .eq("facility_id", selectedFacility.facility_id)
+      .gte("start_time", dayStart.toISOString())
+      .lt("start_time", dayEnd.toISOString())
+      .order("start_time");
+
+    setSlots(error ? [] : slotData);
+    setLoading(false);
+  }, [selectedFacility, currentDate]);
+
+  useEffect(() => {
+    fetchSlots();
+  }, [fetchSlots]);
+
+  const handleAddSlots = async (params) => {
+    const {
+      isBulk,
+      date,
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      slotDuration,
+    } = params;
+    const newSlots = [];
+    const dateRange = isBulk
+      ? eachDayOfInterval({
+          start: new Date(startDate),
+          end: new Date(endDate),
+        })
+      : [new Date(date)];
+
+    for (const day of dateRange) {
+      let current = parse(startTime, "HH:mm", day);
+      const end = parse(endTime, "HH:mm", day);
+      while (isBefore(current, end)) {
+        const slotEnd = addMinutes(current, slotDuration);
+        newSlots.push({
+          facility_id: selectedFacility.facility_id,
+          start_time: current,
+          end_time: slotEnd,
+          is_available: true,
         });
-        if (isConfirmed) {
-            await runSupabaseAction(() => supabase.from('time_slots').delete().eq('slot_id', slotId), "Slot deleted.", "Error deleting slot");
-        }
-    };
-    
-    const handleOwnerCancelBooking = async (bookingId, slotId) => {
-        const isConfirmed = await showModal({
-            title: "Cancel Booking",
-            message: "Cancel this user's booking? This is irreversible.",
-            confirmText: "Cancel",
-            confirmStyle: "danger"
-        });
-        if (isConfirmed) {
-            await runSupabaseAction(async () => {
-                const { error: bookingError } = await supabase.from('bookings').update({ status: 'cancelled', payment_status: 'refunded', cancelled_by: user.id }).eq('booking_id', bookingId);
-                if (bookingError) throw bookingError;
-                return supabase.from('time_slots').update({ is_available: true }).eq('slot_id', slotId);
-            }, "Booking cancelled and slot is now available.", "Error cancelling booking");
-        }
-    };
+        current = slotEnd;
+      }
+    }
 
-    const handleSavePrice = async (slotId) => {
-        const priceValue = customPrice.trim() === '' ? null : parseFloat(customPrice);
-        if (customPrice.trim() !== '' && (isNaN(priceValue) || priceValue < 0)) {
-            await showModal({ title: "Invalid Price", message: "Please enter a valid price." }); return;
-        }
-        await runSupabaseAction(() => supabase.from('time_slots').update({ price_override: priceValue }).eq('slot_id', slotId), "Price updated!", "Error updating price");
-        setEditingSlot(null); setCustomPrice('');
-    };
+    if (newSlots.length > 0) {
+      const { error } = await supabase
+        .from("time_slots")
+        .upsert(newSlots, { onConflict: "facility_id, start_time, end_time" });
+      if (error) {
+        alert("Error adding slots: " + error.message);
+      } else {
+        setIsModalOpen(false);
+        fetchSlots();
+      }
+    } else {
+      setIsModalOpen(false);
+    }
+  };
 
-    const closeBlockForm = () => { setSlotToBlock(null); setBlockReason(''); };
-    
-    const handleConfirmBlock = async () => {
-        await runSupabaseAction(() => supabase.from('time_slots').update({ is_available: false, block_reason: blockReason.trim() || 'Blocked by owner' }).eq('slot_id', slotToBlock.slot_id), "Slot blocked!", "Error blocking slot");
-        closeBlockForm();
-    };
+  const handleToggleBlockSlot = async (slot) => {
+    const newStatus = !slot.is_available;
+    const reason = !newStatus
+      ? prompt(
+          "Reason for blocking this slot (e.g., Maintenance):",
+          slot.block_reason || ""
+        )
+      : null;
+    if (newStatus || reason !== null) {
+      const { error } = await supabase
+        .from("time_slots")
+        .update({
+          is_available: newStatus,
+          block_reason: newStatus ? null : reason,
+        })
+        .eq("slot_id", slot.slot_id);
+      if (error) {
+        alert("Error updating slot: " + error.message);
+      } else {
+        fetchSlots();
+      }
+    }
+  };
 
-    const handleUnblockSlot = async (slotId) => {
-        const isConfirmed = await showModal({
-            title: "Unblock Slot",
-            message: "Unblock this slot?",
-            confirmText: "Unblock"
-        });
-        if (isConfirmed) {
-            await runSupabaseAction(() => supabase.from('time_slots').update({ is_available: true, block_reason: null }).eq('slot_id', slotId), "Slot unblocked!", "Error unblocking slot");
-        }
-    };
+  const handleSaveBookingWindow = async () => {
+    setIsSavingWindow(true);
+    const { error } = await supabase
+      .from("venues")
+      .update({ booking_window_days: bookingWindow })
+      .eq("venue_id", selectedVenue.venue_id);
+    if (error) {
+      alert("Error saving setting: " + error.message);
+    } else {
+      alert("Booking window updated successfully!");
+    }
+    setIsSavingWindow(false);
+  };
 
-    const handleBulkAddSlots = async () => {
-        if (slotsToCreate.size === 0) { 
-            await showModal({ title: "No Slots Selected", message: "Please select slots to add." }); 
-            return; 
-        }
-        
-        // Create timezone-aware timestamps
-        const slotsToInsert = Array.from(slotsToCreate).map(hour => ({
-            facility_id: selectedFacilityId,
-            start_time: createTimezoneAwareTimestamp(selectedDate, hour),
-            end_time: createTimezoneAwareTimestamp(selectedDate, hour + 1),
-        }));
-
-        console.log('Creating slots with timezone-aware timestamps:', slotsToInsert);
-        
-        await runSupabaseAction(() => supabase.from('time_slots').insert(slotsToInsert), `${slotsToInsert.length} slot(s) added successfully!`, "Error adding slots");
-        setSlotsToCreate(new Set());
-    };
-    
-    const handleSelectAll = () => {
-        const allAvailableHours = daySchedule
-            .filter(item => item.status === 'empty')
-            .map(item => item.hour);
-        setSlotsToCreate(new Set(allAvailableHours));
-    };
-
-    const toggleSlotForCreation = (hour) => setSlotsToCreate(prev => {
-        const newSlots = new Set(prev);
-        newSlots.has(hour) ? newSlots.delete(hour) : newSlots.add(hour);
-        return newSlots;
-    });
-
-    const changeDate = (days) => {
-        const date = new Date(selectedDate);
-        date.setDate(date.getDate() + days);
-        setSelectedDate(date.toISOString().split('T')[0]);
-    };
-
-    const selectedVenue = venues.find(v => v.venue_id === selectedVenueId);
-    const currentFacility = selectedVenue?.facilities?.find(f => f.facility_id === selectedFacilityId);
-
-    const daySchedule = useMemo(() => {
-        if (!selectedVenue?.opening_time || !selectedVenue?.closing_time) return [];
-        const openingHour = parseInt(selectedVenue.opening_time.split(':')[0], 10);
-        const closingHour = parseInt(selectedVenue.closing_time.split(':')[0], 10);
-        
-        const schedule = Array.from({ length: closingHour - openingHour }, (_, i) => ({ 
-            hour: openingHour + i, 
-            slot: null, 
-            status: 'empty' 
-        }));
-        
-        // Filter slots for the selected date using timezone-aware comparison
-        const slotsForDate = currentFacility?.time_slots?.filter(s => {
-            const slotDate = new Date(s.start_time);
-            const selectedDateTime = new Date(selectedDate);
-            return slotDate.toDateString() === selectedDateTime.toDateString();
-        }) || [];
-
-        return schedule.map(item => {
-            // Find slot by comparing the local hour from the timestamp
-            const slot = slotsForDate.find(s => getLocalHourFromTimestamp(s.start_time) === item.hour);
-            if (!slot) return item;
-            
-            const bookingForSlot = (slot.bookings || []).find(b => b.status === 'confirmed');
-            const status = bookingForSlot ? 'booked' : (!slot.is_available ? 'blocked' : 'available');
-            return { hour: item.hour, slot, status, booking_id: bookingForSlot?.booking_id };
-        });
-    }, [selectedVenue, currentFacility, selectedDate]);
-
-    const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    if (loading) return (
-        <div className="min-h-screen bg-background flex items-center justify-center">
-            <div className="flex flex-col items-center gap-4">
-                <div className="w-12 h-12 border-4 border-primary-green border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-medium-text font-medium">Loading your venues...</p>
-            </div>
+  const renderSlot = (slot) => {
+    const baseClasses =
+      "p-4 rounded-lg text-center transition-all duration-300";
+    const formatTime = (dateStr) => format(new Date(dateStr), "p");
+    if (slot.bookings && slot.bookings.length > 0)
+      return (
+        <div className={`${baseClasses} bg-blue-100 border border-blue-300`}>
+          <p className="font-bold text-blue-800">Booked</p>
+          <p className="text-sm text-blue-600">{formatTime(slot.start_time)}</p>
         </div>
-    );
-
+      );
+    if (!slot.is_available)
+      return (
+        <div
+          onClick={() => handleToggleBlockSlot(slot)}
+          className={`${baseClasses} bg-yellow-100 border border-yellow-300 cursor-pointer hover:shadow-lg`}
+        >
+          <p className="font-bold text-yellow-800">Blocked</p>
+          <p className="text-sm text-yellow-600 truncate">
+            {slot.block_reason || ""}
+          </p>
+        </div>
+      );
     return (
-        <div className="min-h-screen bg-background">
-            <div className="bg-gradient-to-r from-primary-green to-primary-green-light">
-                <div className="container mx-auto px-6 py-8">
-                    <div className="flex items-center gap-3 mb-2"><div className="p-2 bg-white/20 rounded-xl"><FaClock className="text-white text-xl" /></div><h1 className="text-3xl font-bold text-white">Manage Time Slots</h1></div>
-                    <p className="text-white/90 text-lg">Create, edit, and manage your facility time slots</p>
-                </div>
-            </div>
-
-            <div className="container mx-auto px-6 py-8">
-                {venues.length === 0 ? (
-                    <div className="bg-card-bg rounded-2xl border border-border-color p-16 text-center shadow-sm">
-                        <div className="max-w-md mx-auto">
-                            <div className="p-4 bg-light-green-bg rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-                                <FaMapMarkerAlt className="text-primary-green text-2xl" />
-                            </div>
-                            <h3 className="text-xl font-semibold text-dark-text mb-2">No Approved Venues Found</h3>
-                            <p className="text-medium-text">You need to have at least one approved venue before managing time slots. Please wait for admin approval or contact support.</p>
-                        </div>
-                    </div>
-                ) : (
-                    <>
-                        {slotsToCreate.size > 0 && (
-                            <div className="sticky top-4 z-50 mb-6">
-                                <div className="bg-card-bg rounded-2xl border border-primary-green shadow-2xl p-6">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <div className="p-3 bg-primary-green/10 rounded-xl"><FaPlusCircle className="text-primary-green text-xl" /></div>
-                                            <div>
-                                                <h4 className="font-semibold text-dark-text">{slotsToCreate.size} time slot{slotsToCreate.size !== 1 && 's'} selected</h4>
-                                                <p className="text-medium-text text-sm">Ready to create new time slots</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <button onClick={handleSelectAll} className="px-6 py-3 bg-primary-green/10 text-primary-green rounded-xl font-semibold hover:bg-primary-green/20">
-                                                Select All
-                                            </button>
-                                            <button onClick={() => setSlotsToCreate(new Set())} className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200">
-                                                Clear Selection
-                                            </button>
-                                            <button onClick={handleBulkAddSlots} className="px-8 py-3 bg-primary-green text-white rounded-xl font-semibold shadow-lg hover:bg-primary-green-dark transition-transform hover:scale-105 flex items-center gap-2">
-                                                <FaPlusCircle />Create Selected Slots
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="bg-card-bg rounded-2xl border border-border-color p-8 shadow-sm mb-8">
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                <ControlField label="Select Venue" icon={FaMapMarkerAlt}>
-                                    <select value={selectedVenueId} onChange={handleVenueChange} className="w-full p-4 border border-border-color rounded-xl bg-card-bg focus:border-primary-green focus:ring-4 focus:ring-primary-green/10 hover:border-primary-green/50">{venues.map(v => (<option key={v.venue_id} value={v.venue_id}>{v.name}</option>))}</select>
-                                </ControlField>
-                                <ControlField label="Select Facility" icon={FaClock}>
-                                    <select value={selectedFacilityId} onChange={e => setSelectedFacilityId(e.target.value)} disabled={!selectedVenueId} className="w-full p-4 border border-border-color rounded-xl bg-card-bg focus:border-primary-green focus:ring-4 focus:ring-primary-green/10 hover:border-primary-green/50 disabled:bg-hover-bg disabled:cursor-not-allowed"><option value="">Select a facility</option>{selectedVenue?.facilities?.map(f => (<option key={f.facility_id} value={f.facility_id}>{f.name} ({f.sports?.name})</option>))}</select>
-                                </ControlField>
-                                <ControlField label="Select Date" icon={FaCalendarAlt}>
-                                    <div className="flex items-center gap-2">
-                                        <button onClick={() => changeDate(-1)} className="p-4 border border-border-color rounded-xl hover:bg-hover-bg hover:border-primary-green"><FaChevronLeft className="text-medium-text" /></button>
-                                        <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="flex-1 p-4 border border-border-color rounded-xl bg-card-bg focus:border-primary-green focus:ring-4 focus:ring-primary-green/10" />
-                                        <button onClick={() => changeDate(1)} className="p-4 border border-border-color rounded-xl hover:bg-hover-bg hover:border-primary-green"><FaChevronRight className="text-medium-text" /></button>
-                                    </div>
-                                </ControlField>
-                            </div>
-                            {selectedDate && <div className="mt-6 pt-6 border-t border-border-color text-center"><h3 className="text-lg font-semibold text-dark-text">Schedule for {formatDate(selectedDate)}</h3></div>}
-                        </div>
-                        
-                        {selectedFacilityId ? (
-                            <div className="bg-card-bg rounded-2xl border border-border-color p-8 shadow-sm pb-12">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-                                    {daySchedule.map(item => <TimeSlotCard key={item.hour} item={item} facility={currentFacility} isSelected={slotsToCreate.has(item.hour)} actions={{onToggleSelection: toggleSlotForCreation, onEditPrice: (slot) => {setEditingSlot(slot.slot_id); setCustomPrice(slot.price_override || '');}, onSavePrice: handleSavePrice, onDelete: handleDeleteSlot, onBlock: (slot) => setSlotToBlock(slot), onUnblock: handleUnblockSlot, onCancelBooking: handleOwnerCancelBooking, editState: { editingSlot, setEditingSlot, customPrice, setCustomPrice }}} />)}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="bg-card-bg rounded-2xl border border-border-color p-16 text-center shadow-sm"><div className="max-w-md mx-auto"><div className="p-4 bg-light-green-bg rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center"><FaClock className="text-primary-green text-2xl" /></div><h3 className="text-xl font-semibold text-dark-text mb-2">Select Facility</h3><p className="text-medium-text">Please select a venue and facility to view and manage time slots.</p></div></div>
-                        )}
-                    </>
-                )}
-            </div>
-
-            {slotToBlock && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-                    <div className="bg-card-bg rounded-2xl shadow-2xl w-full max-w-md">
-                        <div className="p-8">
-                            <div className="text-center mb-6">
-                                <div className="p-4 bg-yellow-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                                    <FaBan className="text-yellow-600 text-2xl" />
-                                </div>
-                                <h3 className="text-2xl font-bold text-dark-text mb-2">Block Time Slot</h3>
-                                <p className="text-medium-text">
-                                    Time: {formatTimestampForDisplay(slotToBlock.start_time).displayTime}
-                                </p>
-                            </div>
-                            <div className="space-y-4 mb-8">
-                                <label htmlFor="block-reason" className="block font-semibold text-dark-text">Reason for blocking (optional)</label>
-                                <input id="block-reason" type="text" value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="e.g., Maintenance, Private event..." className="w-full p-4 border border-border-color rounded-xl bg-card-bg focus:border-primary-green focus:ring-4 focus:ring-primary-green/10" />
-                            </div>
-                            <div className="flex gap-4">
-                                <button onClick={closeBlockForm} className="flex-1 py-3 px-6 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200">Cancel</button>
-                                <button onClick={handleConfirmBlock} className="flex-1 py-3 px-6 bg-yellow-500 text-white rounded-xl font-semibold hover:bg-yellow-600 flex items-center justify-center gap-2"><FaBan />Block Slot</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
+      <div
+        onClick={() => handleToggleBlockSlot(slot)}
+        className={`${baseClasses} bg-green-100 border border-green-300 cursor-pointer hover:bg-red-100`}
+      >
+        <p className="font-bold text-green-800">Available</p>
+        <p className="text-sm text-green-600">{formatTime(slot.start_time)}</p>
+      </div>
     );
-}
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-12">
+        <div className="flex flex-wrap justify-between items-center mb-8 gap-4">
+          <h1 className="text-3xl font-bold text-dark-text">Manage Slots</h1>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            disabled={!selectedFacility}
+            className="flex items-center gap-2 py-2 px-5 font-semibold text-white bg-primary-green rounded-lg hover:bg-primary-green-dark disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FiPlus /> Add Slots
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column */}
+          <div className="lg:col-span-1 space-y-8">
+            <div className="bg-card-bg p-6 rounded-2xl shadow-md border border-border-color space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-medium-text mb-2">
+                  Select Venue
+                </label>
+                <select
+                  value={selectedVenue?.venue_id || ""}
+                  onChange={(e) =>
+                    setSelectedVenue(
+                      venues.find((v) => v.venue_id === e.target.value)
+                    )
+                  }
+                  className="w-full px-4 py-2 bg-background border border-border-color rounded-lg"
+                >
+                  {venues.map((v) => (
+                    <option key={v.venue_id} value={v.venue_id}>
+                      {v.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-medium-text mb-2">
+                  Select Facility
+                </label>
+                <select
+                  value={selectedFacility?.facility_id || ""}
+                  onChange={(e) =>
+                    setSelectedFacility(
+                      facilities.find((f) => f.facility_id === e.target.value)
+                    )
+                  }
+                  className="w-full px-4 py-2 bg-background border border-border-color rounded-lg"
+                  disabled={!selectedVenue || facilities.length === 0}
+                >
+                  {facilities.map((f) => (
+                    <option key={f.facility_id} value={f.facility_id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <Calendar
+              currentDate={currentDate}
+              setCurrentDate={setCurrentDate}
+              calendarViewDate={calendarViewDate}
+              setCalendarViewDate={setCalendarViewDate}
+            />
+
+            <div className="bg-card-bg p-6 rounded-2xl shadow-md border border-border-color space-y-4">
+              <h3 className="text-lg font-bold text-dark-text flex items-center gap-2">
+                <FiSettings /> Player Booking Window
+              </h3>
+              <p className="text-sm text-medium-text">
+                Set how many days into the future players can see and book
+                available slots.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-medium-text mb-2">
+                  Booking available for the next
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="number"
+                    value={bookingWindow}
+                    onChange={(e) => setBookingWindow(parseInt(e.target.value))}
+                    min="1"
+                    max="90"
+                    className="w-full px-4 py-2 bg-background border border-border-color rounded-lg"
+                  />
+                  <span className="font-semibold text-medium-text">days</span>
+                </div>
+              </div>
+              <button
+                onClick={handleSaveBookingWindow}
+                disabled={isSavingWindow || !selectedVenue}
+                className="w-full py-2 px-4 font-semibold text-white bg-primary-green rounded-lg hover:bg-primary-green-dark disabled:opacity-50 transition-colors"
+              >
+                {isSavingWindow ? "Saving..." : "Save Setting"}
+              </button>
+            </div>
+          </div>
+
+          {/* Right Column */}
+          <div className="lg:col-span-2">
+            <div className="flex justify-between items-center bg-card-bg p-4 rounded-t-2xl border-b border-border-color">
+              <button
+                onClick={() => setCurrentDate(addDays(currentDate, -1))}
+                disabled={isSameDay(currentDate, today)}
+                className="p-2 rounded-full hover:bg-hover-bg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FiChevronLeft size={24} className="text-medium-text" />
+              </button>
+              <h2 className="text-xl font-bold text-dark-text text-center">
+                {format(currentDate, "EEEE, MMMM d")}
+              </h2>
+              <button
+                onClick={() => setCurrentDate(addDays(currentDate, 1))}
+                className="p-2 rounded-full hover:bg-hover-bg"
+              >
+                <FiChevronRight size={24} className="text-medium-text" />
+              </button>
+            </div>
+            <div className="bg-card-bg p-6 rounded-b-2xl shadow-md min-h-[500px]">
+              {loading ? (
+                <p>Loading...</p>
+              ) : !selectedFacility ? (
+                <div className="text-center py-20 flex flex-col items-center">
+                  <FiAlertTriangle className="text-yellow-500 text-4xl mb-4" />
+                  <p className="text-medium-text">
+                    Please select a venue and facility.
+                  </p>
+                </div>
+              ) : slots.length === 0 ? (
+                <div className="text-center py-20 flex flex-col items-center">
+                  <FiCheckCircle className="text-primary-green text-4xl mb-4" />
+                  <p className="text-medium-text">
+                    No slots have been added for this day.
+                  </p>
+                  <p className="text-sm text-light-text">
+                    Click "Add Slots" to get started.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {slots.map((slot) => (
+                    <div key={slot.slot_id}>{renderSlot(slot)}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {isModalOpen && (
+        <AddSlotsModal
+          facility={selectedFacility}
+          onSave={handleAddSlots}
+          onCancel={() => setIsModalOpen(false)}
+        />
+      )}
+    </div>
+  );
+};
 
 export default ManageSlotsPage;

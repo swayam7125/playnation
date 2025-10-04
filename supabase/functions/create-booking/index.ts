@@ -1,3 +1,4 @@
+// playnation - Copy/supabase/functions/create-booking/index.ts
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -33,6 +34,7 @@ serve(async (req) => {
     }
 
     // 3. Call the database function with the admin client to bypass RLS
+    // This function will check for slot availability and create the booking in one transaction.
     const { data, error } = await supabaseAdmin.rpc('create_booking_for_user', {
       p_user_id: user.id,
       p_facility_id: facility_id,
@@ -41,6 +43,13 @@ serve(async (req) => {
     });
 
     if (error) {
+      // Check for a specific error code if you have one for "slot taken"
+      if (error.message.includes('slot has just been taken')) {
+         return new Response(JSON.stringify({ error: 'This slot has just been taken. Please choose another one.' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 409, // Conflict
+        });
+      }
       throw new Error(`Database error: ${error.message}`);
     }
 
@@ -48,10 +57,9 @@ serve(async (req) => {
 
     // 4. Check the logical status returned from the database function
     if (result.status === 'error') {
-      // Return a 409 Conflict status if the slot is taken
       return new Response(JSON.stringify({ error: result.message }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 409,
+        status: 409, // Conflict status for "slot taken"
       });
     }
 
