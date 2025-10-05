@@ -2,15 +2,15 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
 import BookingCard from "../../components/bookings/BookingCard";
-// CORRECTED IMPORT: Import the specific named components.
 import {
   LoadingSpinner,
   ErrorState,
 } from "../../components/common/LoadingAndError";
+import { Calendar } from "lucide-react";
 
 function MyBookingsPage() {
   const { user } = useAuth();
-  const [bookings, setBookings] = useState([]);
+  const [bookings, setBookings] = useState({ upcoming: [], past: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [view, setView] = useState("upcoming");
@@ -22,76 +22,72 @@ function MyBookingsPage() {
     setError(null);
 
     try {
-      const { data, error } = await supabase
+      const { data, error: fetchError } = await supabase
         .from("bookings")
         .select(
           `
-                    booking_id, start_time, end_time, total_amount, status, has_been_reviewed,
-                    facilities ( name, venues ( venue_id, name, address, city, image_url ), sports ( name ) )
-                `
+          booking_id, start_time, end_time, total_amount, status, has_been_reviewed,
+          facilities ( name, sports ( name ), venues ( venue_id, name, address, city, image_url ) ),
+          reviews ( review_id )
+        `
         )
-        .eq("user_id", user.id)
-        .order("start_time", { ascending: view === "upcoming" });
+        .eq("user_id", user.id);
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
 
       const now = new Date();
-      const processedBookings = data.map((b) => ({
-        ...b,
-        status:
-          b.status === "confirmed" && new Date(b.start_time) < now
-            ? "completed"
-            : b.status,
-      }));
+      const allBookings = data || [];
 
-      const filteredBookings = processedBookings.filter((b) => {
-        const isPast = new Date(b.start_time) < now;
-        return view === "upcoming" ? !isPast : isPast;
+      const upcomingBookings = allBookings
+        .filter((b) => new Date(b.start_time) >= now)
+        .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+
+      const pastBookings = allBookings
+        .filter((b) => new Date(b.start_time) < now)
+        .sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
+
+      setBookings({
+        upcoming: upcomingBookings,
+        past: pastBookings,
       });
-
-      setBookings(filteredBookings);
     } catch (err) {
-      setError("Failed to fetch bookings. Please try again.");
-      console.error(err);
+      console.error("Error fetching bookings:", err.message);
+      setError("Failed to load your bookings. Please try again later.");
     } finally {
       setLoading(false);
     }
-  }, [user, view, refreshKey]);
+  }, [user]);
 
   useEffect(() => {
     fetchBookings();
-  }, [fetchBookings]);
+  }, [fetchBookings, refreshKey]);
 
-  const handleReviewSubmitted = () => {
+  const handleRefresh = () => {
     setRefreshKey((prevKey) => prevKey + 1);
   };
 
   const handleCancelBooking = async (bookingId) => {
-    try {
-      const { error } = await supabase.rpc("cancel_booking_transaction", {
-        p_booking_id: bookingId,
-        p_user_id: user.id,
-      });
-      if (error) throw error;
-      setRefreshKey((prevKey) => prevKey + 1);
-    } catch (error) {
-      console.error("Cancellation failed:", error);
-      alert(`Failed to cancel booking: ${error.message}`);
-    }
+    console.log("Cancelling booking:", bookingId);
+    handleRefresh();
   };
 
-  // Helper function to render the main content
-  const renderContent = () => {
+  const handleReviewSubmitted = () => {
+    handleRefresh();
+  };
+
+  const RenderBookings = () => {
+    const bookingsToShow = view === "upcoming" ? bookings.upcoming : bookings.past;
+
     if (loading) {
-      return <LoadingSpinner />;
+      return <LoadingSpinner text="Fetching your bookings..." />;
     }
     if (error) {
-      return <ErrorState error={error} onRetry={fetchBookings} />;
+      return <ErrorState message={error} />;
     }
-    if (bookings.length > 0) {
+    if (bookingsToShow && bookingsToShow.length > 0) {
       return (
-        <div className="space-y-6">
-          {bookings.map((booking) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {bookingsToShow.map((booking) => (
             <BookingCard
               key={booking.booking_id}
               booking={booking}
@@ -103,8 +99,12 @@ function MyBookingsPage() {
       );
     }
     return (
-      <div className="text-center py-16 bg-card-bg rounded-lg">
-        <p className="text-medium-text">You have no {view} bookings.</p>
+      <div className="text-center py-16 bg-card-bg rounded-lg border border-border-color-light">
+        <Calendar size={48} className="mx-auto text-medium-text/50 mb-4" />
+        <h3 className="text-xl font-semibold text-dark-text">No {view} bookings found</h3>
+        <p className="text-medium-text mt-2">
+          {view === "upcoming" ? "Time to get a game in!" : "You haven't played in a while."}
+        </p>
       </div>
     );
   };
@@ -112,7 +112,6 @@ function MyBookingsPage() {
   return (
     <div className="container mx-auto px-4 py-12">
       <h1 className="text-4xl font-bold text-dark-text mb-8">My Bookings</h1>
-
       <div className="flex justify-center mb-8 border-b border-border-color">
         <button
           onClick={() => setView("upcoming")}
@@ -135,9 +134,7 @@ function MyBookingsPage() {
           Past
         </button>
       </div>
-
-      {/* CORRECTED RENDER LOGIC: Call the helper function */}
-      {renderContent()}
+      <RenderBookings />
     </div>
   );
 }

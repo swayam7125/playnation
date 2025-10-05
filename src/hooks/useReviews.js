@@ -1,54 +1,44 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../supabaseClient";
-import useSupabaseQuery from "./useSupabaseQuery";
 
 const useReviews = (venueId) => {
-  const {
-    data: reviews,
-    loading,
-    error,
-    refetch,
-  } = useSupabaseQuery(
-    "reviews",
-    // Corrected Query: Fetches profile information for the user
-    `*, profile:profiles (full_name, avatar_url)`,
-    `venue_id=eq.${venueId}`
-  );
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(false); // Start as false
+  const [error, setError] = useState(null);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const fetchReviews = useCallback(async () => {
+    if (!venueId) return; // Guard clause
 
-  const submitReview = useCallback(
-    async (review) => {
-      setIsSubmitting(true);
-      try {
-        const { data: sessionData, error: sessionError } =
-          await supabase.auth.getSession();
-        if (sessionError || !sessionData.session?.user) {
-          throw new Error("User not authenticated. Please log in to submit a review.");
-        }
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: fetchError } = await supabase
+        .from("reviews")
+        .select(`*, profiles (*)`)
+        .eq("venue_id", venueId)
+        .order("created_at", { ascending: false });
 
-        const user = sessionData.session.user;
-        const newReview = {
-          ...review,
-          venue_id: venueId,
-          user_id: user.id,
-        };
+      if (fetchError) throw fetchError;
+      setReviews(data || []);
+    } catch (err) {
+      console.error("Error fetching reviews:", err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [venueId]);
 
-        const { data, error } = await supabase.from("reviews").insert([newReview]).select();
-        if (error) throw error;
+  useEffect(() => {
+    // Only fetch if venueId is present
+    if (venueId) {
+      fetchReviews();
+    } else {
+      setLoading(false);
+      setReviews([]);
+    }
+  }, [venueId, fetchReviews]);
 
-        // Refetch reviews to show the new one instantly
-        refetch();
-
-        return data;
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [venueId, refetch]
-  );
-
-  return { reviews, loading, error, submitReview, isSubmitting };
+  return { reviews, loading, error, refetch: fetchReviews };
 };
 
 export default useReviews;
