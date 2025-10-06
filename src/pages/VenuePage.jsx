@@ -140,18 +140,21 @@ function VenuePage() {
   };
 
   const handleProceedToBook = () => {
-    if (!selectedSlot || !selectedFacility) return;
-    const finalPrice =
-      selectedSlot.price_override ?? selectedFacility.hourly_rate;
-    navigate("/booking", {
-      state: {
-        venue,
-        facility: selectedFacility,
-        slot: selectedSlot,
-        price: finalPrice,
-      },
-    });
-  };
+  if (!selectedSlot || !selectedFacility) return;
+  const finalPrice =
+    selectedSlot.price_override ?? selectedFacility.hourly_rate;
+  
+  // FIX: Change this line to include the facility ID in the URL
+  navigate(`/booking/${selectedFacility.facility_id}`, {
+    state: {
+      venue,
+      facility: selectedFacility,
+      slot: selectedSlot,
+      price: finalPrice,
+    },
+  });
+};
+
 
   const uniqueAmenities = [
     ...new Set(

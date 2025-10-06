@@ -94,7 +94,7 @@ function App() {
           <Route path="/" element={<AppLayout />}>
             <Route index element={<HomePage />} />
             <Route path="explore" element={<ExplorePage />} />
-            <Route path="venue/:venueId" element={<VenuePage />} />
+            <Route path="venues/:venueId" element={<VenuePage />} />
             <Route path="about" element={<AboutUsPage />} />
             <Route path="contact" element={<ContactUsPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
@@ -107,7 +107,7 @@ function App() {
             {/* Player Routes */}
             <Route path="my-bookings" element={<MyBookingsPage />} />
             <Route path="profile" element={<ProfilePage />} />
-            <Route path="book/:facilityId" element={<BookingPage />} />
+            <Route path="booking/:facilityId" element={<BookingPage />} />
 
             {/* Owner Routes */}
             <Route
