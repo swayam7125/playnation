@@ -47,7 +47,6 @@ const BookingDetailModal = ({ booking, onClose, onRefundAction }) => {
     pending_refund: "bg-orange-50 text-orange-700 border-orange-200",
   };
 
-  // FIX: Safely get user info, defaulting to 'N/A' or an empty object
   const user = booking.users || {};
 
   return (
@@ -104,7 +103,7 @@ const BookingDetailModal = ({ booking, onClose, onRefundAction }) => {
                   <h3 className="font-semibold text-dark-text">Booking Time</h3>
                 </div>
                 <p className="font-bold text-dark-text">
-                  {formatDate(booking.booking_date)}
+                  {formatDate(booking.start_time)}
                 </p>
                 <p className="text-medium-text">
                   {formatTime(booking.start_time)}
@@ -184,7 +183,6 @@ const BookingRow = ({
   isExpanded,
   onToggleExpand,
 }) => {
-  // ... (This component remains the same, but will now receive correct user data)
   const formatDate = (date) =>
     new Date(date).toLocaleDateString("en-IN", {
       day: "numeric",
@@ -209,13 +207,12 @@ const BookingRow = ({
     pending_refund: "bg-orange-100 text-orange-800 border border-orange-200",
   };
 
-  // FIX: Safely get user info
   const user = booking.users || {};
 
   return (
     <>
       <tr className="border-b border-border-color-light hover:bg-light-green-bg transition-all duration-200 group">
-        <td className="px-6 py-6">
+        <td className="px-6 py-4">
           <div className="flex items-center gap-3">
             <button
               onClick={() => onToggleExpand(booking.booking_id)}
@@ -233,7 +230,7 @@ const BookingRow = ({
             </div>
           </div>
         </td>
-        <td className="px-6 py-6">
+        <td className="px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-primary-green-light rounded-full flex items-center justify-center">
               <FaUser className="text-primary-green text-xs" />
@@ -248,22 +245,22 @@ const BookingRow = ({
             </div>
           </div>
         </td>
-        <td className="px-6 py-6">
+        <td className="px-6 py-4">
           <div className="bg-hover-bg rounded-lg p-2 text-center">
             <div className="text-sm font-semibold text-dark-text">
-              {formatDate(booking.booking_date)}
+              {formatDate(booking.start_time)}
             </div>
             <div className="text-xs text-medium-text">
               {formatTime(booking.start_time)}
             </div>
           </div>
         </td>
-        <td className="px-6 py-6">
+        <td className="px-6 py-4">
           <div className="text-lg font-bold text-primary-green">
             ₹{booking.total_amount}
           </div>
         </td>
-        <td className="px-6 py-6">
+        <td className="px-6 py-4">
           <span
             className={`px-3 py-2 inline-flex text-xs leading-5 font-semibold rounded-lg ${
               statusClasses[booking.status]
@@ -272,7 +269,7 @@ const BookingRow = ({
             {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
           </span>
         </td>
-        <td className="px-6 py-6">
+        <td className="px-6 py-4">
           <span
             className={`px-3 py-2 inline-flex text-xs leading-5 font-semibold rounded-lg ${
               paymentStatusClasses[booking.payment_status]
@@ -282,7 +279,7 @@ const BookingRow = ({
               booking.payment_status.replace("_", " ").slice(1)}
           </span>
         </td>
-        <td className="px-6 py-6 text-right">
+        <td className="px-6 py-4 text-right">
           <div className="flex items-center gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             <button
               onClick={() => onViewDetails(booking)}
@@ -346,7 +343,6 @@ const BookingRow = ({
 };
 
 function AdminBookingsPage() {
-  // ... (State and other functions remain the same)
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -359,7 +355,7 @@ function AdminBookingsPage() {
     date_range: "all",
   });
   const [sortConfig, setSortConfig] = useState({
-    key: "booking_date",
+    key: "start_time",
     direction: "desc",
   });
   const [showFilters, setShowFilters] = useState(false);
@@ -370,20 +366,16 @@ function AdminBookingsPage() {
       setLoading(true);
       setError(null);
       try {
-        // --- THE FIX IS HERE ---
-        // The query now correctly selects related data from the 'users' table.
-        // Supabase client understands 'users(*)' because of the foreign key relationship.
         let query = supabase
           .from("bookings")
           .select(
             `
-                    *, 
-                    users:user_id (username, email, phone_number), 
-                    facilities(*, venues(*))
-                `
+              *, 
+              users:user_id (username, email, phone_number), 
+              facilities(*, venues(*))
+            `
           )
-          .order("booking_date", { ascending: false });
-        // --- END OF FIX ---
+          .order("start_time", { ascending: false });
 
         if (currentSearchTerm && currentSearchTerm.trim()) {
           const searchPattern = `%${currentSearchTerm.toLowerCase()}%`;
@@ -401,6 +393,23 @@ function AdminBookingsPage() {
         ) {
           query = query.eq("payment_status", currentFilters.payment_status);
         }
+        
+        if (currentFilters.date_range !== "all" && currentFilters.date_range) {
+          const today = new Date();
+          let startDate = new Date();
+          
+          if (currentFilters.date_range === 'today') {
+            startDate.setHours(0, 0, 0, 0);
+          } else if (currentFilters.date_range === 'week') {
+            startDate.setDate(today.getDate() - 7);
+            startDate.setHours(0, 0, 0, 0);
+          } else if (currentFilters.date_range === 'month') {
+            startDate.setMonth(today.getMonth() - 1);
+            startDate.setHours(0, 0, 0, 0);
+          }
+          
+          query = query.gte('start_time', startDate.toISOString());
+        }
 
         const { data, error } = await query;
         if (error) throw error;
@@ -415,7 +424,6 @@ function AdminBookingsPage() {
     []
   );
 
-  // ... (rest of the component logic remains the same)
   const handleRefundAction = async (bookingId, newPaymentStatus) => {
     const action =
       newPaymentStatus === "refunded" ? "Approve Refund" : "Revert Refund";
@@ -501,10 +509,9 @@ function AdminBookingsPage() {
       ...filteredAndSortedBookings.map((booking) => [
         booking.facilities.venues.name,
         booking.facilities.name,
-        // FIX: Use the correct 'users' property
         booking.users?.username || "N/A",
         booking.users?.email || "User Deleted",
-        new Date(booking.booking_date).toLocaleDateString("en-IN"),
+        new Date(booking.start_time).toLocaleDateString("en-IN"),
         new Date(booking.start_time).toLocaleTimeString("en-IN"),
         booking.total_amount,
         booking.status,
@@ -525,7 +532,6 @@ function AdminBookingsPage() {
   const filteredAndSortedBookings = useMemo(() => {
     let filtered = bookings;
 
-    // Note: Main search is now done on the server, this is a fallback client-side filter
     if (searchTerm) {
       const lowerCaseSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -553,7 +559,7 @@ function AdminBookingsPage() {
         aVal = parseFloat(a.total_amount);
         bVal = parseFloat(b.total_amount);
       } else if (
-        sortConfig.key === "booking_date" ||
+        sortConfig.key === "start_time" ||
         sortConfig.key === "created_at"
       ) {
         aVal = new Date(a[sortConfig.key]);
@@ -629,73 +635,76 @@ function AdminBookingsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-dark-text mb-2">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-dark-text mb-1">
           Booking Management
         </h1>
         <p className="text-medium-text">
           Manage and monitor all venue bookings
         </p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-        <div className="bg-gradient-to-br from-primary-green to-primary-green-dark text-white p-6 rounded-2xl shadow-lg">
-          <h3 className="text-sm font-medium opacity-90">Total Bookings</h3>
-          <p className="text-3xl font-bold">{stats.total}</p>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <div className="bg-gradient-to-br from-primary-green to-primary-green-dark text-white p-4 rounded-2xl shadow-lg">
+          <h3 className="text-xs font-medium opacity-90">Total Bookings</h3>
+          <p className="text-2xl font-bold mt-1">{stats.total}</p>
         </div>
-        <div className="bg-card-bg border-2 border-blue-200 p-6 rounded-2xl">
-          <h3 className="text-sm font-medium text-blue-600">Confirmed</h3>
-          <p className="text-2xl font-bold text-blue-700">{stats.confirmed}</p>
+        <div className="bg-card-bg border-2 border-blue-200 p-4 rounded-2xl">
+          <h3 className="text-xs font-medium text-blue-600">Confirmed</h3>
+          <p className="text-xl font-bold text-blue-700 mt-1">{stats.confirmed}</p>
         </div>
-        <div className="bg-card-bg border-2 border-green-200 p-6 rounded-2xl">
-          <h3 className="text-sm font-medium text-green-600">Completed</h3>
-          <p className="text-2xl font-bold text-green-700">{stats.completed}</p>
+        <div className="bg-card-bg border-2 border-green-200 p-4 rounded-2xl">
+          <h3 className="text-xs font-medium text-green-600">Completed</h3>
+          <p className="text-xl font-bold text-green-700 mt-1">{stats.completed}</p>
         </div>
-        <div className="bg-card-bg border-2 border-red-200 p-6 rounded-2xl">
-          <h3 className="text-sm font-medium text-red-600">Cancelled</h3>
-          <p className="text-2xl font-bold text-red-700">{stats.cancelled}</p>
+        <div className="bg-card-bg border-2 border-red-200 p-4 rounded-2xl">
+          <h3 className="text-xs font-medium text-red-600">Cancelled</h3>
+          <p className="text-xl font-bold text-red-700 mt-1">{stats.cancelled}</p>
         </div>
-        <div className="bg-gradient-to-br from-primary-green-light to-primary-green text-white p-6 rounded-2xl shadow-lg">
-          <h3 className="text-sm font-medium opacity-90">Total Revenue</h3>
-          <p className="text-2xl font-bold">
+        <div className="bg-gradient-to-br from-primary-green-light to-primary-green text-white p-4 rounded-2xl shadow-lg">
+          <h3 className="text-xs font-medium opacity-90">Total Revenue</h3>
+          <p className="text-xl font-bold mt-1">
             ₹{stats.totalRevenue.toLocaleString()}
           </p>
         </div>
       </div>
-      <div className="bg-card-bg rounded-2xl shadow-lg border border-border-color-light p-6 mb-8">
-        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between mb-4">
-          <div className="relative flex-1 max-w-md">
-            <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-light-text" />
+      {/* --- COMPACT ACTION BAR START --- */}
+      <div className="bg-card-bg rounded-2xl shadow-lg border border-border-color-light p-4 mb-6">
+        <div className="flex flex-wrap gap-2 items-center justify-between">
+          <div className="relative flex-grow sm:flex-grow-0 sm:w-72">
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-light-text" />
             <input
               type="text"
-              placeholder="Search bookings, users, venues..."
+              placeholder="Search..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-hover-bg border-2 border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent transition-all duration-200"
+              className="w-full text-sm pl-9 pr-4 py-2 bg-hover-bg border-2 border-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent transition-all duration-200"
             />
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl transition-all duration-200 border-2 font-medium ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 border-2 text-sm font-medium ${
                 showFilters
                   ? "bg-primary-green text-white border-primary-green"
                   : "bg-hover-bg text-medium-text border-border-color hover:border-primary-green"
               }`}
             >
-              <FaFilter /> Filters
+              <FaFilter />
+              <span>Filters</span>
             </button>
             <button
               onClick={exportToCSV}
-              className="flex items-center gap-2 px-4 py-3 bg-card-bg text-medium-text rounded-xl hover:bg-primary-green hover:text-white transition-all duration-200 border-2 border-border-color hover:border-primary-green font-medium"
+              className="flex items-center gap-2 px-3 py-2 bg-card-bg text-medium-text rounded-lg hover:bg-primary-green hover:text-white transition-all duration-200 border-2 border-border-color hover:border-primary-green text-sm font-medium"
             >
-              <FaDownload /> Export
+              <FaDownload />
+              <span>Export</span>
             </button>
           </div>
         </div>
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-border-color-light">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 mt-3 border-t border-border-color-light">
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-2">
+              <label className="block text-xs font-medium text-dark-text mb-1">
                 Status
               </label>
               <select
@@ -703,16 +712,16 @@ function AdminBookingsPage() {
                 onChange={(e) =>
                   setFilters({ ...filters, status: e.target.value })
                 }
-                className="w-full p-3 bg-hover-bg border-2 border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
+                className="w-full p-2 text-sm bg-hover-bg border-2 border-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
               >
-                <option value="all">All Statuses</option>
+                <option value="all">All</option>
                 <option value="confirmed">Confirmed</option>
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-2">
+              <label className="block text-xs font-medium text-dark-text mb-1">
                 Payment Status
               </label>
               <select
@@ -720,16 +729,16 @@ function AdminBookingsPage() {
                 onChange={(e) =>
                   setFilters({ ...filters, payment_status: e.target.value })
                 }
-                className="w-full p-3 bg-hover-bg border-2 border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
+                className="w-full p-2 text-sm bg-hover-bg border-2 border-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
               >
-                <option value="all">All Payment Statuses</option>
+                <option value="all">All</option>
                 <option value="paid">Paid</option>
                 <option value="refunded">Refunded</option>
                 <option value="pending_refund">Pending Refund</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-dark-text mb-2">
+              <label className="block text-xs font-medium text-dark-text mb-1">
                 Date Range
               </label>
               <select
@@ -737,9 +746,9 @@ function AdminBookingsPage() {
                 onChange={(e) =>
                   setFilters({ ...filters, date_range: e.target.value })
                 }
-                className="w-full p-3 bg-hover-bg border-2 border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
+                className="w-full p-2 text-sm bg-hover-bg border-2 border-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
               >
-                <option value="all">All Dates</option>
+                <option value="all">All Time</option>
                 <option value="today">Today</option>
                 <option value="week">Last 7 Days</option>
                 <option value="month">Last 30 Days</option>
@@ -748,6 +757,7 @@ function AdminBookingsPage() {
           </div>
         )}
       </div>
+       {/* --- COMPACT ACTION BAR END --- */}
       <div className="bg-card-bg rounded-2xl shadow-lg border border-border-color-light overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border-color-light">
@@ -774,10 +784,10 @@ function AdminBookingsPage() {
                 <th
                   scope="col"
                   className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider cursor-pointer hover:bg-primary-green-light hover:bg-opacity-20 transition-colors"
-                  onClick={() => handleSort("booking_date")}
+                  onClick={() => handleSort("start_time")}
                 >
                   <div className="flex items-center gap-2">
-                    Booking Date {getSortIcon("booking_date")}
+                    Booking Date {getSortIcon("start_time")}
                   </div>
                 </th>
                 <th

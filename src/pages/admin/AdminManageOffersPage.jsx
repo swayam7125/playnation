@@ -1,33 +1,38 @@
-// src/pages/admin/AdminManageOffersPage.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../supabaseClient";
-import { useAuth } from "../../AuthContext";
 import { useModal } from "../../ModalContext";
-import { FaPlus, FaTicketAlt } from "react-icons/fa";
-import OwnerOfferCard from "../../components/offers/OwnerOfferCard";
 import OfferForm from "../../components/offers/OfferForm";
+import OwnerOfferCard from "../../components/offers/OwnerOfferCard";
+import { FaPlus, FaSearch } from "react-icons/fa";
 
 function AdminManageOffersPage() {
-  const { profile } = useAuth(); // Get the user's profile
-  const { showModal } = useModal();
   const [offers, setOffers] = useState([]);
+  const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingOffer, setEditingOffer] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentOffer, setCurrentOffer] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const { showModal, hideModal } = useModal();
 
-  const fetchOffers = useCallback(async () => {
-    // ... fetch logic remains the same
+  const fetchOffersAndVenues = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: offersError } = await supabase
+      const { data: offersData, error: offersError } = await supabase
         .from("offers")
-        .select(`*, venues(name), offer_sports(sport_id, sports(name))`)
-        .order("created_at", { ascending: false });
+        .select("*, venues (name)");
       if (offersError) throw offersError;
-      setOffers(data || []);
+
+      const { data: venuesData, error: venuesError } = await supabase
+        .from("venues")
+        .select("venue_id, name");
+      if (venuesError) throw venuesError;
+
+      setOffers(offersData || []);
+      setVenues(venuesData || []);
     } catch (err) {
+      console.error("Error fetching data:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -35,119 +40,150 @@ function AdminManageOffersPage() {
   }, []);
 
   useEffect(() => {
-    fetchOffers();
-  }, [fetchOffers]);
+    fetchOffersAndVenues();
+  }, [fetchOffersAndVenues]);
 
-  // Handler functions for managing offers
   const handleAddNew = () => {
-    setEditingOffer(null);
-    setIsFormOpen(true);
+    setCurrentOffer(null);
+    setIsModalOpen(true);
   };
+
   const handleEdit = (offer) => {
-    setEditingOffer(offer);
-    setIsFormOpen(true);
+    setCurrentOffer(offer);
+    setIsModalOpen(true);
   };
-  const handleSave = () => {
-    fetchOffers();
-    setIsFormOpen(false);
-    setEditingOffer(null);
-  };
+
   const handleDelete = async (offerId) => {
     const isConfirmed = await showModal({
       title: "Confirm Deletion",
-      message: "Are you sure you want to delete this offer?",
+      message: "Are you sure you want to delete this offer? This action cannot be undone.",
       confirmText: "Delete",
       confirmStyle: "danger",
     });
+
     if (isConfirmed) {
-      const { error } = await supabase
-        .from("offers")
-        .delete()
-        .eq("offer_id", offerId);
-      if (error) {
-        setError(error.message);
-      } else {
-        fetchOffers();
+      try {
+        const { error } = await supabase
+          .from("offers")
+          .delete()
+          .eq("offer_id", offerId);
+        if (error) throw error;
+        await showModal({ title: "Success", message: "Offer deleted successfully." });
+        fetchOffersAndVenues();
+      } catch (err) {
+        await showModal({ title: "Error", message: `Failed to delete offer: ${err.message}` });
       }
     }
   };
 
-  if (loading) {
-    /* ... */
-  }
-  if (error) {
-    /* ... */
-  }
+  const handleToggle = async (offer) => {
+    try {
+      const { error } = await supabase
+        .from("offers")
+        .update({ is_active: !offer.is_active })
+        .eq("offer_id", offer.offer_id);
+      if (error) throw error;
+      fetchOffersAndVenues();
+    } catch (err) {
+      await showModal({ title: "Error", message: `Failed to toggle offer status: ${err.message}` });
+    }
+  };
 
-  // Re-paste loading/error states
+  const handleSave = () => {
+    setIsModalOpen(false);
+    fetchOffersAndVenues();
+  };
+
+  const filteredOffers = useMemo(() => {
+    if (!searchTerm) return offers;
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return offers.filter(
+      (offer) =>
+        offer.title.toLowerCase().includes(lowercasedFilter) ||
+        (offer.venues && offer.venues.name.toLowerCase().includes(lowercasedFilter))
+    );
+  }, [offers, searchTerm]);
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="container mx-auto px-4 py-12 flex items-center justify-center min-h-96">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-green mx-auto mb-4"></div>
-          <p className="text-medium-text text-lg">Loading all offers...</p>
+          <p className="text-medium-text">Loading offers...</p>
         </div>
       </div>
     );
   }
+
   if (error) {
     return (
-      <p className="container mx-auto text-center p-12 text-red-600">
-        Error: {error}
-      </p>
+      <div className="container mx-auto px-4 py-12 text-center">
+        <p className="text-red-500">{`Error: ${error}`}</p>
+      </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-12">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-dark-text">
-            Manage All Offers (Admin)
-          </h1>
+    <div className="container mx-auto px-4 py-6">
+      <div className="mb-4">
+        <h1 className="text-3xl font-bold text-dark-text mb-1">
+          Manage Offers
+        </h1>
+        <p className="text-medium-text">Create, edit, and manage all promotional offers.</p>
+      </div>
+
+      <div className="bg-card-bg rounded-xl shadow-md border border-border-color-light p-4 mb-6">
+        <div className="flex flex-wrap gap-2 items-center justify-between">
+          <div className="relative flex-grow sm:flex-grow-0 sm:w-64">
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-light-text" />
+            <input
+              type="text"
+              placeholder="Search by title or venue..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full text-sm pl-9 pr-4 py-2 bg-hover-bg border-2 border-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent transition-all"
+            />
+          </div>
           <button
             onClick={handleAddNew}
-            className="bg-primary-green text-white px-6 py-3 rounded-xl font-semibold hover:bg-primary-green-dark transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-green text-white rounded-lg hover:bg-primary-green-dark transition-all duration-200 text-sm font-medium"
           >
-            <FaPlus /> Add New Offer
+            <FaPlus />
+            <span>Create New Offer</span>
           </button>
         </div>
+      </div>
 
-        {offers.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {offers.map((offer) => (
-              <OwnerOfferCard
-                key={offer.offer_id}
-                offer={offer}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                profile={profile} // <-- PASS THE PROFILE DOWN
-              />
-            ))}
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredOffers.length > 0 ? (
+          filteredOffers.map((offer) => (
+            <OwnerOfferCard
+              key={offer.offer_id}
+              offer={offer}
+              onEdit={() => handleEdit(offer)}
+              onDelete={() => handleDelete(offer.offer_id)}
+              onToggle={() => handleToggle(offer)}
+            />
+          ))
         ) : (
-          <div className="bg-card-bg rounded-2xl border border-border-color p-8 text-center shadow-sm">
-            <div className="max-w-md mx-auto">
-              <div className="p-4 bg-light-green-bg rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-                <FaTicketAlt className="text-primary-green text-3xl" />
-              </div>
-              <h3 className="text-xl font-semibold text-dark-text mb-2">
-                No offers found in the system.
-              </h3>
-              <p className="text-medium-text">
-                Click "Add New Offer" to create the first one.
-              </p>
-            </div>
+          <div className="col-span-full text-center py-12">
+            <p className="text-medium-text">No offers found. Try adjusting your search.</p>
           </div>
         )}
       </div>
 
-      {isFormOpen && (
-        <OfferForm
-          offer={editingOffer}
-          onSave={handleSave}
-          onCancel={() => setIsFormOpen(false)}
-        />
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card-bg rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <OfferForm
+              offer={currentOffer}
+              venues={venues}
+              onSave={handleSave}
+              onCancel={() => setIsModalOpen(false)}
+              isAdmin={true}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
