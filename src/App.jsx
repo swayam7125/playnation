@@ -21,7 +21,6 @@ import HomePage from "./pages/HomePage";
 import ExplorePage from "./pages/ExplorePage";
 import VenuePage from "./pages/VenuePage";
 import AuthPage from "./pages/AuthPage";
-import DashboardPage from "./pages/DashboardPage";
 import AboutUsPage from "./pages/AboutUsPage";
 import ContactUsPage from "./pages/ContactUsPage";
 
@@ -97,7 +96,6 @@ function App() {
             <Route path="venues/:venueId" element={<VenuePage />} />
             <Route path="about" element={<AboutUsPage />} />
             <Route path="contact" element={<ContactUsPage />} />
-            <Route path="dashboard" element={<DashboardPage />} />
             
             {/* Auth Routes */}
             <Route path="auth" element={<AuthPage />} />

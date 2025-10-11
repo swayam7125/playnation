@@ -29,6 +29,7 @@ function RegisterForm() {
   const handleRegister = async (e) => {
     e.preventDefault();
 
+    // Client-side validation using toasts
     if (formData.password.length < 6) {
       toast.error("Password must be at least 6 characters long.");
       return;
@@ -42,7 +43,9 @@ function RegisterForm() {
     const loadingToast = toast.loading("Creating your account...");
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // The signUp function passes all profile data in options.data.
+      // Your SQL trigger will use this to create the profile automatically.
+      const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
@@ -56,47 +59,41 @@ function RegisterForm() {
         },
       });
 
-      if (authError) throw authError;
+      if (error) {
+        throw error; // Let the catch block handle the error toast
+      }
 
-      if (authData.user) {
-        const { error: profileError } = await supabase.from("users").insert([
-          {
-            id: authData.user.id,
-            username: formData.username,
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            phone_number: formData.phone_number,
-            role: formData.role,
-            email: formData.email,
-          },
-        ]);
+      toast.dismiss(loadingToast);
 
-        if (profileError) throw profileError;
+      if (data.user) {
+        toast.success("Account created! Please check your email for verification.");
+        updateUser(data.user); // Update auth context
 
-        toast.dismiss(loadingToast);
-        toast.success("Account created! Check your email for verification.");
-        updateUser(authData.user);
-
+        // --- MODIFIED: Role-based redirection logic ---
         if (from) {
           navigate(from, { replace: true });
         } else {
-          navigate("/dashboard");
+          if (formData.role === 'venue_owner') {
+            navigate("/owner/dashboard");
+          } else {
+            navigate("/");
+          }
         }
       }
     } catch (error) {
       toast.dismiss(loadingToast);
-      toast.error(error.message || "An error occurred during registration.");
+      toast.error(error.message || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   };
 
-  const inputStyles = "w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-green focus:border-primary-green transition-all";
-  const labelStyles = "block mb-1 text-xs font-medium text-gray-700";
+  const inputStyles = "w-full p-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-primary-green focus:border-primary-green transition-all";
+  const labelStyles = "block mb-0.5 text-xs font-medium text-gray-700";
 
   return (
     <form onSubmit={handleRegister}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-1.5">
         <div>
           <label htmlFor="first_name" className={labelStyles}>
             First Name
@@ -222,7 +219,7 @@ function RegisterForm() {
       </div>
       <button
         type="submit"
-        className="w-full bg-primary-green text-white py-2 rounded-lg text-sm font-semibold transition-all duration-300 hover:bg-primary-green-dark hover:-translate-y-0.5 disabled:opacity-50 disabled:transform-none shadow-md hover:shadow-lg mt-3"
+        className="w-full bg-primary-green text-white py-1.5 rounded text-xs font-semibold transition-all duration-300 hover:bg-primary-green-dark disabled:opacity-50 shadow-md hover:shadow-lg mt-2"
         disabled={loading}
       >
         {loading ? "Creating Account..." : "Create Account"}
