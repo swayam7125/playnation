@@ -11,7 +11,6 @@ function ExplorePage() {
   const [sortBy, setSortBy] = useState("name");
   const [viewMode, setViewMode] = useState("grid");
 
-  // --- MODIFIED: Pass filter states to the custom hook for server-side execution ---
   const { venues, loading, error } = useVenues({
     selectedSport: selectedSport,
     searchTerm: searchTerm,
@@ -35,7 +34,6 @@ function ExplorePage() {
     fetchSports();
   }, []);
 
-  // --- MODIFIED: Use the venues returned by the hook directly, as they are already filtered and sorted ---
   const filteredAndSortedVenues = venues;
 
   const clearFilters = () => {
@@ -47,34 +45,32 @@ function ExplorePage() {
   const activeFiltersCount = [
     selectedSport !== "all",
     searchTerm.length > 0,
-    // We only count the filters that apply constraints on the server/client
   ].filter(Boolean).length;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-br from-primary-green to-primary-green-dark text-white py-10 px-4">
+      {/* Compact Hero Section */}
+      <div className="bg-gradient-to-br from-primary-green to-primary-green-dark text-white py-6 px-4">
         <div className="container mx-auto text-center">
-          <h1 className="text-3xl md:text-4xl font-bold mb-3">
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">
             Explore Amazing Venues
           </h1>
-          <p className="text-lg text-green-200 mb-6 max-w-2xl mx-auto">
-            Discover the perfect sports venues in your area. Filter by sport,
-            location, and more to find your ideal playing ground.
+          <p className="text-sm text-green-200 mb-4 max-w-2xl mx-auto">
+            Discover the perfect sports venues in your area
           </p>
 
-          {/* Search Bar */}
-          <div className="max-w-2xl mx-auto relative">
+          {/* Compact Search Bar */}
+          <div className="max-w-xl mx-auto relative">
             <input
               type="text"
-              placeholder="Search venues by name, location, or description..."
+              placeholder="Search venues..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full py-4 px-6 pr-12 rounded-full border-0 text-dark-text text-lg shadow-lg focus:outline-none focus:ring-4 focus:ring-white/30 transition-all duration-300"
+              className="w-full py-2.5 px-4 pr-10 rounded-full border-0 text-dark-text text-sm shadow-md focus:outline-none focus:ring-2 focus:ring-white/30 transition-all"
             />
-            <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
               <svg
-                className="w-6 h-6 text-light-text"
+                className="w-5 h-5 text-light-text"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -91,22 +87,22 @@ function ExplorePage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        {/* Filters and Controls */}
-        <div className="bg-card-bg rounded-2xl shadow-lg p-6 mb-8 border border-border-color-light">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+      <div className="container mx-auto px-4 py-4">
+        {/* Compact Filters and Controls */}
+        <div className="bg-card-bg rounded-xl shadow-md p-4 mb-4 border border-border-color-light">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
             {/* Sport Filter */}
             <div className="flex-1">
-              <label className="block text-sm font-semibold text-dark-text mb-3">
+              <label className="block text-xs font-semibold text-dark-text mb-2">
                 Filter by Sport
               </label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 <button
                   onClick={() => setSelectedSport("all")}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
                     selectedSport === "all"
-                      ? "bg-primary-green text-white shadow-md"
-                      : "bg-light-green-bg text-primary-green border border-primary-green/20 hover:bg-primary-green hover:text-white hover:shadow-md"
+                      ? "bg-primary-green text-white shadow-sm"
+                      : "bg-light-green-bg text-primary-green border border-primary-green/20 hover:bg-primary-green hover:text-white"
                   }`}
                 >
                   All Sports
@@ -116,10 +112,10 @@ function ExplorePage() {
                     <button
                       key={sport.sport_id}
                       onClick={() => setSelectedSport(sport.sport_id)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
                         selectedSport === sport.sport_id
-                          ? "bg-primary-green text-white shadow-md"
-                          : "bg-light-green-bg text-primary-green border border-primary-green/20 hover:bg-primary-green hover:text-white hover:shadow-md"
+                          ? "bg-primary-green text-white shadow-sm"
+                          : "bg-light-green-bg text-primary-green border border-primary-green/20 hover:bg-primary-green hover:text-white"
                       }`}
                     >
                       {sport.name}
@@ -129,22 +125,22 @@ function ExplorePage() {
             </div>
 
             {/* Sort and View Controls */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {/* Sort Dropdown */}
               <div>
-                <label className="block text-sm font-semibold text-dark-text mb-2">
+                <label className="block text-xs font-semibold text-dark-text mb-1.5">
                   Sort by
                 </label>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="px-4 py-2 border border-border-color rounded-lg text-dark-text bg-card-bg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
+                  className="px-3 py-1.5 text-sm border border-border-color rounded-lg text-dark-text bg-card-bg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
                 >
                   <option value="name">Name</option>
-                  <option value="rating" disabled>
+                  <option value="rating">
                     Rating
                   </option>
-                  <option value="price" disabled>
+                  <option value="price">
                     Price
                   </option>
                 </select>
@@ -152,20 +148,20 @@ function ExplorePage() {
 
               {/* View Mode Toggle */}
               <div>
-                <label className="block text-sm font-semibold text-dark-text mb-2">
+                <label className="block text-xs font-semibold text-dark-text mb-1.5">
                   View
                 </label>
                 <div className="flex border border-border-color rounded-lg overflow-hidden">
                   <button
                     onClick={() => setViewMode("grid")}
-                    className={`px-3 py-2 ${
+                    className={`px-2.5 py-1.5 ${
                       viewMode === "grid"
                         ? "bg-primary-green text-white"
                         : "bg-card-bg text-medium-text hover:bg-hover-bg"
                     } transition-colors duration-200`}
                   >
                     <svg
-                      className="w-5 h-5"
+                      className="w-4 h-4"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -180,14 +176,14 @@ function ExplorePage() {
                   </button>
                   <button
                     onClick={() => setViewMode("list")}
-                    className={`px-3 py-2 ${
+                    className={`px-2.5 py-1.5 ${
                       viewMode === "list"
                         ? "bg-primary-green text-white"
                         : "bg-card-bg text-medium-text hover:bg-hover-bg"
                     } transition-colors duration-200`}
                   >
                     <svg
-                      className="w-5 h-5"
+                      className="w-4 h-4"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -205,24 +201,22 @@ function ExplorePage() {
             </div>
           </div>
 
-          {/* Active Filters Summary */}
+          {/* Compact Active Filters Summary */}
           {activeFiltersCount > 0 && (
-            <div className="mt-4 pt-4 border-t border-border-color-light flex items-center justify-between">
+            <div className="mt-3 pt-3 border-t border-border-color-light flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-medium-text">
-                  {activeFiltersCount} filter{activeFiltersCount > 1 ? "s" : ""}{" "}
-                  active
+                <span className="text-xs text-medium-text">
+                  {activeFiltersCount} filter{activeFiltersCount > 1 ? "s" : ""} active
                 </span>
-                <span className="bg-primary-green text-white text-xs px-2 py-1 rounded-full">
-                  {filteredAndSortedVenues.length} result
-                  {filteredAndSortedVenues.length !== 1 ? "s" : ""}
+                <span className="bg-primary-green text-white text-xs px-2 py-0.5 rounded-full">
+                  {filteredAndSortedVenues.length}
                 </span>
               </div>
               <button
                 onClick={clearFilters}
-                className="text-sm text-primary-green hover:text-primary-green-dark font-medium transition-colors duration-200"
+                className="text-xs text-primary-green hover:text-primary-green-dark font-medium transition-colors duration-200"
               >
-                Clear all filters
+                Clear all
               </button>
             </div>
           )}
@@ -230,18 +224,16 @@ function ExplorePage() {
 
         {/* Results */}
         {loading && (
-          <div className="text-center py-16">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-green mb-4"></div>
-            <p className="text-medium-text text-lg">
-              Loading amazing venues...
-            </p>
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-primary-green mb-3"></div>
+            <p className="text-medium-text text-sm">Loading venues...</p>
           </div>
         )}
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
             <svg
-              className="w-12 h-12 text-red-400 mx-auto mb-4"
+              className="w-10 h-10 text-red-400 mx-auto mb-3"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -253,17 +245,17 @@ function ExplorePage() {
                 d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <p className="text-red-800 text-lg font-semibold mb-2">
+            <p className="text-red-800 text-base font-semibold mb-1">
               Oops! Something went wrong
             </p>
-            <p className="text-red-600">{error}</p>
+            <p className="text-red-600 text-sm">{error}</p>
           </div>
         )}
 
         {!loading && !error && filteredAndSortedVenues.length === 0 && (
-          <div className="text-center py-16">
+          <div className="text-center py-12">
             <svg
-              className="w-24 h-24 text-light-text mx-auto mb-6"
+              className="w-16 h-16 text-light-text mx-auto mb-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -275,18 +267,18 @@ function ExplorePage() {
                 d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
               />
             </svg>
-            <h3 className="text-xl font-semibold text-dark-text mb-2">
+            <h3 className="text-lg font-semibold text-dark-text mb-1">
               No venues found
             </h3>
-            <p className="text-medium-text mb-6">
+            <p className="text-medium-text text-sm mb-4">
               {searchTerm || selectedSport !== "all"
-                ? "Try adjusting your filters or search terms to discover more venues."
-                : "We couldn't find any venues at the moment."}
+                ? "Try adjusting your filters or search terms"
+                : "We couldn't find any venues at the moment"}
             </p>
             {activeFiltersCount > 0 && (
               <button
                 onClick={clearFilters}
-                className="bg-primary-green text-white px-6 py-3 rounded-full font-semibold hover:bg-primary-green-dark transition-colors duration-200 shadow-lg hover:shadow-xl"
+                className="bg-primary-green text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-primary-green-dark transition-colors duration-200 shadow-md"
               >
                 Clear Filters
               </button>
@@ -298,8 +290,8 @@ function ExplorePage() {
           <div
             className={
               viewMode === "grid"
-                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-                : "flex flex-col gap-6 max-w-5xl mx-auto"
+                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                : "flex flex-col gap-4 max-w-4xl mx-auto"
             }
           >
             {filteredAndSortedVenues.map((venue) => (
@@ -307,7 +299,7 @@ function ExplorePage() {
                 key={venue.id}
                 className={
                   viewMode === "list"
-                    ? "transform hover:scale-[1.02] transition-transform duration-200"
+                    ? "transform hover:scale-[1.01] transition-transform duration-200"
                     : ""
                 }
               >

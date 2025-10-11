@@ -52,7 +52,7 @@ const AppLayout = () => {
   const { pathname } = location;
 
   // Define the paths where the footer should be displayed
-  const showFooterOnPaths = ["/", "/explore", "/about", "/contact"];
+  const showFooterOnPaths = ["/", "/about", "/contact"];
 
   // Check for exact paths or if it's a dynamic venue page
   const shouldShowFooter =
@@ -84,9 +84,9 @@ function App() {
               duration: 5000,
             },
             style: {
-              fontSize: '14px',
+              fontSize: '16px',
               maxWidth: '500px',
-              padding: '12px 16px',
+              padding: '16px 24px',
             },
           }}
         />

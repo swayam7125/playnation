@@ -52,16 +52,16 @@ function VenueCard({ venue, viewMode = "grid" }) {
       onClick={handleCardClick}
     >
       <div
-        className={`bg-card-bg rounded-xl shadow-md border border-border-color-light 
-          hover:shadow-lg hover:border-primary-green/30 transition-all duration-300 
+        className={`bg-card-bg rounded-lg shadow-sm border border-border-color-light 
+          hover:shadow-md hover:border-primary-green/30 transition-all duration-300 
           group overflow-hidden cursor-pointer
-          ${viewMode === "grid" ? "flex flex-col w-[300px] h-full" : "flex flex-row w-full h-52"}`}
+          ${viewMode === "grid" ? "flex flex-col w-full h-full" : "flex flex-row w-full h-40"}`}
       >
         {/* IMAGE */}
         <div
           className={`${
-            viewMode === "grid" ? "w-full h-48" : "w-64 h-full"
-          } relative overflow-hidden`}
+            viewMode === "grid" ? "w-full h-36" : "w-48 h-full"
+          } relative overflow-hidden flex-shrink-0`}
         >
           {isHovered && imagesToDisplay.length > 1 ? (
             <Swiper
@@ -103,43 +103,43 @@ function VenueCard({ venue, viewMode = "grid" }) {
 
         {/* INFO */}
         <div
-          className={`p-5 flex flex-col flex-grow 
+          className={`p-3 flex flex-col flex-grow 
             ${viewMode === "list" ? "justify-between" : ""}`}
         >
           {/* Title & Address */}
           <div>
-            <h3 className="text-xl font-semibold text-dark-text mb-1 group-hover:text-primary-green-dark transition-colors">
+            <h3 className="text-base font-semibold text-dark-text mb-0.5 line-clamp-1 group-hover:text-primary-green-dark transition-colors">
               {venue.name}
             </h3>
-            <p className="text-sm text-medium-text flex items-center">
-              <FaMapMarkerAlt className="mr-1 text-primary-green" />
-              {venue.address}, {venue.city}
+            <p className="text-xs text-medium-text flex items-center line-clamp-1">
+              <FaMapMarkerAlt className="mr-1 text-primary-green flex-shrink-0" size={10} />
+              <span className="truncate">{venue.address}, {venue.city}</span>
             </p>
           </div>
 
           {/* Sports Tags */}
           {availableSports.length > 0 && (
-            <div className="flex gap-2 mt-3 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-              {availableSports.slice(0, 4).map((sport) => (
+            <div className="flex gap-1.5 mt-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+              {availableSports.slice(0, 3).map((sport) => (
                 <span
                   key={sport}
-                  className="bg-light-green-bg text-emerald-800 px-3 py-1 rounded-full text-xs font-medium border border-emerald-200 whitespace-nowrap"
+                  className="bg-light-green-bg text-emerald-800 px-2 py-0.5 rounded-full text-xs font-medium border border-emerald-200 whitespace-nowrap"
                 >
                   {sport}
                 </span>
               ))}
-              {availableSports.length > 4 && (
-                <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-medium border border-gray-200 whitespace-nowrap">
-                  +{availableSports.length - 4} more
+              {availableSports.length > 3 && (
+                <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs font-medium border border-gray-200 whitespace-nowrap">
+                  +{availableSports.length - 3}
                 </span>
               )}
             </div>
           )}
 
           {/* CTA */}
-          <div className="flex justify-end mt-4">
-            <span className="text-sm font-semibold text-primary-green group-hover:text-primary-green-dark transition-colors">
-              View Details & Book →
+          <div className="flex justify-end mt-2">
+            <span className="text-xs font-semibold text-primary-green group-hover:text-primary-green-dark transition-colors">
+              View Details →
             </span>
           </div>
         </div>
