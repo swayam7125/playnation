@@ -1,9 +1,4 @@
-import {
-  Routes,
-  Route,
-  Outlet,
-  useLocation,
-} from "react-router-dom";
+import { Routes, Route, Outlet, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 
 // Auth & Context
@@ -83,9 +78,9 @@ function App() {
               duration: 5000,
             },
             style: {
-              fontSize: '16px',
-              maxWidth: '500px',
-              padding: '16px 24px',
+              fontSize: "16px",
+              maxWidth: "500px",
+              padding: "16px 24px",
             },
           }}
         />
@@ -96,7 +91,7 @@ function App() {
             <Route path="venues/:venueId" element={<VenuePage />} />
             <Route path="about" element={<AboutUsPage />} />
             <Route path="contact" element={<ContactUsPage />} />
-            
+
             {/* Auth Routes */}
             <Route path="auth" element={<AuthPage />} />
             <Route path="login" element={<AuthPage />} />
@@ -125,15 +120,10 @@ function App() {
                 path="manage-slots/:facilityId"
                 element={<ManageSlotsPage />}
               />
-              <Route
-                path="manage-offers"
-                element={<ManageOffersPage />}
-              />
+              <Route path="manage-offers" element={<ManageOffersPage />} />
               {/* --- FIX: Changed route path to "calendar" --- */}
-              <Route
-                path="calendar"
-                element={<BookingCalendarPage />}
-              />
+              <Route path="calendar" 
+              element={<BookingCalendarPage />} />
             </Route>
 
             {/* Admin Routes */}
