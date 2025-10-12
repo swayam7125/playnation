@@ -1,4 +1,3 @@
-// src/pages/HomePage.jsx
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
@@ -29,11 +28,28 @@ export default function HomePage() {
   const [heroOffers, setHeroOffers] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // --- START REDIRECTION LOGIC ---
   useEffect(() => {
-    if (user && profile?.role === "venue_owner") {
-      navigate("/owner/dashboard");
+    // This effect runs immediately when the component mounts with the final user/profile state
+    if (user && profile) {
+      if (profile.role === "venue_owner") {
+        navigate("/owner/dashboard", { replace: true });
+        return;
+      }
+      if (profile.role === "admin") {
+        navigate("/admin", { replace: true });
+        return;
+      }
     }
   }, [user, profile, navigate]);
+  // --- END REDIRECTION LOGIC ---
+
+  // RENDER GUARD: If redirection is imminent, return null instantly for a cleaner switch.
+  // This executes on the very first render and returns null before the JSX is calculated.
+  const isRedirecting = profile?.role === "venue_owner" || profile?.role === "admin";
+  if (isRedirecting) {
+      return null;
+  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -72,21 +88,12 @@ export default function HomePage() {
       }
     };
 
-    if (!profile || profile?.role !== "venue_owner") {
+    // Fetch data only if the user is a 'player' or anonymous
+    if (!user || profile.role === "player") {
       fetchData();
     }
-  }, [profile]);
+  }, [user, profile]);
 
-  if (profile?.role === "venue_owner") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary-green border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-medium-text font-medium">Redirecting to your dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   const features = [
     {
@@ -357,27 +364,6 @@ export default function HomePage() {
             ))}
           </div>
         </section>
-
-        {/* Stats Section */}
-        {/* <section className="py-20">
-          <div className="bg-gradient-to-r from-primary-green to-primary-green-dark rounded-3xl p-12 text-center text-white">
-            <h2 className="text-4xl font-bold mb-4">
-              Join Thousands of Happy Players
-            </h2>
-            <p className="text-xl opacity-90 mb-12">
-              Be part of India's largest sports community
-            </p>
-            
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-              {stats.map((stat, index) => (
-                <div key={index} className="text-center">
-                  <div className="text-4xl lg:text-5xl font-bold mb-2">{stat.number}</div>
-                  <div className="text-lg opacity-80">{stat.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section> */}
 
         {/* Testimonials Section */}
         <section className="py-20">

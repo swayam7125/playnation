@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
+import toast from "react-hot-toast";
 import BookingCard from "../../components/bookings/BookingCard";
 import {
   LoadingSpinner,
@@ -38,13 +39,15 @@ function MyBookingsPage() {
       const now = new Date();
       const allBookings = data || [];
 
+      // FIX: Upcoming bookings must be in the future AND have a 'confirmed' status.
       const upcomingBookings = allBookings
-        .filter((b) => new Date(b.start_time) >= now)
+        .filter((b) => new Date(b.start_time) >= now && b.status === 'confirmed')
         .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
 
+      // FIX: Past bookings include all bookings that are in the past OR any booking that is not 'confirmed' (cancelled/failed).
       const pastBookings = allBookings
-        .filter((b) => new Date(b.start_time) < now)
-        .sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
+        .filter((b) => new Date(b.start_time) < now || b.status !== 'confirmed')
+        .sort((a, b) => new Date(b.start_time) - new Date(b.start_time));
 
       setBookings({
         upcoming: upcomingBookings,
@@ -66,14 +69,57 @@ function MyBookingsPage() {
     setRefreshKey((prevKey) => prevKey + 1);
   };
 
-  const handleCancelBooking = async (bookingId) => {
-    console.log("Cancelling booking:", bookingId);
-    handleRefresh();
-  };
-
   const handleReviewSubmitted = () => {
     handleRefresh();
   };
+
+  // The confirmation modal/logic is now handled entirely within BookingCard.jsx
+  const handleCancelBooking = async (bookingId) => {
+    if (!user || !bookingId) return;
+
+    // Start loading toast
+    const loadingToast = toast.loading('Canceling booking...');
+
+    try {
+      // Call the secure PostgreSQL function using RPC
+      const { error: rpcError } = await supabase.rpc(
+        'cancel_booking_transaction', 
+        { 
+          p_booking_id: bookingId, 
+          p_user_id: user.id 
+        }
+      );
+
+      if (rpcError) {
+        // Throw to enter catch block and handle DB errors
+        throw new Error(rpcError.message);
+      }
+
+      // Success notification
+      toast.success('Booking successfully cancelled and slot released.', { id: loadingToast });
+      
+      // Refresh the booking list
+      handleRefresh();
+
+    } catch (err) {
+      console.error("Cancellation error:", err);
+      const dbErrorMessage = err.message || "Could not cancel booking. Please try again.";
+      let friendlyMessage;
+
+      // Map specific database errors to friendly messages
+      if (dbErrorMessage.includes('already cancelled')) {
+        friendlyMessage = 'Booking is already cancelled.';
+      } else if (dbErrorMessage.includes('Booking not found')) {
+        friendlyMessage = 'Booking not found or not owned by you.';
+      } else {
+        friendlyMessage = dbErrorMessage; // Use the direct DB error if it's clear
+      }
+
+      // Error notification
+      toast.error(friendlyMessage, { id: loadingToast });
+    }
+  };
+
 
   const RenderBookings = () => {
     const bookingsToShow = view === "upcoming" ? bookings.upcoming : bookings.past;
@@ -103,7 +149,7 @@ function MyBookingsPage() {
         <Calendar size={48} className="mx-auto text-medium-text/50 mb-4" />
         <h3 className="text-xl font-semibold text-dark-text">No {view} bookings found</h3>
         <p className="text-medium-text mt-2">
-          {view === "upcoming" ? "Time to get a game in!" : "You haven't played in a while."}
+          {view === "upcoming" ? "Time to book your next game!" : "You haven't played in a while."}
         </p>
       </div>
     );
