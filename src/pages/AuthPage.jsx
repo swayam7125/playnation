@@ -17,17 +17,12 @@ function AuthPage() {
     setIsLoginView(location.pathname === '/login');
   }, [location.pathname]);
 
-  // --- THIS IS THE FIX ---
-  // This effect adds `overflow-hidden` to the body when the component mounts,
-  // preventing the page from scrolling. It cleans up by removing the class
-  // when the component unmounts (when you navigate to another page).
   useEffect(() => {
     document.body.classList.add('overflow-hidden');
     return () => {
       document.body.classList.remove('overflow-hidden');
     };
   }, []);
-  // --- END OF FIX ---
 
   const toggleView = (path) => {
     navigate(path, { state: location.state, replace: true });

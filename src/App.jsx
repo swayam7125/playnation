@@ -3,11 +3,13 @@ import {
   Route,
   Outlet,
   useLocation,
+  Navigate,
 } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
+import React, { useEffect } from "react"; // 👈 Import React and useEffect
 
 // Auth & Context
-import { AuthProvider } from "./AuthContext";
+import { AuthProvider, useAuth } from "./AuthContext";
 import { ModalProvider } from "./ModalContext";
 import AdminProtectedRoute from "./components/auth/AdminProtectedRoute";
 import OwnerProtectedRoute from "./components/auth/OwnerProtectedRoute";
@@ -45,6 +47,19 @@ import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
 import AdminManageOffersPage from "./pages/admin/AdminManageOffersPage";
 import AdminNotifyPage from "./pages/admin/AdminNotifyPage";
 
+// --- NEW COMPONENT: Resets scroll position on route change ---
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    // Scrolls to the top-left corner of the page on every route change
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+};
+// -------------------------------------------------------------
+
 // Layout Component to conditionally render footer
 const AppLayout = () => {
   const location = useLocation();
@@ -55,7 +70,7 @@ const AppLayout = () => {
 
   // Check for exact paths or if it's a dynamic venue page
   const shouldShowFooter =
-    showFooterOnPaths.includes(pathname) || pathname.startsWith("/venue/");
+    showFooterOnPaths.includes(pathname) || pathname.startsWith("/venues/");
 
   return (
     <div className="flex flex-col min-h-screen bg-background font-sans">
@@ -67,6 +82,10 @@ const AppLayout = () => {
     </div>
   );
 };
+
+// --- The App component with the previous flicker fix integrated ---
+// You MUST ensure your HomePage.jsx file is clean of the redundant redirection logic 
+// from previous steps for the AuthContext delay fix to work correctly.
 
 function App() {
   return (
@@ -90,8 +109,11 @@ function App() {
           }}
         />
         <Routes>
-          <Route path="/" element={<AppLayout />}>
+          <Route path="/" element={<> <ScrollToTop /> <AppLayout /> </>}> {/* 👈 WRAPPING LAYOUT WITH SCROLLTOTOP */}
+            
+            {/* Index route element restored to HomePage (The delay is in AuthContext) */}
             <Route index element={<HomePage />} />
+            
             <Route path="explore" element={<ExplorePage />} />
             <Route path="venues/:venueId" element={<VenuePage />} />
             <Route path="about" element={<AboutUsPage />} />
@@ -107,7 +129,7 @@ function App() {
             <Route path="profile" element={<ProfilePage />} />
             <Route path="booking/:facilityId" element={<BookingPage />} />
 
-            {/* Owner Routes */}
+            {/* Owner Routes (Path is fixed, protected) */}
             <Route
               path="owner"
               element={
@@ -122,14 +144,13 @@ function App() {
               <Route path="add-venue" element={<AddVenuePage />} />
               <Route path="edit-venue/:venueId" element={<EditVenuePage />} />
               <Route
-                path="manage-slots/:facilityId"
+                path="manage-slots"
                 element={<ManageSlotsPage />}
               />
               <Route
                 path="manage-offers"
                 element={<ManageOffersPage />}
               />
-              {/* --- FIX: Changed route path to "calendar" --- */}
               <Route
                 path="calendar"
                 element={<BookingCalendarPage />}
