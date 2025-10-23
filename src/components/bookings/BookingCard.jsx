@@ -1,263 +1,275 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
-import { Calendar, Clock, MapPin, Tag, Landmark, MessageSquarePlus, X, XCircle, AlertTriangle } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { formatCurrency } from '../../utils/formatters';
-import ReviewForm from '../reviews/ReviewForm';
+// src/components/bookings/BookingCard.jsx
 
-const BookingCard = ({ booking, onReviewSubmitted, onCancelBooking }) => {
-  const [isReviewing, setIsReviewing] = useState(false);
-  const [isCancelling, setIsCancelling] = useState(false);
-  const [cancellationReason, setCancellationReason] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  
-  const { facilities, start_time, end_time, total_amount, status, reviews } = booking || {};
-  const venue = facilities?.venues;
+import React, { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
+// We no longer need useModal for cancellation
+// import { useModal } from "../../ModalContext"; 
+import {
+  MapPin,
+  Calendar,
+  Clock,
+  Sparkles,
+  XCircle,
+  CheckCircle,
+  MessageSquare,
+} from "lucide-react";
+import ReviewModal from "../reviews/ReviewModal";
+import CancelBookingModal from "./CancelBookingModal"; // This import is correct
 
-  if (!booking || !venue || !facilities) {
-    return (
-      <div className="bg-card-bg rounded-lg shadow p-4 border border-border-color-light text-center">
-        <p className="text-sm text-medium-text">Booking information unavailable</p>
-      </div>
-    );
+// --- Helper Functions for Formatting ---
+const formatDate = (dateString) => {
+  return new Date(dateString).toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+};
+
+const formatTime = (dateString) => {
+  return new Date(dateString).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
+// --- Helper Components for UI ---
+const InfoRow = ({ icon: Icon, text }) => (
+  <div className="flex items-center gap-3 text-medium-text">
+    <Icon className="h-4 w-4 flex-shrink-0 text-primary-green" />
+    <span className="text-sm">{text}</span>
+  </div>
+);
+
+const BookingStatusBadge = ({ status }) => {
+  let bgColor, textColor, text, Icon;
+  switch (status) {
+    case "confirmed":
+      bgColor = "bg-green-100";
+      textColor = "text-green-800";
+      text = "Confirmed";
+      Icon = CheckCircle;
+      break;
+    case "cancelled":
+      bgColor = "bg-red-100";
+      textColor = "text-red-800";
+      text = "Cancelled";
+Icon = XCircle;
+      break;
+    default:
+      bgColor = "bg-yellow-100";
+      textColor = "text-yellow-800";
+      text = status;
+      Icon = Clock;
+  }
+  return (
+    <div
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${bgColor} ${textColor}`}
+    >
+      <Icon className="h-3 w-3" />
+      {text}
+    </div>
+  );
+};
+
+// --- Main BookingCard Component ---
+
+function BookingCard({
+  booking,
+  onReviewSubmitted,
+  onCancelBooking,
+  isHighlighted = false,
+}) {
+  // const { showModal } = useModal(); // No longer needed
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false); // This is correct
+  const cardRef = useRef(null);
+
+  // Auto-scroll to the card if it's highlighted
+  useEffect(() => {
+    if (isHighlighted && cardRef.current) {
+      cardRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
+      });
+    }
+  }, [isHighlighted]);
+
+  if (!booking || !booking.facilities || !booking.facilities.venues) {
+    return null; // Don't render if data is incomplete
   }
 
-  const now = new Date();
-  const bookingStartTime = new Date(start_time);
-  const isUpcoming = bookingStartTime >= now;
-  
-  const canCancel = isUpcoming && status === 'confirmed';
-  const canReview = status === 'completed' && (!reviews || reviews.length === 0);
+  const {
+    booking_id,
+    start_time,
+    end_time,
+    total_amount,
+    status,
+    facilities,
+  } = booking;
+  const { name: facilityName, sports } = facilities;
+  const { venue_id, name: venueName, address, image_url } = facilities.venues;
 
-  const getStatusClass = (currentStatus) => {
-    switch (currentStatus?.toLowerCase()) {
-      case 'confirmed': return 'bg-green-100 text-green-700';
-      case 'completed': return 'bg-blue-100 text-blue-700';
-      case 'cancelled': return 'bg-red-100 text-red-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
-  };
-  
-  const handleReviewSuccess = () => {
-    setIsReviewing(false);
-    if (onReviewSubmitted) {
-      onReviewSubmitted();
-    }
-  };
+  const isUpcoming = new Date(start_time) >= new Date() && status === "confirmed"; //
+  const isPast = new Date(start_time) < new Date() && status === "confirmed";
+  const hasBeenReviewed = booking.reviews && booking.reviews.length > 0;
+
+  // --- Handlers ---
 
   const handleCancelClick = () => {
-    setIsCancelling(true);
-    setCancellationReason('');
+    setIsCancelModalOpen(true); // This is correct
   };
 
-  const handleCancelConfirm = async () => {
-    if (!cancellationReason.trim()) {
-      toast.error('Please provide a reason for cancellation');
-      return;
-    }
+  // 👇 --- THIS FUNCTION WAS MISSING ---
+  // This function is passed to CancelBookingModal's onSubmit
+  // It receives the (booking_id, reason) and passes them up to MyBookingsPage
+  const handleConfirmCancel = async (bookingId, reason) => {
+    await onCancelBooking(bookingId, reason); // Call the main function from props
+    setIsCancelModalOpen(false); // Close modal on success
+  };
+  // 👆 --- END OF MISSING FUNCTION ---
 
-    setIsProcessing(true);
-    const success = await onCancelBooking(booking.booking_id, cancellationReason);
-    setIsProcessing(false);
-    
-    if (success) {
-      setIsCancelling(false);
-    }
+  const handleReviewClick = () => {
+    setIsReviewModalOpen(true);
+  };
+
+  const handleReviewSuccess = () => {
+    setIsReviewModalOpen(false);
+    onReviewSubmitted(); // Refresh the bookings list in the parent
   };
 
   return (
     <>
-      <div className="bg-card-bg rounded-lg shadow-md border border-border-color-light overflow-hidden hover:shadow-lg transition-shadow">
-        {/* Image Section - Smaller */}
+      <div
+        ref={cardRef}
+        className={`flex flex-col overflow-hidden rounded-xl bg-card-bg shadow-lg transition-all duration-500 ease-in-out ${
+          isHighlighted
+            ? "ring-4 ring-primary-green ring-offset-2 ring-offset-background"
+            : "border border-border-color-light hover:shadow-xl"
+        }`}
+      >
+        {/* --- Image and Header --- */}
         <div className="relative">
-          <img
-            src={venue.image_url?.[0] || 'https://via.placeholder.com/400x150?text=No+Image'}
-            alt={venue.name}
-            className="w-full h-32 object-cover"
-          />
-          <div className={`absolute top-2 right-2 px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusClass(status)}`}>
-            {status.toUpperCase()}
+          <Link to={`/venues/${venue_id}`}>
+            <img
+              src={image_url || "https://via.placeholder.com/400x200?text=Venue"}
+              alt={venueName}
+              className="h-48 w-full object-cover"
+            />
+          </Link>
+          <div className="absolute top-3 right-3">
+            <BookingStatusBadge status={status} />
           </div>
         </div>
 
-        {/* Content Section - Compact */}
-        <div className="p-4">
-          {/* Venue Info - Compact */}
-          <div className="mb-3">
-            <p className="text-xs text-medium-text font-medium flex items-center gap-1.5 mb-1">
-               <Landmark size={12} /> {facilities.name} • {facilities.sports?.name || 'General'}
+        {/* --- Card Content --- */}
+        <div className="flex flex-1 flex-col p-5">
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-primary-green">
+              {sports.name.toUpperCase()}
             </p>
-            <h3 className="text-base font-bold text-dark-text leading-tight mb-1">
-              <Link to={`/venues/${venue.venue_id}`} className="hover:text-primary-green transition-colors line-clamp-1">
-                  {venue.name}
-              </Link>
-            </h3>
-            <p className="text-xs text-medium-text flex items-center gap-1.5 line-clamp-1">
-              <MapPin size={12} /> {venue.address}
+            <Link to={`/venues/${venue_id}`}>
+              <h3 className="mt-1 text-xl font-bold text-dark-text hover:text-primary-green">
+                {venueName}
+              </h3>
+            </Link>
+            <p className="mt-1 text-sm font-semibold text-medium-text">
+              {facilityName}
             </p>
+
+            <hr className="my-4 border-t border-border-color-light" />
+
+            {/* --- Booking Details --- */}
+            <div className="space-y-3">
+              <InfoRow icon={Calendar} text={formatDate(start_time)} />
+              <InfoRow
+                icon={Clock}
+                text={`${formatTime(start_time)} - ${formatTime(end_time)}`}
+              />
+              <InfoRow icon={MapPin} text={address} />
+            </div>
           </div>
 
-          {/* Divider */}
-          <div className="border-t border-border-color my-3"></div>
+          {/* --- Price and Actions --- */}
+          <div className="mt-6">
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-sm text-medium-text">Total Paid:</span>
+              <span className="text-2xl font-bold text-dark-text">
+                ₹{total_amount}
+              </span>
+            </div>
 
-          {/* Booking Details - Compact Grid */}
-          <div className="space-y-2 text-xs">
-             <div className="flex items-center justify-between">
-                  <span className="text-medium-text flex items-center gap-1.5">
-                    <Calendar size={13}/> Date
-                  </span>
-                  <span className="font-semibold text-dark-text">{format(new Date(start_time), 'PP')}</span>
-             </div>
-             <div className="flex items-center justify-between">
-                  <span className="text-medium-text flex items-center gap-1.5">
-                    <Clock size={13}/> Time
-                  </span>
-                  <span className="font-semibold text-dark-text">
-                    {format(new Date(start_time), 'p')} - {format(new Date(end_time), 'p')}
-                  </span>
-             </div>
-             <div className="flex items-center justify-between">
-                  <span className="text-medium-text flex items-center gap-1.5">
-                    <Tag size={13}/> Amount
-                  </span>
-                  <span className="font-bold text-primary-green text-sm">{formatCurrency(total_amount)}</span>
-             </div>
-          </div>
-          
-          {/* Action Buttons - Compact */}
-          {(canCancel || canReview) && (
-            <div className="mt-3 pt-3 border-t border-border-color-light space-y-2">
-              {canCancel && (
+            {/* --- Action Buttons --- */}
+            <div className="flex w-full gap-3">
+              {isUpcoming && ( //
                 <button
                   onClick={handleCancelClick}
-                  className="w-full bg-red-500 text-white text-xs font-semibold py-2 rounded-md hover:bg-red-600 transition-colors flex items-center justify-center gap-1.5"
+                  className="flex-1 rounded-lg border-2 border-red-500 bg-red-50 px-4 py-2.5 text-center text-sm font-semibold text-red-600 transition hover:bg-red-100"
                 >
-                  <XCircle size={14} />
                   Cancel Booking
                 </button>
               )}
-              
-              {canReview && (
-                <button
-                  onClick={() => setIsReviewing(true)}
-                  className="w-full bg-blue-500 text-white text-xs font-semibold py-2 rounded-md hover:bg-blue-600 transition-colors flex items-center justify-center gap-1.5"
+
+              {isPast && (
+                <>
+                  {hasBeenReviewed ? (
+                    <button
+                      disabled
+                      className="flex-1 rounded-lg border-2 border-border-color bg-hover-bg px-4 py-2.5 text-center text-sm font-semibold text-medium-text"
+                    >
+                      <CheckCircle className="mr-1.5 inline h-4 w-4" />
+                      Reviewed
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleReviewClick}
+                      className="flex-1 rounded-lg border-2 border-primary-green bg-primary-green px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-primary-green-dark"
+                    >
+                      <Sparkles className="mr-1.5 inline h-4 w-4" />
+                      Write a Review
+                    </button>
+                  )}
+                </>
+              )}
+
+              {status === "cancelled" && (
+                <Link
+                  to="/explore"
+                  className="flex-1 rounded-lg bg-primary-green px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-primary-green-dark"
                 >
-                  <MessageSquarePlus size={14} />
-                  Add Review
-                </button>
+                  Book Again
+                </Link>
               )}
             </div>
-          )}
+          </div>
         </div>
       </div>
+
+      {/* --- Modals --- */}
       
-      {/* Cancellation Confirmation Modal */}
-      {isCancelling && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md relative max-h-[90vh] overflow-y-auto">
-            <button 
-              onClick={() => setIsCancelling(false)} 
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10"
-              disabled={isProcessing}
-            >
-              <X size={24} />
-            </button>
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <AlertTriangle className="text-red-500" size={28} />
-                <h2 className="text-xl font-bold text-gray-900">Cancel Booking</h2>
-              </div>
-              
-              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800 mb-2">
-                  <strong>Important:</strong>
-                </p>
-                <ul className="text-sm text-yellow-800 space-y-1 list-disc list-inside">
-                  <li>The time slot will be made available for others</li>
-                  <li>Payment status remains as "Paid"</li>
-                  <li>Request refund from venue owner directly</li>
-                </ul>
-              </div>
-
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-600 mb-2 font-semibold">
-                  Booking Details:
-                </p>
-                <p className="text-sm text-gray-900 font-semibold">
-                  {venue.name}
-                </p>
-                <p className="text-sm text-gray-700">
-                  {facilities.name} - {facilities.sports?.name}
-                </p>
-                <p className="text-sm text-gray-600 mt-1">
-                  {format(new Date(start_time), 'PPP')} at {format(new Date(start_time), 'p')}
-                </p>
-                <p className="text-sm text-green-600 font-semibold mt-1">
-                  Amount: {formatCurrency(total_amount)}
-                </p>
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Reason for Cancellation <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={cancellationReason}
-                  onChange={(e) => setCancellationReason(e.target.value)}
-                  placeholder="e.g., Change of plans, found another venue..."
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
-                  rows="3"
-                  disabled={isProcessing}
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setIsCancelling(false)}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg hover:bg-gray-300 transition-colors font-semibold text-sm"
-                  disabled={isProcessing}
-                >
-                  Keep Booking
-                </button>
-                <button
-                  onClick={handleCancelConfirm}
-                  className="flex-1 bg-red-500 text-white py-2.5 rounded-lg hover:bg-red-600 transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isProcessing || !cancellationReason.trim()}
-                >
-                  {isProcessing ? 'Cancelling...' : 'Confirm Cancel'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* 👇 --- THIS COMPONENT RENDER WAS MISSING --- */}
+      {isUpcoming && (
+        <CancelBookingModal
+          isOpen={isCancelModalOpen}
+          onClose={() => setIsCancelModalOpen(false)}
+          booking={booking}
+          onSubmit={handleConfirmCancel} 
+        />
       )}
-      
-      {/* Review Form Overlay */}
-      {isReviewing && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg relative max-h-[90vh] overflow-y-auto">
-            <button 
-              onClick={() => setIsReviewing(false)} 
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10"
-            >
-              <X size={24} />
-            </button>
-            <div className="p-6">
-               <h2 className="text-xl font-bold text-gray-900 mb-4">Review: {venue.name}</h2>
-               <ReviewForm
-                bookingId={booking.booking_id}
-                venueId={venue.venue_id}
-                userId={booking.user_id}
-                onClose={() => setIsReviewing(false)}
-                onReviewSubmitted={handleReviewSuccess}
-              />
-            </div>
-          </div>
-        </div>
+      {/* 👆 --- END OF MISSING COMPONENT --- */}
+
+      {isPast && (
+        <ReviewModal
+          isOpen={isReviewModalOpen}
+          onClose={() => setIsReviewModalOpen(false)}
+          booking={booking}
+          onReviewSubmitted={handleReviewSuccess}
+        />
       )}
     </>
   );
-};
+}
 
 export default BookingCard;

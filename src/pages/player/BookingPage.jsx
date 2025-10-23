@@ -91,13 +91,17 @@ function BookingPage() {
       throw new Error(data.error);
     }
 
+    const newBookingId = data?.booking_id;
+
     await showModal({
       title: "Success!",
       message: data?.message || `Your slot at ${venue.name} has been reserved.`,
       confirmText: "Go to My Bookings",
     });
 
-    navigate("/my-bookings");
+    navigate("/my-bookings", { 
+      state: { highlightedId: newBookingId } 
+    });
     
   } catch (err) {
     const errorMessage = err.message || "An unexpected error occurred. Please try again.";

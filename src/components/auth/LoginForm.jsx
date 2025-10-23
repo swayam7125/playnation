@@ -1,13 +1,15 @@
 import React, { useState } from "react";
 import { supabase } from "../../supabaseClient";
 import toast from "react-hot-toast"; // Import toast
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const LoginForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const form = location.state?.from || { pathname: "/" };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,7 +30,7 @@ const LoginForm = () => {
       toast.error(error.message); // Show error toast
     } else {
       toast.success("Logged in successfully!"); // Show success toast
-      navigate("/"); // Redirect on success
+      navigate(form, { replace: true });
     }
     setLoading(false);
   };

@@ -1,6 +1,9 @@
+// src/pages/player/MyBookingsPage.jsx
+
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
+import { useLocation } from "react-router-dom"; //
 import toast from "react-hot-toast";
 import BookingCard from "../../components/bookings/BookingCard";
 import {
@@ -11,11 +14,13 @@ import { Calendar } from "lucide-react";
 
 function MyBookingsPage() {
   const { user } = useAuth();
+  const location = useLocation(); //
   const [bookings, setBookings] = useState({ upcoming: [], past: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [view, setView] = useState("upcoming");
   const [refreshKey, setRefreshKey] = useState(0);
+  const highlightedId = location.state?.highlightedId; //
 
   const fetchBookings = useCallback(async () => {
     if (!user) return;
@@ -31,7 +36,7 @@ function MyBookingsPage() {
           facilities ( name, sports ( name ), venues ( venue_id, name, address, city, image_url ) ),
           reviews ( review_id )
         `
-        )
+        ) //
         .eq("user_id", user.id);
 
       if (fetchError) throw fetchError;
@@ -41,12 +46,12 @@ function MyBookingsPage() {
 
       // FIX: Upcoming bookings must be in the future AND have a 'confirmed' status.
       const upcomingBookings = allBookings
-        .filter((b) => new Date(b.start_time) >= now && b.status === 'confirmed')
+        .filter((b) => new Date(b.start_time) >= now && b.status === "confirmed") //
         .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
 
       // FIX: Past bookings include all bookings that are in the past OR any booking that is not 'confirmed' (cancelled/failed).
       const pastBookings = allBookings
-        .filter((b) => new Date(b.start_time) < now || b.status !== 'confirmed')
+        .filter((b) => new Date(b.start_time) < now || b.status !== "confirmed") //
         .sort((a, b) => new Date(b.start_time) - new Date(b.start_time));
 
       setBookings({
@@ -73,9 +78,10 @@ function MyBookingsPage() {
     handleRefresh();
   };
 
-  // The confirmation modal/logic is now handled entirely within BookingCard.jsx
-  const handleCancelBooking = async (bookingId) => {
-    if (!user || !bookingId) return;
+  // 👇 --- THIS FUNCTION WAS INCORRECT ---
+  // It must accept 'reason' and pass it to the RPC
+  const handleCancelBooking = async (bookingId, reason) => {
+    if (!user || !bookingId || !reason) return;
 
     // Start loading toast
     const loadingToast = toast.loading('Canceling booking...');
@@ -86,7 +92,8 @@ function MyBookingsPage() {
         'cancel_booking_transaction', 
         { 
           p_booking_id: bookingId, 
-          p_user_id: user.id 
+          p_user_id: user.id,
+          p_cancellation_reason: reason // 👈 Pass the reason here
         }
       );
 
@@ -119,6 +126,7 @@ function MyBookingsPage() {
       toast.error(friendlyMessage, { id: loadingToast });
     }
   };
+  // 👆 --- END OF CORRECTED FUNCTION ---
 
 
   const RenderBookings = () => {
@@ -139,6 +147,7 @@ function MyBookingsPage() {
               booking={booking}
               onReviewSubmitted={handleReviewSubmitted}
               onCancelBooking={handleCancelBooking}
+              isHighlighted={booking.booking_id === highlightedId}
             />
           ))}
         </div>

@@ -18,329 +18,13 @@ import {
   FaSortAmountUp,
 } from "react-icons/fa";
 import { useModal } from "../../ModalContext";
+// --- 1. ADD IMPORTS ---
+import BookingDetailModal from "../../components/admin/BookingDetailModal";
+import BookingRow from "../../components/admin/BookingRow";
 
-const BookingDetailModal = ({ booking, onClose, onRefundAction }) => {
-  if (!booking) return null;
+// --- 2. DELETE THE INTERNAL BookingDetailModal COMPONENT (lines 22-199) ---
 
-  const formatDate = (date) =>
-    new Date(date).toLocaleDateString("en-IN", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  const formatTime = (time) =>
-    new Date(time).toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-  const statusColors = {
-    confirmed: "bg-blue-50 text-blue-700 border-blue-200",
-    completed: "bg-green-50 text-green-700 border-green-200",
-    cancelled: "bg-red-50 text-red-700 border-red-200",
-  };
-
-  const paymentColors = {
-    paid: "bg-green-50 text-green-700 border-green-200",
-    refunded: "bg-yellow-50 text-yellow-700 border-yellow-200",
-    pending_refund: "bg-orange-50 text-orange-700 border-orange-200",
-  };
-
-  const user = booking.users || {};
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-card-bg rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-8">
-          <div className="flex justify-between items-start mb-6">
-            <h2 className="text-2xl font-bold text-dark-text">
-              Booking Details
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-light-text hover:text-dark-text text-xl"
-            >
-              ×
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div className="space-y-4">
-              <div className="bg-light-green-bg rounded-xl p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <FaMapMarkerAlt className="text-primary-green" />
-                  <h3 className="font-semibold text-dark-text">
-                    Venue Information
-                  </h3>
-                </div>
-                <p className="font-bold text-dark-text">
-                  {booking.facilities.venues.name}
-                </p>
-                <p className="text-medium-text">{booking.facilities.name}</p>
-              </div>
-
-              <div className="bg-hover-bg rounded-xl p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <FaUser className="text-primary-green" />
-                  <h3 className="font-semibold text-dark-text">
-                    User Information
-                  </h3>
-                </div>
-                <p className="font-bold text-dark-text">
-                  {user.username || "N/A"}
-                </p>
-                <p className="text-medium-text">
-                  {user.email || "User Deleted"}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-hover-bg rounded-xl p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <FaCalendar className="text-primary-green" />
-                  <h3 className="font-semibold text-dark-text">Booking Time</h3>
-                </div>
-                <p className="font-bold text-dark-text">
-                  {formatDate(booking.start_time)}
-                </p>
-                <p className="text-medium-text">
-                  {formatTime(booking.start_time)}
-                </p>
-              </div>
-
-              <div className="bg-hover-bg rounded-xl p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <FaCreditCard className="text-primary-green" />
-                  <h3 className="font-semibold text-dark-text">Payment</h3>
-                </div>
-                <p className="font-bold text-2xl text-primary-green">
-                  ₹{booking.total_amount}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-4 mb-6">
-            <div
-              className={`px-4 py-2 rounded-full border ${
-                statusColors[booking.status]
-              } font-semibold`}
-            >
-              Status:{" "}
-              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-            </div>
-            <div
-              className={`px-4 py-2 rounded-full border ${
-                paymentColors[booking.payment_status]
-              } font-semibold`}
-            >
-              Payment:{" "}
-              {booking.payment_status
-                .replace("_", " ")
-                .charAt(0)
-                .toUpperCase() +
-                booking.payment_status.replace("_", " ").slice(1)}
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-4 border-t border-border-color-light">
-            {booking.status === "cancelled" &&
-              booking.payment_status === "paid" && (
-                <button
-                  onClick={() => onRefundAction(booking.booking_id, "refunded")}
-                  className="flex items-center gap-2 px-6 py-3 bg-primary-green text-white rounded-xl hover:bg-primary-green-dark transition-all duration-200 font-medium"
-                >
-                  <FaRedo /> Approve Refund
-                </button>
-              )}
-            {booking.payment_status === "refunded" && (
-              <button
-                onClick={() => onRefundAction(booking.booking_id, "paid")}
-                className="flex items-center gap-2 px-6 py-3 bg-yellow-500 text-white rounded-xl hover:bg-yellow-600 transition-all duration-200 font-medium"
-              >
-                <FaUndo /> Revert Refund
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              className="px-6 py-3 bg-border-color text-medium-text rounded-xl hover:bg-border-color-light transition-all duration-200 font-medium"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const BookingRow = ({
-  booking,
-  onRefundAction,
-  onViewDetails,
-  isExpanded,
-  onToggleExpand,
-}) => {
-  const formatDate = (date) =>
-    new Date(date).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  const formatTime = (time) =>
-    new Date(time).toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-  const statusClasses = {
-    confirmed: "bg-blue-100 text-blue-800 border border-blue-200",
-    completed: "bg-green-100 text-green-800 border border-green-200",
-    cancelled: "bg-red-100 text-red-800 border border-red-200",
-  };
-
-  const paymentStatusClasses = {
-    paid: "bg-green-100 text-green-800 border border-green-200",
-    refunded: "bg-yellow-100 text-yellow-800 border border-yellow-200",
-    pending_refund: "bg-orange-100 text-orange-800 border border-orange-200",
-  };
-
-  const user = booking.users || {};
-
-  return (
-    <>
-      <tr className="border-b border-border-color-light hover:bg-light-green-bg transition-all duration-200 group">
-        <td className="px-6 py-4">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => onToggleExpand(booking.booking_id)}
-              className="text-light-text hover:text-primary-green transition-colors"
-            >
-              {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
-            </button>
-            <div>
-              <div className="text-sm font-bold text-dark-text">
-                {booking.facilities.venues.name}
-              </div>
-              <div className="text-xs text-medium-text bg-hover-bg px-2 py-1 rounded-md inline-block mt-1">
-                {booking.facilities.name}
-              </div>
-            </div>
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-primary-green-light rounded-full flex items-center justify-center">
-              <FaUser className="text-primary-green text-xs" />
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-dark-text">
-                {user.username || "N/A"}
-              </div>
-              <div className="text-xs text-light-text">
-                {user.email || "User Deleted"}
-              </div>
-            </div>
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <div className="bg-hover-bg rounded-lg p-2 text-center">
-            <div className="text-sm font-semibold text-dark-text">
-              {formatDate(booking.start_time)}
-            </div>
-            <div className="text-xs text-medium-text">
-              {formatTime(booking.start_time)}
-            </div>
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <div className="text-lg font-bold text-primary-green">
-            ₹{booking.total_amount}
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <span
-            className={`px-3 py-2 inline-flex text-xs leading-5 font-semibold rounded-lg ${
-              statusClasses[booking.status]
-            }`}
-          >
-            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-          </span>
-        </td>
-        <td className="px-6 py-4">
-          <span
-            className={`px-3 py-2 inline-flex text-xs leading-5 font-semibold rounded-lg ${
-              paymentStatusClasses[booking.payment_status]
-            }`}
-          >
-            {booking.payment_status.replace("_", " ").charAt(0).toUpperCase() +
-              booking.payment_status.replace("_", " ").slice(1)}
-          </span>
-        </td>
-        <td className="px-6 py-4 text-right">
-          <div className="flex items-center gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <button
-              onClick={() => onViewDetails(booking)}
-              className="p-2 text-primary-green hover:bg-primary-green hover:text-white rounded-lg transition-all duration-200"
-              title="View Details"
-            >
-              <FaEye />
-            </button>
-            {booking.status === "cancelled" &&
-              booking.payment_status === "paid" && (
-                <button
-                  onClick={() => onRefundAction(booking.booking_id, "refunded")}
-                  className="p-2 text-green-600 hover:bg-green-600 hover:text-white rounded-lg transition-all duration-200"
-                  title="Approve Refund"
-                >
-                  <FaRedo />
-                </button>
-              )}
-            {booking.payment_status === "refunded" && (
-              <button
-                onClick={() => onRefundAction(booking.booking_id, "paid")}
-                className="p-2 text-yellow-600 hover:bg-yellow-600 hover:text-white rounded-lg transition-all duration-200"
-                title="Revert Refund"
-              >
-                <FaUndo />
-              </button>
-            )}
-          </div>
-        </td>
-      </tr>
-      {isExpanded && (
-        <tr className="bg-light-green-bg">
-          <td colSpan="7" className="px-6 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="text-light-text">Booking ID:</span>
-                <span className="ml-2 font-mono bg-hover-bg px-2 py-1 rounded">
-                  {booking.booking_id}
-                </span>
-              </div>
-              <div>
-                <span className="text-light-text">Created:</span>
-                <span className="ml-2 text-medium-text">
-                  {new Date(booking.created_at).toLocaleDateString("en-IN")}
-                </span>
-              </div>
-              <div className="md:text-right">
-                <button
-                  onClick={() => onViewDetails(booking)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary-green text-white rounded-lg hover:bg-primary-green-dark transition-all duration-200"
-                >
-                  <FaEye /> View Full Details
-                </button>
-              </div>
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
-  );
-};
+// --- 3. DELETE THE INTERNAL BookingRow COMPONENT (lines 203-345) ---
 
 function AdminBookingsPage() {
   const [bookings, setBookings] = useState([]);
@@ -505,23 +189,25 @@ function AdminBookingsPage() {
         "Amount",
         "Status",
         "Payment Status",
+        "Cancellation Reason", // <-- Added CSV column
       ],
       ...filteredAndSortedBookings.map((booking) => [
         booking.facilities.venues.name,
         booking.facilities.name,
-        booking.users?.username || "N/A",
+        booking.users?.username || "-",
         booking.users?.email || "User Deleted",
         new Date(booking.start_time).toLocaleDateString("en-IN"),
         new Date(booking.start_time).toLocaleTimeString("en-IN"),
         booking.total_amount,
         booking.status,
         booking.payment_status,
+        booking.cancellation_reason || "", // <-- Added CSV data
       ]),
     ]
-      .map((row) => row.join(","))
+      .map((row) => `"${row.join('","')}"`) // Quote all fields
       .join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv" });
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -817,6 +503,16 @@ function AdminBookingsPage() {
                     Payment {getSortIcon("payment_status")}
                   </div>
                 </th>
+
+                {/* --- HEADER FOR REASON --- */}
+                <th
+                  scope="col"
+                  className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider"
+                >
+                  Reason
+                </th>
+                {/* --- END OF CHANGE --- */}
+
                 <th scope="col" className="relative px-6 py-4">
                   <span className="sr-only">Actions</span>
                 </th>
@@ -838,7 +534,7 @@ function AdminBookingsPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center">
+                  <td colSpan="8" className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-4">
                       <div className="w-16 h-16 bg-border-color-light rounded-full flex items-center justify-center">
                         <FaCalendar className="text-light-text text-xl" />

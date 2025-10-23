@@ -94,7 +94,7 @@ serve(async (req) => {
         end_time: timeSlot.end_time,
         total_amount: total_amount,
         status: 'confirmed',
-        payment_status: 'pending',
+        payment_status: 'paid',
       })
       .select('booking_id')
       .single();
