@@ -102,9 +102,9 @@ function App() {
               duration: 5000,
             },
             style: {
-              fontSize: '16px',
-              maxWidth: '500px',
-              padding: '16px 24px',
+              fontSize: "16px",
+              maxWidth: "500px",
+              padding: "16px 24px",
             },
           }}
         />
@@ -118,7 +118,7 @@ function App() {
             <Route path="venues/:venueId" element={<VenuePage />} />
             <Route path="about" element={<AboutUsPage />} />
             <Route path="contact" element={<ContactUsPage />} />
-            
+
             {/* Auth Routes */}
             <Route path="auth" element={<AuthPage />} />
             <Route path="login" element={<AuthPage />} />
