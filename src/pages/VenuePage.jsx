@@ -1,6 +1,6 @@
 // src/pages/VenuePage.jsx
 import React, { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import { FaClock, FaStar, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import StarRating from "../components/reviews/StarRating";
@@ -14,10 +14,14 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 
+import { useAuth } from "../AuthContext";
+import { useModal } from "../ModalContext";
+// -----------------------
+
 const placeholderImage =
   "https://images.unsplash.com/photo-1593341646782-e02a_a4ff2ab?w=800";
 
-// ... (rest of the helper functions remain the same)
+// Helper function to get today's date string
 const getTodayString = () => {
   const today = new Date();
   const offset = today.getTimezoneOffset();
@@ -25,6 +29,7 @@ const getTodayString = () => {
   return todayWithOffset.toISOString().split("T")[0];
 };
 
+// Helper function to format time
 const formatTime = (dateString) =>
   new Date(dateString).toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -35,6 +40,11 @@ const formatTime = (dateString) =>
 function VenuePage() {
   const { venueId } = useParams();
   const navigate = useNavigate();
+
+  const location = useLocation();
+  const { user } = useAuth();
+  const { showModal } = useModal();
+
   const [venue, setVenue] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [offers, setOffers] = useState([]);
@@ -45,16 +55,21 @@ function VenuePage() {
   const [selectedDate, setSelectedDate] = useState(getTodayString());
   const [visibleReviews, setVisibleReviews] = useState(5);
 
+  // --- NEW STATE for dynamic slot loading ---
+  const [slots, setSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(true);
+  // ------------------------------------------
+
   useEffect(() => {
     const fetchVenueData = async () => {
-      // ... (fetchVenueData function remains the same)
       setLoading(true);
       setError(null);
       try {
+        // --- MODIFIED --- Removed 'time_slots (*)' from this query
         const { data: venueData, error: venueError } = await supabase
           .from("venues")
           .select(
-            `*, facilities (*, sports (name), time_slots (*), facility_amenities (*, amenities (name)))`
+            `*, facilities (*, sports (name), facility_amenities (*, amenities (name)))`
           )
           .eq("venue_id", venueId)
           .single();
@@ -90,21 +105,72 @@ function VenuePage() {
     fetchVenueData();
   }, [venueId]);
 
-  // ... (rest of the component logic remains the same)
+  // --- NEW: useEffect to fetch slots dynamically ---
+  useEffect(() => {
+    // Don't fetch if we don't have a facility or date selected
+    if (!selectedFacilityId || !selectedDate) {
+      setSlots([]);
+      setSlotsLoading(false);
+      return;
+    }
+
+    const fetchSlots = async () => {
+      setSlotsLoading(true);
+      setSlots([]); // Clear previous slots
+      setSelectedSlot(null); // Clear selected slot
+
+      try {
+        // Get the start of the selected date
+        // We use setHours to avoid timezone issues, creating a local date string
+        const startDate = new Date(selectedDate);
+        startDate.setHours(0, 0, 0, 0);
+
+        // Get the end of the selected date
+        const endDate = new Date(selectedDate);
+        endDate.setHours(23, 59, 59, 999);
+
+        // Fetch only slots that are:
+        // 1. For the selected facility
+        // 2. Are still available
+        // 3. Are in the future (from right now)
+        // 4. Start on the selected date
+        // 5. End on the selected date
+        const { data: slotData, error: slotError } = await supabase
+          .from("time_slots")
+          .select("*")
+          .eq("facility_id", selectedFacilityId)
+          .eq("is_available", true)
+          .gte("start_time", new Date().toISOString()) // Only slots from now onwards
+          .gte("start_time", startDate.toISOString()) // On the selected day
+          .lte("end_time", endDate.toISOString()); // On the selected day
+
+        if (slotError) throw slotError;
+
+        // Sort the results by start time
+        const sortedSlots = (slotData || []).sort(
+          (a, b) => new Date(a.start_time) - new Date(b.start_time)
+        );
+
+        setSlots(sortedSlots);
+      } catch (err) {
+        console.error("Error fetching time slots:", err.message);
+        // Optionally set a specific slot-related error state here
+      } finally {
+        setSlotsLoading(false);
+      }
+    };
+
+    fetchSlots();
+  }, [selectedFacilityId, selectedDate]); // Re-run when facility or date changes
+  // ------------------------------------------------
+
   const selectedFacility = venue?.facilities.find(
     (f) => f.facility_id === selectedFacilityId
   );
 
-  const filteredTimeSlots = useMemo(() => {
-    if (!selectedFacility) return [];
-    return selectedFacility.time_slots
-      .filter((slot) => {
-        const slotDate = new Date(slot.start_time).toISOString().split("T")[0];
-        const isFutureSlot = new Date(slot.start_time) > new Date();
-        return slot.is_available && slotDate === selectedDate && isFutureSlot;
-      })
-      .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-  }, [selectedFacility, selectedDate]);
+  // --- MODIFIED --- This useMemo is no longer needed
+  // const filteredTimeSlots = useMemo(() => { ... });
+  // ------------------
 
   const averageRating = useMemo(() => {
     if (reviews.length === 0) return 0;
@@ -140,21 +206,39 @@ function VenuePage() {
   };
 
   const handleProceedToBook = () => {
-  if (!selectedSlot || !selectedFacility) return;
-  const finalPrice =
-    selectedSlot.price_override ?? selectedFacility.hourly_rate;
-  
-  // FIX: Change this line to include the facility ID in the URL
-  navigate(`/booking/${selectedFacility.facility_id}`, {
-    state: {
-      venue,
-      facility: selectedFacility,
-      slot: selectedSlot,
-      price: finalPrice,
-    },
-  });
-};
+    if (!selectedSlot || !selectedFacility) return;
 
+    if (!user) {
+      showModal({
+        title: "Login Required",
+        message: "Please log in or sign up to proceed with your booking.",
+        confirmText: "Login / Sign Up",
+        onConfirm: () => {
+          navigate("/login", {
+            state: {
+              from: location.pathname + location.search,
+            },
+          });
+        },
+      });
+      return;
+    }
+
+    const finalPrice =
+      selectedSlot.price_override ?? selectedFacility.hourly_rate;
+
+    navigate(
+      `/booking/${selectedFacility.facility_id}?slot_id=${selectedSlot.slot_id}`,
+      {
+        state: {
+          venue,
+          facility: selectedFacility,
+          slot: selectedSlot,
+          price: finalPrice,
+        },
+      }
+    );
+  };
 
   const uniqueAmenities = [
     ...new Set(
@@ -188,7 +272,6 @@ function VenuePage() {
 
   return (
     <div className="bg-background">
-      {/* ... (The JSX for the top part of the component remains the same) */}
       <div className="container mx-auto px-4 py-12">
         <div className="bg-card-bg rounded-2xl shadow-lg border border-border-color-light overflow-hidden">
           <div className="relative w-full h-80 md:h-96 overflow-hidden">
@@ -322,9 +405,18 @@ function VenuePage() {
                   className="w-full px-4 py-3 bg-hover-bg border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green"
                 />
               </div>
+
+              {/* --- MODIFIED --- This block now uses 'slotsLoading' and 'slots' state */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {filteredTimeSlots.length > 0 ? (
-                  filteredTimeSlots.map((slot) => (
+                {slotsLoading ? (
+                  <div className="col-span-full text-center py-4">
+                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary-green"></div>
+                    <p className="text-medium-text text-sm mt-2">
+                      Loading slots...
+                    </p>
+                  </div>
+                ) : slots.length > 0 ? (
+                  slots.map((slot) => (
                     <button
                       key={slot.slot_id}
                       onClick={() => handleSlotSelect(slot)}
@@ -344,6 +436,7 @@ function VenuePage() {
                   </p>
                 )}
               </div>
+              {/* --- END OF MODIFICATION --- */}
             </div>
 
             <div className="reviews-section border-t border-border-color pt-8">
@@ -364,7 +457,7 @@ function VenuePage() {
                             {review.users?.first_name || review.users?.username}
                           </span>
                         </div>
-                        {/* UPDATED: Sanitize user-generated comment before rendering */}
+                        {/* Sanitize user-generated comment before rendering */}
                         <p
                           className="text-medium-text"
                           dangerouslySetInnerHTML={{

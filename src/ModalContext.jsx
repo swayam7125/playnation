@@ -1,40 +1,37 @@
-import React, { createContext, useState, useContext, useCallback } from "react";
-import Modal from "./components/common/Modal";
+// src/ModalContext.jsx
+import React, { createContext, useContext, useState } from "react";
+import Modal from "./components/common/Modal"; // Assuming this is the correct path
 
 const ModalContext = createContext();
 
 export const useModal = () => useContext(ModalContext);
 
 export const ModalProvider = ({ children }) => {
-  const [modalQueue, setModalQueue] = useState([]);
+  const [modalProps, setModalProps] = useState(null);
 
-  const showModal = useCallback((options) => {
-    return new Promise((resolve) => {
-      const modal = {
-        ...options,
-        onConfirm: (result) => {
-          setModalQueue((q) => q.slice(1)); // Remove the current modal from the queue
-          resolve(result);
-        },
-        onCancel: () => {
-          setModalQueue((q) => q.slice(1)); // Remove the current modal from the queue
-          resolve(null);
-        },
-      };
-      setModalQueue((q) => [...q, modal]); // Add the new modal to the end of the queue
-    });
-  }, []);
+  const showModal = (props) => {
+    setModalProps(props);
+  };
 
-  const hideModal = useCallback(() => {
-    setModalQueue((q) => q.slice(1));
-  }, []);
-
-  const currentModal = modalQueue[0];
+  const hideModal = () => {
+    setModalProps(null);
+  };
 
   return (
     <ModalContext.Provider value={{ showModal, hideModal }}>
       {children}
-      {currentModal && <Modal {...currentModal} />}
+      {modalProps && (
+        <Modal
+          {...modalProps} // 👈 *** THIS IS THE FIX ***
+          onClose={() => {
+            // Ensure onClose logic from props is also called if it exists
+            if (modalProps.onClose) {
+              modalProps.onClose();
+            }
+            hideModal(); // Always hide the modal
+          }}
+        />
+      )}
     </ModalContext.Provider>
   );
 };

@@ -12,6 +12,7 @@ function AuthPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isLoginView, setIsLoginView] = useState(true);
+  
 
   useEffect(() => {
     setIsLoginView(location.pathname === '/login');

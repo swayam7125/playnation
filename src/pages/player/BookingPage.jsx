@@ -1,10 +1,14 @@
-// src/pages/player/BookingPage.jsx
-
-import React, { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react"; // 👈 Add useEffect
+import {
+  useLocation,
+  useNavigate,
+  useParams, // 👈 Add useParams
+  useSearchParams, // 👈 Add useSearchParams
+} from "react-router-dom";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
 import { useModal } from "../../ModalContext";
+import toast from "react-hot-toast"; // 👈 Import toast for errors
 
 const formatDate = (dateString) =>
   new Date(dateString).toLocaleDateString("en-US", {
@@ -25,98 +29,213 @@ function BookingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showModal } = useModal();
-  const { venue, facility, slot, price } = location.state || {};
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
+  // --- NEW: URL-based data fetching ---
+  const { facilityId } = useParams(); // 👈 Get facilityId from URL
+  const [searchParams] = useSearchParams(); // 👈 Get query params
+  const slotId = searchParams.get("slot_id");
+
+  // This local state will hold our booking info, whether from state or fetch
+  const [bookingDetails, setBookingDetails] = useState(location.state || null);
+  
+  // This loading state is for the *initial* page load fetch
+  const [pageLoading, setPageLoading] = useState(!bookingDetails);
+  // This error is for the *initial* page load fetch
+  const [pageError, setPageError] = useState(null);
+
+  // Renamed: This state is for the "Confirm Booking" button action
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [confirmError, setConfirmError] = useState(null);
+
+  useEffect(() => {
+    // If we already have details from location.state, we don't need to fetch
+    if (bookingDetails) {
+      setPageLoading(false);
+      return;
+    }
+
+    // If state is missing, fetch from Supabase using URL params
+    const fetchBookingData = async () => {
+      if (!facilityId || !slotId) {
+        setPageError("Invalid booking link. Missing facility or slot information.");
+        setPageLoading(false);
+        return;
+      }
+
+      try {
+        // 1. Fetch Facility, Venue, and Sport info
+        const { data: facilityData, error: facilityError } = await supabase
+          .from("facilities")
+          .select(
+            `
+            *,
+            sports (name),
+            venues (*)
+          `
+          )
+          .eq("facility_id", facilityId)
+          .single();
+
+        if (facilityError) throw new Error(`Could not find facility. ${facilityError.message}`);
+        if (!facilityData) throw new Error("Facility not found.");
+
+        // 2. Fetch the specific Time Slot
+        const { data: slotData, error: slotError } = await supabase
+          .from("time_slots")
+          .select("*")
+          .eq("slot_id", slotId)
+          .single();
+        
+        if (slotError) throw new Error(`Could not find slot. ${slotError.message}`);
+        if (!slotData) throw new Error("Slot not found or is no longer available.");
+
+        // 3. Re-calculate the price
+        const finalPrice = slotData.price_override ?? facilityData.hourly_rate;
+
+        // 4. Set our local state
+        setBookingDetails({
+          venue: facilityData.venues,
+          facility: facilityData,
+          slot: slotData,
+          price: finalPrice,
+        });
+
+      } catch (err) {
+        setPageError(err.message);
+      } finally {
+        setPageLoading(false);
+      }
+    };
+
+    fetchBookingData();
+  }, [facilityId, slotId, bookingDetails, navigate]); // 👈 Deps array
+
+  // --- END: NEW URL-based data fetching ---
+
+  // Destructure details *after* they have been potentially fetched
+  const { venue, facility, slot, price } = bookingDetails || {};
+
+  // --- MODIFIED: Loading/Error/Redirect states ---
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-background py-8 px-4 text-center">
+        <h1 className="text-2xl font-bold text-dark-text">Loading Booking Details...</h1>
+      </div>
+    );
+  }
+
+  if (pageError) {
+    return (
+      <div className="min-h-screen bg-background py-8 px-4 text-center">
+        <h1 className="text-2xl font-bold text-red-600">Error Loading Booking</h1>
+        <p className="text-medium-text mt-2">{pageError}</p>
+        <button
+          onClick={() => navigate("/explore")}
+          className="mt-6 py-2 px-6 rounded-lg font-semibold bg-primary-green text-white hover:bg-primary-green-dark transition-all"
+        >
+          Go to Explore
+        </button>
+      </div>
+    );
+  }
+
+  // This can happen if the URL params were invalid and fetchBookingData set an error
+  // or if something truly unexpected happened.
   if (!venue || !facility || !slot || price === undefined) {
-    React.useEffect(() => {
-      navigate("/explore");
-    }, [navigate]);
+    // We can navigate away, but it's better to show an error (handled above)
+    // For safety, we'll keep a fallback redirect.
+    useEffect(() => {
+      if (!pageLoading) {
+        toast.error("Could not load booking details. Redirecting...");
+        navigate("/explore");
+      }
+    }, [pageLoading, navigate]);
     return null;
   }
+  // --- END: MODIFIED states ---
 
   const totalAmount = price;
 
   const handleConfirmBooking = async () => {
-  if (!user) {
-    showModal({
-      title: "Login Required",
-      message: "Please log in to complete your booking.",
-    });
-    navigate("/login", { state: { from: location } });
-    return;
-  }
-
-  setLoading(true);
-  setError(null);
-  
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session?.access_token) {
-      throw new Error('No valid session found. Please log in again.');
+    if (!user) {
+      showModal({
+        title: "Login Required",
+        message: "Please log in to complete your booking.",
+      });
+      // 👇 Pass current path (with query params) to redirect back after login
+      navigate("/login", { state: { from: location.pathname + location.search } });
+      return;
     }
 
-    const facilityId = facility.facility_id || facility.id;
-    const slotId = slot.slot_id || slot.id;
+    setConfirmLoading(true); // 👈 Use confirmLoading
+    setConfirmError(null);   // 👈 Use confirmError
     
-    const { data, error: functionError } = await supabase.functions.invoke('create-booking', {
-      body: {
-        facility_id: facilityId,
-        slot_id: slotId,
-        total_amount: totalAmount,
-      },
-    });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
 
-    if (functionError) {
-      let errorMessage = 'An error occurred while creating the booking';
-      
-      if (functionError.context && typeof functionError.context.text === 'function') {
-        try {
-          const errorText = await functionError.context.text();
-          const errorData = JSON.parse(errorText);
-          if (errorData.error) {
-            errorMessage = errorData.error;
-          }
-        } catch (e) {
-          // Use default error message
-        }
+      if (!session?.access_token) {
+        throw new Error('No valid session found. Please log in again.');
       }
+
+      const facilityIdToBook = facility.facility_id || facility.id;
+      const slotIdToBook = slot.slot_id || slot.id;
       
-      throw new Error(errorMessage);
+      const { data, error: functionError } = await supabase.functions.invoke('create-booking', {
+        body: {
+          facility_id: facilityIdToBook,
+          slot_id: slotIdToBook,
+          total_amount: totalAmount,
+        },
+      });
+
+      if (functionError) {
+        let errorMessage = 'An error occurred while creating the booking';
+        
+        if (functionError.context && typeof functionError.context.text === 'function') {
+          try {
+            const errorText = await functionError.context.text();
+            const errorData = JSON.parse(errorText);
+            if (errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } catch (e) {
+            // Use default error message
+          }
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      const newBookingId = data?.booking_id;
+
+      await showModal({
+        title: "Success!",
+        message: data?.message || `Your slot at ${venue.name} has been reserved.`,
+        confirmText: "Go to My Bookings",
+      });
+
+      navigate("/my-bookings", { 
+        state: { highlightedId: newBookingId } 
+      });
+      
+    } catch (err) {
+      const errorMessage = err.message || "An unexpected error occurred. Please try again.";
+      
+      setConfirmError(errorMessage); // 👈 Use confirmError
+      showModal({
+        title: "Booking Failed",
+        message: errorMessage,
+        confirmText: "Close",
+        confirmStyle: "danger",
+      });
+    } finally {
+      setConfirmLoading(false); // 👈 Use confirmLoading
     }
-
-    if (data?.error) {
-      throw new Error(data.error);
-    }
-
-    const newBookingId = data?.booking_id;
-
-    await showModal({
-      title: "Success!",
-      message: data?.message || `Your slot at ${venue.name} has been reserved.`,
-      confirmText: "Go to My Bookings",
-    });
-
-    navigate("/my-bookings", { 
-      state: { highlightedId: newBookingId } 
-    });
-    
-  } catch (err) {
-    const errorMessage = err.message || "An unexpected error occurred. Please try again.";
-    
-    setError(errorMessage);
-    showModal({
-      title: "Booking Failed",
-      message: errorMessage,
-      confirmText: "Close",
-      confirmStyle: "danger",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">
@@ -131,8 +250,8 @@ function BookingPage() {
           </p>
         </div>
 
-        {/* Error Message */}
-        {error && (
+        {/* MODIFIED: Error Message */}
+        {confirmError && ( 
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -149,7 +268,7 @@ function BookingPage() {
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-red-800">Error: {error}</p>
+                <p className="text-sm text-red-800">Error: {confirmError}</p>
               </div>
             </div>
           </div>
@@ -166,7 +285,7 @@ function BookingPage() {
                 <div>
                   <h2 className="text-2xl font-bold">{venue.name}</h2>
                   <p className="text-primary-green-light mt-1">
-                    {facility.sports.name} • {facility.name}
+                    {facility.sports?.name} • {facility.name} {/* 👈 Add optional chaining for safety */}
                   </p>
                 </div>
                 <div className="text-right">
@@ -249,7 +368,7 @@ function BookingPage() {
                 <div className="flex justify-between items-center py-3 px-4 bg-hover-bg rounded-lg">
                   <span className="text-medium-text">Sport</span>
                   <span className="font-semibold text-dark-text">
-                    {facility.sports.name}
+                    {facility.sports?.name} {/* 👈 Add optional chaining */}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-3 px-4 bg-hover-bg rounded-lg">
@@ -300,18 +419,18 @@ function BookingPage() {
               </button>
               <button
                 onClick={handleConfirmBooking}
-                disabled={loading}
+                disabled={confirmLoading} // 👈 Use confirmLoading
                 className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-all duration-200 relative overflow-hidden ${
-                  loading
+                  confirmLoading // 👈 Use confirmLoading
                     ? "bg-gray-400 cursor-not-allowed text-white"
                     : "bg-primary-green text-white hover:bg-primary-green-dark shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                 }`}
               >
-                {!loading && (
+                {!confirmLoading && ( // 👈 Use confirmLoading
                   <div className="absolute inset-0 bg-white opacity-0 hover:opacity-10 transition-opacity duration-200"></div>
                 )}
                 <div className="relative z-10">
-                  {loading ? (
+                  {confirmLoading ? ( // 👈 Use confirmLoading
                     <div className="flex items-center justify-center">
                       <svg
                         className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"

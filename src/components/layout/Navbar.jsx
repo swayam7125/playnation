@@ -1,3 +1,4 @@
+// src/components/layout/Navbar.jsx
 import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
@@ -10,19 +11,24 @@ function Navbar() {
   const { showModal } = useModal();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleLogout = async () => {
-    const isConfirmed = await showModal({
+  // 👇 --- *** THIS FUNCTION IS NOW FIXED *** ---
+  const handleLogout = () => {
+    // We no longer `await` a response from showModal
+    showModal({
       title: "Confirm Logout",
       message: "Are you sure you want to log out?",
       confirmText: "Logout",
       confirmStyle: "danger",
+      showCancel: true, // 👈 Add this to show the cancel button
+      onConfirm: () => {
+        // 👈 Instead, we pass the logic into the onConfirm prop
+        logout();
+        navigate("/");
+      },
     });
-
-    if (isConfirmed) {
-      logout();
-      navigate("/");
-    }
+    // 👈 The `if (isConfirmed)` block is no longer needed
   };
+  // --- *** END OF FIX *** ---
 
   const handleProfileClick = () => {
     navigate("/profile");
