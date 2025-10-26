@@ -3838,7 +3838,8 @@ CREATE TABLE public.bookings (
     has_been_reviewed boolean DEFAULT false,
     cancelled_at timestamp with time zone,
     cancelled_by uuid,
-    cancellation_reason text
+    cancellation_reason text,
+    offer_id uuid
 );
 
 
@@ -5711,6 +5712,30 @@ COPY auth.audit_log_entries (instance_id, id, payload, created_at, ip_address) F
 00000000-0000-0000-0000-000000000000	33ac1a9e-dc95-402a-8abc-4f11572618a1	{"action":"token_revoked","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-10-24 08:21:21.621178+00	
 00000000-0000-0000-0000-000000000000	094d15eb-66a5-4824-be19-47288a488bdf	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-24 08:22:04.39281+00	
 00000000-0000-0000-0000-000000000000	5f7e8575-3d4c-4334-8ebf-4c612cfbd7d9	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-24 08:22:07.483092+00	
+00000000-0000-0000-0000-000000000000	85f74af7-5af0-46d2-a3b7-b65cf14b5baf	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-24 08:53:36.182458+00	
+00000000-0000-0000-0000-000000000000	97f303c9-92dd-4463-8403-d3ad659574bd	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-24 09:03:39.854465+00	
+00000000-0000-0000-0000-000000000000	6dc6405a-a19f-449c-a740-75d0def8bd05	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-24 09:11:20.592587+00	
+00000000-0000-0000-0000-000000000000	dabbdcf4-da20-4c40-adb5-0feeadbb1e22	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-24 09:11:27.791877+00	
+00000000-0000-0000-0000-000000000000	8b86dc44-d99a-4782-a714-1c8f6a8a4a41	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-24 09:11:35.551775+00	
+00000000-0000-0000-0000-000000000000	6782a169-1e57-4da9-854f-08f3d79f0f59	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-24 09:14:11.744738+00	
+00000000-0000-0000-0000-000000000000	78e65f3d-9299-46f1-872a-f859b679af86	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-24 09:14:24.030413+00	
+00000000-0000-0000-0000-000000000000	0912f25d-8b57-4d8c-aae3-cfd223db6127	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-24 09:14:36.895113+00	
+00000000-0000-0000-0000-000000000000	52a5037f-b8f2-4469-8e01-7d8441d486dd	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-24 09:18:14.581066+00	
+00000000-0000-0000-0000-000000000000	3a51e8a0-b805-431e-893b-800f8228ae65	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-24 13:54:11.230155+00	
+00000000-0000-0000-0000-000000000000	a2754802-efd0-4c74-a8ff-f83459245d65	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-24 13:55:11.655348+00	
+00000000-0000-0000-0000-000000000000	71317fa0-9923-490a-8f65-87e136688e0a	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-24 13:55:17.165651+00	
+00000000-0000-0000-0000-000000000000	88218f4c-30db-44dc-b2cc-fe0929b7c17e	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-10-24 13:57:07.396424+00	
+00000000-0000-0000-0000-000000000000	dda51fad-1662-44ca-867c-6e43e01ffdff	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-25 16:00:32.7751+00	
+00000000-0000-0000-0000-000000000000	b7a07a94-f011-43fa-966c-cad59c3a57f5	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-25 16:02:06.344042+00	
+00000000-0000-0000-0000-000000000000	5fe73c15-3e10-43f0-b4a7-e35c6a8d0211	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-26 15:37:14.44242+00	
+00000000-0000-0000-0000-000000000000	1ceac63e-ab37-4aea-91fb-405fffc70f59	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-26 15:57:03.651673+00	
+00000000-0000-0000-0000-000000000000	f7d11b31-a877-4d1f-b909-8027a483e90d	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-26 15:57:08.544151+00	
+00000000-0000-0000-0000-000000000000	5bfa3fd1-ae4b-4fae-98ba-c24a5aeee4c6	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-26 16:01:35.51406+00	
+00000000-0000-0000-0000-000000000000	a06b2399-e4c7-4286-af52-7f0878923d5c	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-26 16:01:41.053964+00	
+00000000-0000-0000-0000-000000000000	71fc864a-6717-4026-bc3d-54333cbc0c69	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-26 16:12:17.712342+00	
+00000000-0000-0000-0000-000000000000	0df913e3-d312-4332-99a3-d98698ee4510	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-26 16:12:23.091999+00	
+00000000-0000-0000-0000-000000000000	93d36b60-9890-4340-a132-5f3f305caad2	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-26 16:13:46.303727+00	
+00000000-0000-0000-0000-000000000000	0ace1d6f-fa4c-4740-9100-36af1dcd276d	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-26 16:13:50.844488+00	
 \.
 
 
@@ -5748,7 +5773,7 @@ COPY auth.instances (id, uuid, raw_base_config, created_at, updated_at) FROM std
 --
 
 COPY auth.mfa_amr_claims (session_id, created_at, updated_at, authentication_method, id) FROM stdin;
-dcdf63ff-14a4-4338-a804-f60681ce9ff1	2025-10-24 08:22:07.502017+00	2025-10-24 08:22:07.502017+00	password	975e03f9-8e2f-4442-af81-92031489786b
+64fbc8b6-4530-4432-befa-8ce49eba4b9c	2025-10-26 16:13:50.87246+00	2025-10-26 16:13:50.87246+00	password	aba4018b-e409-4fb2-8e90-37cd9fee9c46
 \.
 
 
@@ -5805,7 +5830,7 @@ COPY auth.one_time_tokens (id, user_id, token_type, token_hash, relates_to, crea
 --
 
 COPY auth.refresh_tokens (instance_id, id, token, user_id, revoked, created_at, updated_at, parent, session_id) FROM stdin;
-00000000-0000-0000-0000-000000000000	713	j26g5kdc4a4q	c90139a0-2de3-4237-89b8-032367f73a37	f	2025-10-24 08:22:07.500183+00	2025-10-24 08:22:07.500183+00	\N	dcdf63ff-14a4-4338-a804-f60681ce9ff1
+00000000-0000-0000-0000-000000000000	725	6e2hxwvptrnb	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f	2025-10-26 16:13:50.859554+00	2025-10-26 16:13:50.859554+00	\N	64fbc8b6-4530-4432-befa-8ce49eba4b9c
 \.
 
 
@@ -5905,7 +5930,7 @@ COPY auth.schema_migrations (version) FROM stdin;
 --
 
 COPY auth.sessions (id, user_id, created_at, updated_at, factor_id, aal, not_after, refreshed_at, user_agent, ip, tag, oauth_client_id) FROM stdin;
-dcdf63ff-14a4-4338-a804-f60681ce9ff1	c90139a0-2de3-4237-89b8-032367f73a37	2025-10-24 08:22:07.486749+00	2025-10-24 08:22:07.486749+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0	49.36.91.106	\N	\N
+64fbc8b6-4530-4432-befa-8ce49eba4b9c	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2025-10-26 16:13:50.850743+00	2025-10-26 16:13:50.850743+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0	49.36.89.20	\N	\N
 \.
 
 
@@ -5930,10 +5955,10 @@ COPY auth.sso_providers (id, resource_id, created_at, updated_at, disabled) FROM
 --
 
 COPY auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, invited_at, confirmation_token, confirmation_sent_at, recovery_token, recovery_sent_at, email_change_token_new, email_change, email_change_sent_at, last_sign_in_at, raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at, phone, phone_confirmed_at, phone_change, phone_change_token, phone_change_sent_at, email_change_token_current, email_change_confirm_status, banned_until, reauthentication_token, reauthentication_sent_at, is_sso_user, deleted_at, is_anonymous) FROM stdin;
-00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-10-24 08:22:07.486066+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-10-24 08:22:07.501712+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$IAvXmD9RhMUIQWJlFk8BY.MkX1opB5IqVu4w7nJ63C/TMcq0aH66i	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-10-23 16:17:41.539205+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-10-23 16:17:41.547564+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$IAvXmD9RhMUIQWJlFk8BY.MkX1opB5IqVu4w7nJ63C/TMcq0aH66i	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-10-26 16:13:50.850645+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-10-26 16:13:50.871687+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	e86f726e-9210-47ca-8dc7-c84d46cc55e2	authenticated	authenticated	admin@playnation.com	$2a$10$Odpx/MPYwsSsCf4Uiywd1OgDxHtZ8IXE7531egy3pILZ0da.1sAMu	2025-08-10 08:50:46.562958+00	\N		\N		\N			\N	2025-10-24 13:55:17.168679+00	{"provider": "email", "providers": ["email"]}	{"email_verified": true}	\N	2025-08-10 08:50:46.541627+00	2025-10-24 13:55:17.175115+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	073c625c-eb02-45e8-9c67-50acbdc72cd6	authenticated	authenticated	harsh@gmail.com	$2a$10$4KK/J4ROUoG4YacY/9oQluMayEemAbAWOSoXzXwIOg53cosk3zCLm	2025-08-10 08:14:37.525903+00	\N		\N		\N			\N	2025-10-12 20:33:30.8828+00	{"provider": "email", "providers": ["email"]}	{"sub": "073c625c-eb02-45e8-9c67-50acbdc72cd6", "email": "harsh@gmail.com", "last_name": "shah", "first_name": "harsh", "email_verified": true, "phone_verified": false}	\N	2025-08-10 08:14:37.499555+00	2025-10-12 20:33:30.884608+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	e86f726e-9210-47ca-8dc7-c84d46cc55e2	authenticated	authenticated	admin@playnation.com	$2a$10$Odpx/MPYwsSsCf4Uiywd1OgDxHtZ8IXE7531egy3pILZ0da.1sAMu	2025-08-10 08:50:46.562958+00	\N		\N		\N			\N	2025-10-23 14:56:07.175865+00	{"provider": "email", "providers": ["email"]}	{"email_verified": true}	\N	2025-08-10 08:50:46.541627+00	2025-10-23 14:56:07.186296+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-10-26 16:12:23.098548+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-10-26 16:12:23.104515+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	38f0c23d-4d25-42cd-8ec0-426d6636eecd	authenticated	authenticated	fenil@gmail.com	$2a$10$wC5LDx6u5k8FTIHrKPOEwOm1f21cVE8.SfhPAjB.W6wxEek7Ig9ZC	2025-10-12 09:33:09.062174+00	\N		\N		\N			\N	2025-10-12 09:37:48.705186+00	{"provider": "email", "providers": ["email"]}	{"sub": "38f0c23d-4d25-42cd-8ec0-426d6636eecd", "role": "player", "email": "fenil@gmail.com", "username": "fenill", "last_name": "pastagia", "first_name": "fenil", "phone_number": "7586214860", "email_verified": true, "phone_verified": false}	\N	2025-10-12 09:33:09.015285+00	2025-10-12 11:24:56.534367+00	\N	\N			\N		0	\N		\N	f	\N	f
 \.
 
@@ -5985,38 +6010,8 @@ COPY public.backup_reviews (review_id, user_id, venue_id, rating, comment, creat
 -- Data for Name: bookings; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.bookings (booking_id, user_id, facility_id, slot_id, start_time, end_time, total_amount, status, payment_status, customer_name, customer_phone, created_at, has_been_reviewed, cancelled_at, cancelled_by, cancellation_reason) FROM stdin;
-a1988d01-0f64-4743-9cce-7d576f42ad8b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	83576b2b-d65f-4e53-bb8c-419eaf2c90b3	2025-10-07 03:30:00+00	2025-10-07 04:30:00+00	1500	confirmed	pending	\N	\N	2025-10-06 10:55:48.516758+00	f	\N	\N	\N
-64ca99b0-4372-45a9-8bc3-04943da619e7	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	314fe74a-b1d5-4c1f-bc30-f60ca28dac42	2025-10-07 04:30:00+00	2025-10-07 05:30:00+00	1500	confirmed	pending	\N	\N	2025-10-06 17:43:33.44907+00	f	\N	\N	\N
-217e69e0-fc62-4fc1-b06e-f5d5d06add1d	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	f51a94af-14f0-44ac-86d4-4d30a0fcb558	2025-10-11 08:30:00+00	2025-10-11 09:30:00+00	1500	confirmed	pending	\N	\N	2025-10-11 07:48:52.610724+00	f	\N	\N	\N
-b7313a30-f9b5-437f-a8d6-a1abc19165cd	38f0c23d-4d25-42cd-8ec0-426d6636eecd	9566ee54-1213-482b-b766-6d0f87c88776	7a39bdb3-2ddb-4971-98d9-62aec0b58dbb	2025-10-12 10:30:00+00	2025-10-12 11:30:00+00	1500	cancelled	pending	\N	\N	2025-10-12 09:33:24.596578+00	f	2025-10-12 10:24:23.224+00	38f0c23d-4d25-42cd-8ec0-426d6636eecd	I can't
-d045daf3-bc3f-4584-b5fc-bfd85405661e	38f0c23d-4d25-42cd-8ec0-426d6636eecd	2b123724-4e3c-4344-8df1-7b66c1cc81a6	a99225cc-0791-458e-ac69-2a9d37f01c67	2025-10-12 13:30:00+00	2025-10-12 14:30:00+00	1500	cancelled	pending	\N	\N	2025-10-12 10:31:32.809426+00	f	2025-10-12 10:31:50.016+00	38f0c23d-4d25-42cd-8ec0-426d6636eecd	going somewhere else
-df496452-c7fd-4e35-9bbf-a2dba0bfbbe2	38f0c23d-4d25-42cd-8ec0-426d6636eecd	9566ee54-1213-482b-b766-6d0f87c88776	cef53716-0e39-4518-b5b5-cf4e985b264b	2025-10-13 03:30:00+00	2025-10-13 04:30:00+00	1500	cancelled	pending	\N	\N	2025-10-12 09:33:47.320566+00	f	2025-10-12 11:25:04.537+00	38f0c23d-4d25-42cd-8ec0-426d6636eecd	can not attend
-eba14809-617c-4de1-addb-f7763aed4454	38f0c23d-4d25-42cd-8ec0-426d6636eecd	857b3a73-e640-4cfd-b886-a96815b6e562	0b977864-168f-499e-976b-301a08a9f646	2025-10-12 13:30:00+00	2025-10-12 14:30:00+00	10000	cancelled	pending	\N	\N	2025-10-12 09:34:06.487575+00	f	2025-10-12 11:32:27.252+00	38f0c23d-4d25-42cd-8ec0-426d6636eecd	i can not attend
-38e99405-f111-4dfa-ab24-f57777987a1f	38f0c23d-4d25-42cd-8ec0-426d6636eecd	9566ee54-1213-482b-b766-6d0f87c88776	1a5f0d3b-a8ad-4a2d-9f77-11c585f95866	2025-10-12 13:30:00+00	2025-10-12 14:30:00+00	1500	cancelled	refunded	\N	\N	2025-10-12 11:56:00.466669+00	f	2025-10-12 11:57:56.578622+00	38f0c23d-4d25-42cd-8ec0-426d6636eecd	Cancelled by user
-bc1109a5-d441-460d-8552-81ec8d2aea30	38f0c23d-4d25-42cd-8ec0-426d6636eecd	9566ee54-1213-482b-b766-6d0f87c88776	1a5f0d3b-a8ad-4a2d-9f77-11c585f95866	2025-10-12 13:30:00+00	2025-10-12 14:30:00+00	1500	cancelled	refunded	\N	\N	2025-10-12 11:59:17.500548+00	f	2025-10-12 11:59:30.986407+00	38f0c23d-4d25-42cd-8ec0-426d6636eecd	Cancelled by user
-b8a53238-7fa6-473b-a8c4-ed51a5fc6676	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	857b3a73-e640-4cfd-b886-a96815b6e562	fad04bbf-04bb-4952-8bc1-00c6b9486c22	2025-10-12 14:30:00+00	2025-10-12 15:30:00+00	10000	cancelled	paid	\N	\N	2025-10-12 13:19:35.922917+00	f	2025-10-12 13:20:10.985318+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	Cancelled by user
-4adce674-1e0d-4b0d-b74c-ea027768e548	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2b123724-4e3c-4344-8df1-7b66c1cc81a6	7cfdec1b-0128-4dc0-af8c-08a5c6229e2f	2025-10-12 14:30:00+00	2025-10-12 15:30:00+00	1500	confirmed	pending	\N	\N	2025-10-12 13:21:58.494383+00	f	\N	\N	\N
-07846fe4-4b51-453e-811c-4f9545e463ef	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	857b3a73-e640-4cfd-b886-a96815b6e562	fad04bbf-04bb-4952-8bc1-00c6b9486c22	2025-10-12 14:30:00+00	2025-10-12 15:30:00+00	10000	confirmed	pending	\N	\N	2025-10-12 13:23:45.121329+00	f	\N	\N	\N
-6ab2581d-0e2d-4453-98f6-eadcec7bcc83	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	cef53716-0e39-4518-b5b5-cf4e985b264b	2025-10-13 03:30:00+00	2025-10-13 04:30:00+00	1500	cancelled	paid	\N	\N	2025-10-12 18:41:59.83265+00	f	2025-10-12 18:43:02.006869+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	Cancelled by user
-0cefe795-bc3a-4056-8ad9-b9c227064786	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2b123724-4e3c-4344-8df1-7b66c1cc81a6	61390823-5cb8-44d6-834d-b73340ddee9b	2025-10-13 03:30:00+00	2025-10-13 04:30:00+00	1500	confirmed	paid	\N	\N	2025-10-12 18:44:09.668456+00	f	\N	\N	\N
-e534b136-8af9-4c92-9527-069e43f11008	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	d8a3dd07-3622-4a58-99d6-218c5abb7a4a	2025-10-13 12:30:00+00	2025-10-13 13:30:00+00	1500	confirmed	paid	\N	\N	2025-10-12 21:15:34.478059+00	f	\N	\N	\N
-aeeb6443-68dd-4580-9583-7a1ed942533a	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	cef53716-0e39-4518-b5b5-cf4e985b264b	2025-10-13 03:30:00+00	2025-10-13 04:30:00+00	1500	cancelled	paid	\N	\N	2025-10-12 18:44:33.885378+00	f	2025-10-12 21:16:37.283561+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	Cancelled by user
-3cd2d384-d72a-441a-9f71-585ae8922fb9	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	a10b25d8-f5b0-4b82-b6e8-3cdcf0e7bd22	2025-10-13 05:30:00+00	2025-10-13 06:30:00+00	1500	cancelled	paid	\N	\N	2025-10-12 21:14:03.957184+00	f	2025-10-12 21:17:23.183405+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	Cancelled by user
-803f0914-7191-4f20-9d44-d08afe2a24de	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2b123724-4e3c-4344-8df1-7b66c1cc81a6	c702f9c0-57f0-4c7f-9c63-fd3775affb03	2025-10-13 14:30:00+00	2025-10-13 15:30:00+00	1500	cancelled	paid	\N	\N	2025-10-13 07:06:51.555973+00	f	2025-10-13 07:08:40.641429+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	Cancelled by user
-5a32e4d3-576a-4cd7-89c0-7e1520865f2a	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2b123724-4e3c-4344-8df1-7b66c1cc81a6	100f7f16-2294-4782-ba45-fb39a24d4503	2025-10-14 14:30:00+00	2025-10-14 15:30:00+00	1500	cancelled	paid	\N	\N	2025-10-14 11:50:35.475166+00	f	2025-10-14 11:50:48.087754+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	Cancelled by user
-3c6aeaa7-172c-4552-a124-a37c888cfbde	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	857b3a73-e640-4cfd-b886-a96815b6e562	662052ed-4b30-4bbc-b118-1953fcbc1413	2025-10-14 13:30:00+00	2025-10-14 14:30:00+00	10000	cancelled	paid	\N	\N	2025-10-14 11:26:32.723946+00	f	2025-10-14 12:05:52.108032+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	Cancelled by user
-97bf51a5-b8e8-432e-9c49-b7b0c9cfe3ad	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	d6036ce2-7259-4d01-8b1a-9b7fb4ecb5c3	2025-10-14 14:30:00+00	2025-10-14 15:30:00+00	1500	confirmed	paid	\N	\N	2025-10-14 12:06:12.130976+00	f	\N	\N	\N
-887e069e-d269-479a-8cc7-30072ce7f601	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	857b3a73-e640-4cfd-b886-a96815b6e562	a469ffed-4185-461f-94fd-16d07035859b	2025-10-14 14:30:00+00	2025-10-14 15:30:00+00	10000	confirmed	paid	\N	\N	2025-10-14 12:09:40.8392+00	f	\N	\N	\N
-3e3f1680-3394-44f7-8d8b-15005a4579b9	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	fafbb584-999e-4fb9-b9ec-a663cd788197	2025-10-23 13:30:00+00	2025-10-23 14:30:00+00	1500	confirmed	paid	\N	\N	2025-10-23 13:11:37.243127+00	f	\N	\N	\N
-cdcd3850-86cf-4b3a-95bb-944fe4c73acc	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	aa27e328-e88b-420f-bd73-4421acc144d7	2025-10-06 11:30:00+00	2025-10-06 12:30:00+00	1500	confirmed	pending	\N	\N	2025-10-06 10:54:56.210885+00	t	\N	\N	\N
-1f15140f-b8ce-448f-8dea-03604a99a3f7	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	761fa7c6-c790-4937-9106-7f9de91d4116	2025-10-23 14:30:00+00	2025-10-23 15:30:00+00	1500	confirmed	paid	\N	\N	2025-10-23 14:16:51.787045+00	f	\N	\N	\N
-c0bcdf7d-57a1-458f-8eb0-4e9001ca8cde	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	ccb0837d-d7d3-4f56-99a7-610e14389e2c	2025-10-23 14:30:00+00	2025-10-23 15:30:00+00	1500	confirmed	paid	\N	\N	2025-10-23 14:17:37.764439+00	f	\N	\N	\N
-e3e8c018-921b-41b0-bca8-42bc0c687933	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	52de7f59-7814-45cd-8356-8064ac1bcd19	2025-10-28 03:30:00+00	2025-10-28 04:30:00+00	1500	confirmed	paid	\N	\N	2025-10-23 14:20:22.402061+00	f	\N	\N	\N
-18ba3c85-208a-48db-99b7-f05280b7aa2b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	92908011-45a0-4afd-9d36-254a0c26a209	2025-10-26 03:30:00+00	2025-10-26 04:30:00+00	1500	confirmed	paid	\N	\N	2025-10-23 14:20:50.979028+00	f	\N	\N	\N
-77711d30-af0b-445f-8837-37709093a012	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	f1d463a0-b661-4fdc-a556-f01fba3fd29c	2025-10-24 03:30:00+00	2025-10-24 04:30:00+00	1500	cancelled	paid	\N	\N	2025-10-23 14:17:12.797418+00	f	2025-10-23 14:55:56.256772+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	can not attend
-fd79ef34-e548-4ad6-a7ae-bf2a7213252b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	81d1f813-7ae8-43e6-b558-41aeed78feda	2025-10-24 10:30:00+00	2025-10-24 11:30:00+00	1500	confirmed	paid	\N	\N	2025-10-23 15:33:29.060542+00	f	\N	\N	\N
-5acee641-3d17-4ed4-ad55-e8cc8ab7f4de	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	652fe316-3d4e-40ac-877d-05f1f0bfed82	2025-10-28 05:30:00+00	2025-10-28 06:30:00+00	1500	confirmed	paid	\N	\N	2025-10-23 16:44:51.28461+00	f	\N	\N	\N
+COPY public.bookings (booking_id, user_id, facility_id, slot_id, start_time, end_time, total_amount, status, payment_status, customer_name, customer_phone, created_at, has_been_reviewed, cancelled_at, cancelled_by, cancellation_reason, offer_id) FROM stdin;
+aefa391c-a40e-49a4-be71-947e5a2eb8bc	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	1d488336-490b-4799-976e-d82aa4498eeb	2025-10-27 03:30:00+00	2025-10-27 04:30:00+00	1500	confirmed	paid	\N	\N	2025-10-26 16:02:22.32131+00	f	\N	\N	\N	\N
 \.
 
 
@@ -6113,6 +6108,7 @@ COPY public.offer_sports (offer_id, sport_id) FROM stdin;
 COPY public.offers (offer_id, venue_id, title, description, discount_percentage, is_active, valid_from, valid_until, created_at, is_global, background_image_url, offer_code, applies_to_all_sports) FROM stdin;
 0f575722-8123-4148-8525-b25950cd972d	\N	25% Off on weekdays	25% off on all venues for weekdays	25.00	t	2025-10-06 00:00:00+00	2025-10-13 00:00:00+00	2025-10-06 11:30:13.341723+00	t	\N	25WEEK	t
 dd592e08-0f54-4de3-8024-6c524a4f8e2b	1f72fb3d-916d-477a-9e2e-5abd9e21c4da	10% OFF	10% off on Fun & play	10.00	t	2025-10-06 00:00:00+00	2025-10-11 00:00:00+00	2025-10-06 12:17:10.792218+00	f		\N	f
+cd02944b-a06e-432c-a76f-12551906592a	1f72fb3d-916d-477a-9e2e-5abd9e21c4da	50% OFF	Get 50% off on selected venues	9.00	t	2025-10-26 00:00:00+00	2025-11-08 00:00:00+00	2025-10-26 16:13:34.324773+00	f		\N	f
 \.
 
 
@@ -6137,7 +6133,7 @@ COPY public.points_transactions (transaction_id, user_id, points_amount, transac
 --
 
 COPY public.reviews (review_id, user_id, venue_id, rating, comment, created_at, booking_id) FROM stdin;
-e35e0c6f-3126-4f19-9192-f47833dc36eb	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	1f72fb3d-916d-477a-9e2e-5abd9e21c4da	5	nice place to enjoy	\N	cdcd3850-86cf-4b3a-95bb-944fe4c73acc
+e35e0c6f-3126-4f19-9192-f47833dc36eb	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	1f72fb3d-916d-477a-9e2e-5abd9e21c4da	5	nice place to enjoy	\N	\N
 \.
 
 
@@ -6162,1158 +6158,198 @@ COPY public.sports (sport_id, name, description) FROM stdin;
 --
 
 COPY public.time_slots (slot_id, facility_id, start_time, end_time, is_available, price_override, block_reason) FROM stdin;
-07e65912-5270-4048-a334-c24bf59d2cc4	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-06 03:30:00+00	2025-10-06 04:30:00+00	t	\N	\N
-c39d8fec-474f-4fbd-b756-3d7a71f01ee9	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-06 04:30:00+00	2025-10-06 05:30:00+00	t	\N	\N
-9baf7555-06f9-476f-af54-3f5dbdaa1716	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-06 05:30:00+00	2025-10-06 06:30:00+00	t	\N	\N
-e8639c87-55f0-413c-9e75-9bc36056daa5	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-06 06:30:00+00	2025-10-06 07:30:00+00	t	\N	\N
-5f866b5f-5681-4a20-aa2e-09e52e6f6fe1	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-06 07:30:00+00	2025-10-06 08:30:00+00	t	\N	\N
-4ed844c8-5eb6-405b-8dd5-969251a9d06c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-06 08:30:00+00	2025-10-06 09:30:00+00	t	\N	\N
-753498c0-ab79-4041-be3f-5e6c2d7ec982	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-06 09:30:00+00	2025-10-06 10:30:00+00	t	\N	\N
-e6e8a5ea-f1cd-447c-b9b1-25e24bbcf68a	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-06 10:30:00+00	2025-10-06 11:30:00+00	t	\N	\N
-dc2bbf82-65b5-4e87-a920-9e745776c6a0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-06 12:30:00+00	2025-10-06 13:30:00+00	t	\N	\N
-958619fc-d65c-4d7a-9cbb-60f7c4e10846	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-06 13:30:00+00	2025-10-06 14:30:00+00	t	\N	\N
-513c7cca-33a9-4a7e-a5d8-b4f59145ddf4	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-06 14:30:00+00	2025-10-06 15:30:00+00	t	\N	\N
-b3a29512-1869-4a23-9027-63f542287ef0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-07 05:30:00+00	2025-10-07 06:30:00+00	t	\N	\N
-68d1fd52-fed0-4fc3-977d-d376aaa2ab55	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-07 06:30:00+00	2025-10-07 07:30:00+00	t	\N	\N
-f1f2d773-f14c-4ded-953a-a324a7908756	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-07 07:30:00+00	2025-10-07 08:30:00+00	t	\N	\N
-3d404910-9bb0-4d23-afb6-c7cf1ec2481f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-07 08:30:00+00	2025-10-07 09:30:00+00	t	\N	\N
-a22c91ea-a12e-43dc-ac4c-1a6c96f0a4d6	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-07 09:30:00+00	2025-10-07 10:30:00+00	t	\N	\N
-489d4af4-ea59-43bb-bbf7-f57401df53d1	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-07 10:30:00+00	2025-10-07 11:30:00+00	t	\N	\N
-53a8e66c-50e9-494b-bb80-efd9fc722dac	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-07 11:30:00+00	2025-10-07 12:30:00+00	t	\N	\N
-2db6ee1c-d922-4f3c-8227-1df3a83f3be4	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-07 12:30:00+00	2025-10-07 13:30:00+00	t	\N	\N
-002d0d27-6e4d-41e9-99b2-8f61a86998d6	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-07 13:30:00+00	2025-10-07 14:30:00+00	t	\N	\N
-48462175-85a3-49a8-9896-f6107e7f4e1f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-07 14:30:00+00	2025-10-07 15:30:00+00	t	\N	\N
-71af8696-bcb9-4b64-871b-be4a10e273f9	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-08 03:30:00+00	2025-10-08 04:30:00+00	t	\N	\N
-1cb4664c-2a44-4e21-9e34-105326bc4b43	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-08 04:30:00+00	2025-10-08 05:30:00+00	t	\N	\N
-05e490e1-7262-4bcc-ad7a-6d57fdc2194d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-08 05:30:00+00	2025-10-08 06:30:00+00	t	\N	\N
-71b2fe0d-f268-4b8e-b7c3-8bb18e803185	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-08 06:30:00+00	2025-10-08 07:30:00+00	t	\N	\N
-3a3a0651-7224-4a20-a4ad-98119504c01f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-08 07:30:00+00	2025-10-08 08:30:00+00	t	\N	\N
-98447738-9ac5-4c9e-849e-a75a1126fac6	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-08 08:30:00+00	2025-10-08 09:30:00+00	t	\N	\N
-015367d2-c4f7-428a-95b1-f8c0443d897c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-08 09:30:00+00	2025-10-08 10:30:00+00	t	\N	\N
-e89e15e4-0239-471d-b3cb-a0008be81973	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-08 10:30:00+00	2025-10-08 11:30:00+00	t	\N	\N
-2db338f5-1e35-4a52-adff-70541f0958e1	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-08 11:30:00+00	2025-10-08 12:30:00+00	t	\N	\N
-cf90a36d-449a-4332-baa0-6c4e242292e8	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-08 12:30:00+00	2025-10-08 13:30:00+00	t	\N	\N
-ccca32fd-cc8d-4a28-a7c7-52d953971764	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-08 13:30:00+00	2025-10-08 14:30:00+00	t	\N	\N
-eabcb074-f98e-4b69-a2f6-6d4c20d823f0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-08 14:30:00+00	2025-10-08 15:30:00+00	t	\N	\N
-b46f3fd3-6a69-4b8e-948d-3ae1e6b894af	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-09 03:30:00+00	2025-10-09 04:30:00+00	t	\N	\N
-e8a93509-f649-469d-b2e6-02aaab4ffbe1	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-09 04:30:00+00	2025-10-09 05:30:00+00	t	\N	\N
-487f236b-3223-440c-a79b-c74457f9c80c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-09 05:30:00+00	2025-10-09 06:30:00+00	t	\N	\N
-cbfa6642-8f28-4906-9bf3-a3c37ac6fbd9	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-09 06:30:00+00	2025-10-09 07:30:00+00	t	\N	\N
-e345f24a-61fd-497d-abd6-929e59f2fc9f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-09 07:30:00+00	2025-10-09 08:30:00+00	t	\N	\N
-d95dc357-9fcd-4bb8-89c6-a2698d197ec7	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-09 08:30:00+00	2025-10-09 09:30:00+00	t	\N	\N
-0e8e099d-4dbf-4348-bfca-ca276e4c9d6a	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-09 09:30:00+00	2025-10-09 10:30:00+00	t	\N	\N
-f2bf29f5-fbd7-4b1d-998b-031382c12ff2	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-09 10:30:00+00	2025-10-09 11:30:00+00	t	\N	\N
-da3323e3-e502-4f19-97b6-7623abc644ae	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-09 11:30:00+00	2025-10-09 12:30:00+00	t	\N	\N
-e499bdd7-698e-4d82-9d6e-86c6f453a516	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-09 12:30:00+00	2025-10-09 13:30:00+00	t	\N	\N
-d31b4e54-bcfd-492a-9aaf-df2dfc7702bb	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-09 13:30:00+00	2025-10-09 14:30:00+00	t	\N	\N
-e5a3838e-cf11-4352-abc8-636eed0bf608	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-09 14:30:00+00	2025-10-09 15:30:00+00	t	\N	\N
-ea0d52df-5ebf-4e32-b946-ded3714abfb3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-10 03:30:00+00	2025-10-10 04:30:00+00	t	\N	\N
-c8007998-278d-4b55-9a2d-26fcd66858de	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-10 04:30:00+00	2025-10-10 05:30:00+00	t	\N	\N
-8dc71da0-2338-4013-9738-3284cb404761	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-10 05:30:00+00	2025-10-10 06:30:00+00	t	\N	\N
-c65dd1bc-2570-4cb1-869f-5c4c2da3e75b	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-10 06:30:00+00	2025-10-10 07:30:00+00	t	\N	\N
-74420e90-ec2d-4bb8-9810-eff28ad8eed0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-10 07:30:00+00	2025-10-10 08:30:00+00	t	\N	\N
-3e8b23d3-3ad9-42f8-8259-84c686b6ecd1	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-10 08:30:00+00	2025-10-10 09:30:00+00	t	\N	\N
-5260a4bc-9366-473b-a95e-a6b203796f33	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-10 09:30:00+00	2025-10-10 10:30:00+00	t	\N	\N
-b5eab6d8-b4df-494f-bb6c-24cf4fb49f71	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-10 10:30:00+00	2025-10-10 11:30:00+00	t	\N	\N
-97c8c158-f4c9-4808-89bc-bd68010003ae	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-10 11:30:00+00	2025-10-10 12:30:00+00	t	\N	\N
-77ae3627-344a-40a6-86a6-22e27d86640f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-10 12:30:00+00	2025-10-10 13:30:00+00	t	\N	\N
-960a5e22-3414-4fe6-afda-8f356196a003	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-10 13:30:00+00	2025-10-10 14:30:00+00	t	\N	\N
-226688f2-5e49-4a4f-b7dc-ab17bfb5fa8f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-10 14:30:00+00	2025-10-10 15:30:00+00	t	\N	\N
-9f459078-fe8b-4e57-b74b-d0b489682f16	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-11 03:30:00+00	2025-10-11 04:30:00+00	t	\N	\N
-2923bd40-fa4c-4f7b-9a6e-496f72dcbfac	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-11 04:30:00+00	2025-10-11 05:30:00+00	t	\N	\N
-6a897a4b-be82-49a1-ab7b-b1383410b273	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-11 05:30:00+00	2025-10-11 06:30:00+00	t	\N	\N
-907434e5-21c4-40cc-beb2-11ddbfae5a11	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-11 06:30:00+00	2025-10-11 07:30:00+00	t	\N	\N
-8c746e21-e1ae-4d58-bb42-6f2ca2c9212a	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-11 07:30:00+00	2025-10-11 08:30:00+00	t	\N	\N
-1a37cf06-0439-46e5-957a-84a2e0dde005	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-11 09:30:00+00	2025-10-11 10:30:00+00	t	\N	\N
-00000f27-5cca-459d-bc0e-c638ddd7b214	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-11 10:30:00+00	2025-10-11 11:30:00+00	t	\N	\N
-12b7221f-4ac7-45e2-9442-dae28c2f1d3b	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-11 11:30:00+00	2025-10-11 12:30:00+00	t	\N	\N
-26bfda80-728a-4317-8e5d-886a0b54c9fb	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-11 12:30:00+00	2025-10-11 13:30:00+00	t	\N	\N
-df4dd59d-9f77-42d5-b97b-b40b5b3b3402	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-11 13:30:00+00	2025-10-11 14:30:00+00	t	\N	\N
-ff3e3f70-fcd9-4d84-a2b8-74e933658e17	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-11 14:30:00+00	2025-10-11 15:30:00+00	t	\N	\N
-f83da071-532c-4763-b606-a6b716f9752b	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-12 03:30:00+00	2025-10-12 04:30:00+00	t	\N	\N
-570d51d8-384c-4eb9-9335-edb934f6d910	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-12 04:30:00+00	2025-10-12 05:30:00+00	t	\N	\N
-53db7b74-a479-4baa-a024-e4118ef97423	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-12 05:30:00+00	2025-10-12 06:30:00+00	t	\N	\N
-c04e1bb8-bb90-42ff-a125-9981a57c1116	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-12 06:30:00+00	2025-10-12 07:30:00+00	t	\N	\N
-3ca29f1a-6431-42a4-b368-7180fef66607	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-12 07:30:00+00	2025-10-12 08:30:00+00	t	\N	\N
-8dfbe6e6-d9a4-4e6d-9ecf-ef6632c88fe2	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-12 08:30:00+00	2025-10-12 09:30:00+00	t	\N	\N
-57a419ce-3726-4d34-abc8-c621bccfdb19	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-12 09:30:00+00	2025-10-12 10:30:00+00	t	\N	\N
-0f8d8d15-3709-4404-8fd7-8eb3ef24d651	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-12 11:30:00+00	2025-10-12 12:30:00+00	t	\N	\N
-d2d69e95-dd4e-4969-93e7-c56881ae1b63	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-12 12:30:00+00	2025-10-12 13:30:00+00	t	\N	\N
-f515ad81-18c8-471a-9c6c-a80176c0b08e	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-12 14:30:00+00	2025-10-12 15:30:00+00	t	\N	\N
-488baabe-e474-494c-8348-68371ba0bcd3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-13 04:30:00+00	2025-10-13 05:30:00+00	t	\N	\N
-161621b7-4f54-4b9d-ba63-2f15ad673532	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-13 06:30:00+00	2025-10-13 07:30:00+00	t	\N	\N
-c4e1d4b5-7ade-445a-95db-f58275e3f414	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-13 07:30:00+00	2025-10-13 08:30:00+00	t	\N	\N
-169fcf21-468a-4194-9b7a-65772c122724	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-13 08:30:00+00	2025-10-13 09:30:00+00	t	\N	\N
-d5f26d09-2de8-4177-b621-96df955c81b8	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-13 09:30:00+00	2025-10-13 10:30:00+00	t	\N	\N
-d6d612ce-c4ae-44bf-a033-3ff3246e6249	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-13 10:30:00+00	2025-10-13 11:30:00+00	t	\N	\N
-e378e403-4138-46f6-a036-b9d31e57803c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-13 11:30:00+00	2025-10-13 12:30:00+00	t	\N	\N
-40517e21-17f3-4325-b3bb-155a87c4f8d2	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-13 13:30:00+00	2025-10-13 14:30:00+00	t	\N	\N
-90b66fa2-9d9e-495a-a009-5f3bc6184779	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-13 14:30:00+00	2025-10-13 15:30:00+00	t	\N	\N
-aa27e328-e88b-420f-bd73-4421acc144d7	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-06 11:30:00+00	2025-10-06 12:30:00+00	f	\N	\N
-83576b2b-d65f-4e53-bb8c-419eaf2c90b3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-07 03:30:00+00	2025-10-07 04:30:00+00	f	\N	\N
-314fe74a-b1d5-4c1f-bc30-f60ca28dac42	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-07 04:30:00+00	2025-10-07 05:30:00+00	f	\N	\N
-f51a94af-14f0-44ac-86d4-4d30a0fcb558	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-11 08:30:00+00	2025-10-11 09:30:00+00	f	\N	\N
-7a39bdb3-2ddb-4971-98d9-62aec0b58dbb	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-12 10:30:00+00	2025-10-12 11:30:00+00	t	\N	\N
-1a5f0d3b-a8ad-4a2d-9f77-11c585f95866	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-12 13:30:00+00	2025-10-12 14:30:00+00	t	\N	\N
-d8a3dd07-3622-4a58-99d6-218c5abb7a4a	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-13 12:30:00+00	2025-10-13 13:30:00+00	f	\N	\N
-a10b25d8-f5b0-4b82-b6e8-3cdcf0e7bd22	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-13 05:30:00+00	2025-10-13 06:30:00+00	t	\N	\N
-021fbbed-bd05-49a7-b020-b258fce7f294	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-06 03:30:00+00	2025-10-06 04:30:00+00	t	\N	\N
-7f4dbcf3-5f8b-4990-ae06-141235829519	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-06 04:30:00+00	2025-10-06 05:30:00+00	t	\N	\N
-36e46e41-b2e0-4156-91b5-057153e11f12	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-06 05:30:00+00	2025-10-06 06:30:00+00	t	\N	\N
-3f675cc4-76ef-4d8d-a5a0-658db32ade65	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-06 06:30:00+00	2025-10-06 07:30:00+00	t	\N	\N
-6435c5eb-5a2b-49e9-a97c-9b7708ab1a42	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-06 07:30:00+00	2025-10-06 08:30:00+00	t	\N	\N
-4f941be9-da08-4f60-b0c4-e3a0b4b0df7a	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-06 08:30:00+00	2025-10-06 09:30:00+00	t	\N	\N
-f8f6f060-1c2c-447d-a637-c6db4abfe818	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-06 09:30:00+00	2025-10-06 10:30:00+00	t	\N	\N
-3f019a92-be1d-4cba-b504-e2221e1b65df	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-06 10:30:00+00	2025-10-06 11:30:00+00	t	\N	\N
-0f97e0d9-e36a-46d4-8019-3216c8f0a44a	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-06 11:30:00+00	2025-10-06 12:30:00+00	t	\N	\N
-ca9e951a-f319-459a-b202-dd6e82d32c18	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-06 12:30:00+00	2025-10-06 13:30:00+00	t	\N	\N
-193e8b8f-226b-484e-b1e2-8028b60492a1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-06 13:30:00+00	2025-10-06 14:30:00+00	t	\N	\N
-38287f2e-88da-4093-a94d-7bcab07de27e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-06 14:30:00+00	2025-10-06 15:30:00+00	t	\N	\N
-8383be27-c730-4602-9e3f-cd69ae49e455	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-07 03:30:00+00	2025-10-07 04:30:00+00	t	\N	\N
-f70fa712-1e6e-4217-8813-d69dba812603	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-07 04:30:00+00	2025-10-07 05:30:00+00	t	\N	\N
-d88f0770-b164-4cf8-b123-a1a89f1dd6b2	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-07 05:30:00+00	2025-10-07 06:30:00+00	t	\N	\N
-60f4bae8-1cdc-4813-aa50-8743263947f5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-07 06:30:00+00	2025-10-07 07:30:00+00	t	\N	\N
-f08df24e-cf94-4fc6-a1af-72437eded325	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-07 07:30:00+00	2025-10-07 08:30:00+00	t	\N	\N
-4f7da4bd-cbbc-4a0d-ad27-dce1882fc3f0	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-07 08:30:00+00	2025-10-07 09:30:00+00	t	\N	\N
-a95844f6-bd8e-4c24-9c97-27ae0a4309da	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-07 09:30:00+00	2025-10-07 10:30:00+00	t	\N	\N
-1d603f60-3fa1-4728-8bf3-f8ac05baa30f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-07 10:30:00+00	2025-10-07 11:30:00+00	t	\N	\N
-65441e4f-3e85-4374-93ef-226b7ce4323e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-07 11:30:00+00	2025-10-07 12:30:00+00	t	\N	\N
-faf692b3-3ee8-448b-8ebb-9d5dda8c09ff	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-07 12:30:00+00	2025-10-07 13:30:00+00	t	\N	\N
-15308096-a12e-4c93-8993-72baecad6ea8	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-07 13:30:00+00	2025-10-07 14:30:00+00	t	\N	\N
-3bd1b4ab-a74d-475a-ab5c-e66e492894cc	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-07 14:30:00+00	2025-10-07 15:30:00+00	t	\N	\N
-65d09a7d-02ed-403a-9a2a-452d8fa62848	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-08 03:30:00+00	2025-10-08 04:30:00+00	t	\N	\N
-8914441b-5ecd-4dc0-a3a4-39c505f9e5b7	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-08 04:30:00+00	2025-10-08 05:30:00+00	t	\N	\N
-f08309da-d649-4dcc-8003-583619e3f447	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-08 05:30:00+00	2025-10-08 06:30:00+00	t	\N	\N
-b96ccc7e-0d96-43fa-a049-a32c42bcd4a8	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-08 06:30:00+00	2025-10-08 07:30:00+00	t	\N	\N
-7588f5c2-1f5b-4f14-bbcf-935350e91624	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-08 07:30:00+00	2025-10-08 08:30:00+00	t	\N	\N
-96818823-7ac3-4122-9c4c-1188813cf175	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-08 08:30:00+00	2025-10-08 09:30:00+00	t	\N	\N
-09955328-3ec5-43a0-88e4-02c6b7b29ec6	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-08 09:30:00+00	2025-10-08 10:30:00+00	t	\N	\N
-c152725b-85d0-421d-a821-81d36bedfd4c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-08 10:30:00+00	2025-10-08 11:30:00+00	t	\N	\N
-b48f679d-27b2-418d-bffd-4d235742c2a6	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-08 11:30:00+00	2025-10-08 12:30:00+00	t	\N	\N
-163d5a41-ea6f-4dfb-a649-5cb30918dc01	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-08 12:30:00+00	2025-10-08 13:30:00+00	t	\N	\N
-f2f04f50-edc3-4545-a65f-16c6e9d5b110	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-08 13:30:00+00	2025-10-08 14:30:00+00	t	\N	\N
-3baff408-2722-48e1-8bbc-dc8fa505795e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-08 14:30:00+00	2025-10-08 15:30:00+00	t	\N	\N
-2abcd311-a1d3-4fbe-ba05-7c0a9b56d26d	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-09 03:30:00+00	2025-10-09 04:30:00+00	t	\N	\N
-33c19e76-2d54-4c5a-9e0f-f062a40f6731	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-09 04:30:00+00	2025-10-09 05:30:00+00	t	\N	\N
-9df24f02-1f57-44d2-b943-ea1ef31a7028	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-09 05:30:00+00	2025-10-09 06:30:00+00	t	\N	\N
-82808ce5-435e-422f-aacb-690fff3d583f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-09 06:30:00+00	2025-10-09 07:30:00+00	t	\N	\N
-48ecf2cd-2ccd-41df-ae8e-08641a78c1aa	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-09 07:30:00+00	2025-10-09 08:30:00+00	t	\N	\N
-499396fe-ccca-4f46-a2e3-3cd287497da4	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-09 08:30:00+00	2025-10-09 09:30:00+00	t	\N	\N
-bb1579c7-504c-4aee-b5cb-ffca40d97d6d	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-09 09:30:00+00	2025-10-09 10:30:00+00	t	\N	\N
-0fba4f19-8488-4e6c-b4fd-034bb4bbbdfa	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-09 10:30:00+00	2025-10-09 11:30:00+00	t	\N	\N
-58f4d063-6f01-4331-a457-8a52bb044616	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-09 11:30:00+00	2025-10-09 12:30:00+00	t	\N	\N
-bd288cd8-d87c-459f-82a4-5cf4e2b1e059	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-09 12:30:00+00	2025-10-09 13:30:00+00	t	\N	\N
-5edd5569-4cd9-4dcd-a798-3f4647d0ea25	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-09 13:30:00+00	2025-10-09 14:30:00+00	t	\N	\N
-4d048c52-f548-47c0-a0c0-a34e7591126d	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-09 14:30:00+00	2025-10-09 15:30:00+00	t	\N	\N
-7ddf0465-6ff9-4b7f-a5c6-dbd48b2e8bc7	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-10 03:30:00+00	2025-10-10 04:30:00+00	t	\N	\N
-33496dc5-491f-42f2-aaea-8660f4c12b81	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-10 04:30:00+00	2025-10-10 05:30:00+00	t	\N	\N
-7facf9be-f0a8-4128-b38a-b1ba0f967c3f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-10 05:30:00+00	2025-10-10 06:30:00+00	t	\N	\N
-322ae144-a562-453d-954b-0985b1656719	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-10 06:30:00+00	2025-10-10 07:30:00+00	t	\N	\N
-06b6f95d-ca9b-45d8-9bf0-32d9d17dffb8	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-10 07:30:00+00	2025-10-10 08:30:00+00	t	\N	\N
-e2b03d27-a805-4dc7-9592-f7057674e180	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-10 08:30:00+00	2025-10-10 09:30:00+00	t	\N	\N
-eaade2ec-016e-488c-a0ad-301af61f4063	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-10 09:30:00+00	2025-10-10 10:30:00+00	t	\N	\N
-71cbd4ef-f933-4c17-8389-a3eba9aefe2f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-10 10:30:00+00	2025-10-10 11:30:00+00	t	\N	\N
-dc649b90-5d08-4772-86ee-e04446d9b747	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-10 11:30:00+00	2025-10-10 12:30:00+00	t	\N	\N
-9a5d6a66-7689-4713-865a-bff118bd4380	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-10 12:30:00+00	2025-10-10 13:30:00+00	t	\N	\N
-bc59b728-6756-4d91-8004-22913c0498c5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-10 13:30:00+00	2025-10-10 14:30:00+00	t	\N	\N
-4bb10b3b-2abc-42ff-935b-896c3f8b420d	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-10 14:30:00+00	2025-10-10 15:30:00+00	t	\N	\N
-d486f51f-8e5e-40aa-8e74-d32ea7c8c741	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-11 03:30:00+00	2025-10-11 04:30:00+00	t	\N	\N
-2b762e36-8abe-4577-b6f6-5dfe7551c463	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-11 04:30:00+00	2025-10-11 05:30:00+00	t	\N	\N
-b3dbca2c-c70b-4334-a01a-9fb57a74ce67	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-11 05:30:00+00	2025-10-11 06:30:00+00	t	\N	\N
-d1089a0f-548c-44fd-81dd-206a6c80d1d8	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-11 06:30:00+00	2025-10-11 07:30:00+00	t	\N	\N
-85646407-6983-4425-9c0e-ec1790e41f23	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-11 07:30:00+00	2025-10-11 08:30:00+00	t	\N	\N
-aa140ffe-8018-4ef6-81be-3ac7558b461b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-11 08:30:00+00	2025-10-11 09:30:00+00	t	\N	\N
-6a8f9f78-d451-4360-a557-f7d51632d967	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-11 09:30:00+00	2025-10-11 10:30:00+00	t	\N	\N
-29d9ab5b-3425-4ec7-84ed-b345430302f9	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-11 10:30:00+00	2025-10-11 11:30:00+00	t	\N	\N
-4ce26bbe-2254-4cfd-9b1b-fe35a02fbd7e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-11 11:30:00+00	2025-10-11 12:30:00+00	t	\N	\N
-c89bb8c1-9f49-423c-894f-fbd997df6856	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-11 12:30:00+00	2025-10-11 13:30:00+00	t	\N	\N
-de89cc17-b9be-42c3-a3bc-a67567d0520a	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-11 13:30:00+00	2025-10-11 14:30:00+00	t	\N	\N
-7627ea8f-c19b-436b-847e-44eb725dfa13	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-11 14:30:00+00	2025-10-11 15:30:00+00	t	\N	\N
-4ba27223-8846-4a14-ad55-6f481fb2fe70	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-12 03:30:00+00	2025-10-12 04:30:00+00	t	\N	\N
-fd2206d0-ba40-42c4-b096-c9e9f6cecc31	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-12 04:30:00+00	2025-10-12 05:30:00+00	t	\N	\N
-a4ac88c4-22be-4c6a-b686-f1931c8f7b7e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-12 05:30:00+00	2025-10-12 06:30:00+00	t	\N	\N
-e039f5cc-5ac3-4e2f-97d1-acd4a11e5324	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-12 06:30:00+00	2025-10-12 07:30:00+00	t	\N	\N
-2f584262-f6fd-4c22-930c-45d39a0316a6	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-12 07:30:00+00	2025-10-12 08:30:00+00	t	\N	\N
-55ce7b49-1822-432f-9b53-23d6175fe155	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-12 08:30:00+00	2025-10-12 09:30:00+00	t	\N	\N
-0eb8359f-5ecb-466c-8c5a-293a0cfd7b12	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-12 09:30:00+00	2025-10-12 10:30:00+00	t	\N	\N
-8e17c00a-1eca-4948-8132-38d1e063f743	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-12 10:30:00+00	2025-10-12 11:30:00+00	t	\N	\N
-a8fe26bb-8b1e-41f9-9124-4f79f3122fce	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-12 11:30:00+00	2025-10-12 12:30:00+00	t	\N	\N
-134520dd-6bb4-4b29-b260-ffe14f4d8d13	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-12 12:30:00+00	2025-10-12 13:30:00+00	t	\N	\N
-335ce756-aac7-4e06-aebf-60be44eab527	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-12 13:30:00+00	2025-10-12 14:30:00+00	t	\N	\N
-31065fb3-ce8d-4815-889e-4b63b8942359	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-12 14:30:00+00	2025-10-12 15:30:00+00	t	\N	\N
-6aeaab3d-f61d-45e3-9985-4b569898c5ba	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-13 03:30:00+00	2025-10-13 04:30:00+00	t	\N	\N
-74ae1acd-f789-498a-ac3a-4c41647a8829	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-13 04:30:00+00	2025-10-13 05:30:00+00	t	\N	\N
-856eb262-7ae3-4e43-b9a9-f6f97896edcf	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-13 05:30:00+00	2025-10-13 06:30:00+00	t	\N	\N
-fe158263-b98e-45cc-b5a2-d4a11eb0258b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-13 06:30:00+00	2025-10-13 07:30:00+00	t	\N	\N
-6b668255-93f1-4668-a40c-c97347cb66f3	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-13 07:30:00+00	2025-10-13 08:30:00+00	t	\N	\N
-fb4466cb-60ad-4e70-8957-9bd965018c41	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-13 08:30:00+00	2025-10-13 09:30:00+00	t	\N	\N
-6fd4e4ad-17fe-48e5-8ddd-f02b53dbf3be	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-13 09:30:00+00	2025-10-13 10:30:00+00	t	\N	\N
-b2176937-d17b-43b6-bab0-bee7e6cd3df5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-13 10:30:00+00	2025-10-13 11:30:00+00	t	\N	\N
-49238063-b4fc-450c-87e1-b9cb4cff3ca1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-13 11:30:00+00	2025-10-13 12:30:00+00	t	\N	\N
-f914382e-6079-4d03-b5c8-a7af6821eb56	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-13 12:30:00+00	2025-10-13 13:30:00+00	t	\N	\N
-5dd266c9-e02f-4d4b-bf7b-3e6b4f446deb	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-13 13:30:00+00	2025-10-13 14:30:00+00	t	\N	\N
-233c36aa-6d85-4706-9c4e-a66a39e48672	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-13 14:30:00+00	2025-10-13 15:30:00+00	t	\N	\N
-bc4be1fe-7a76-4620-b23b-1b4f718b4cee	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-14 03:30:00+00	2025-10-14 04:30:00+00	t	\N	\N
-70f7c178-e06f-423b-8b38-5ea66b735be8	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-14 04:30:00+00	2025-10-14 05:30:00+00	t	\N	\N
-4649d15d-cfb4-4915-9dd4-29798ab48cd0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-14 05:30:00+00	2025-10-14 06:30:00+00	t	\N	\N
-6b21e18e-c90b-4849-8e95-29067962db0e	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-14 06:30:00+00	2025-10-14 07:30:00+00	t	\N	\N
-394aafb6-aa39-407e-b8f5-cea4deea1031	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-14 07:30:00+00	2025-10-14 08:30:00+00	t	\N	\N
-3708a9ca-89ef-45d5-8fae-e2fd2d11b524	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-14 08:30:00+00	2025-10-14 09:30:00+00	t	\N	\N
-09ba8a8c-fd98-4309-b32d-89fe2036a333	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-14 09:30:00+00	2025-10-14 10:30:00+00	t	\N	\N
-a95db986-9b2c-450a-96f2-e81265b309e0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-14 10:30:00+00	2025-10-14 11:30:00+00	t	\N	\N
-f3965fdc-7f68-4c92-a1d1-6288c029d039	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-14 11:30:00+00	2025-10-14 12:30:00+00	t	\N	\N
-77e69f5c-6207-4f38-89f5-50b5825db3b1	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-14 12:30:00+00	2025-10-14 13:30:00+00	t	\N	\N
-55093f25-aa8c-4f39-b69d-fda8116aca91	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-14 13:30:00+00	2025-10-14 14:30:00+00	t	\N	\N
-8ed2631a-c66f-4090-9b7f-0ce7de79d867	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-15 03:30:00+00	2025-10-15 04:30:00+00	t	\N	\N
-29e95ef1-afbf-4a94-ae1d-c69156f1a188	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-15 04:30:00+00	2025-10-15 05:30:00+00	t	\N	\N
-b95e861e-f4fe-406b-a9b9-2cd1fef23d09	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-15 05:30:00+00	2025-10-15 06:30:00+00	t	\N	\N
-a917678a-50c2-435a-95d6-9581768e5539	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-15 06:30:00+00	2025-10-15 07:30:00+00	t	\N	\N
-65349649-be0c-4a4d-8aa5-0a6e6b81917d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-15 07:30:00+00	2025-10-15 08:30:00+00	t	\N	\N
-e3e9c637-39bd-46e2-b68b-98ec7c01d1b9	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-15 08:30:00+00	2025-10-15 09:30:00+00	t	\N	\N
-f1894bb8-b29c-4ce7-9788-68132a14fbec	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-15 09:30:00+00	2025-10-15 10:30:00+00	t	\N	\N
-7de938fb-8c6c-474a-86a7-210cace4a45f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-15 10:30:00+00	2025-10-15 11:30:00+00	t	\N	\N
-6b1b4f97-0475-4146-a737-65304a8ad2ed	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-15 11:30:00+00	2025-10-15 12:30:00+00	t	\N	\N
-20f3c286-54c9-4c3d-85fa-2e352e1f8c66	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-15 12:30:00+00	2025-10-15 13:30:00+00	t	\N	\N
-b6ad719c-9a1f-4416-9c83-7ce607a1094c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-15 13:30:00+00	2025-10-15 14:30:00+00	t	\N	\N
-638a0608-fb5a-4f98-a616-0b366fed6947	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-15 14:30:00+00	2025-10-15 15:30:00+00	t	\N	\N
-4fb709d8-38ec-4be3-8d07-f755ea3b0a4c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-16 03:30:00+00	2025-10-16 04:30:00+00	t	\N	\N
-b83ab8c2-ea27-4080-aafb-13aa432c6ddf	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-16 04:30:00+00	2025-10-16 05:30:00+00	t	\N	\N
-7e9a6c0a-53c3-419c-9d38-8a62cb33e76e	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-16 05:30:00+00	2025-10-16 06:30:00+00	t	\N	\N
-a609d169-516e-4069-a6af-0e621fb9781d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-16 06:30:00+00	2025-10-16 07:30:00+00	t	\N	\N
-b340dc9a-965e-4157-ae3b-d0bc18ff7682	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-16 07:30:00+00	2025-10-16 08:30:00+00	t	\N	\N
-a10fa895-0e89-46af-bd1d-964f28a494e5	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-16 08:30:00+00	2025-10-16 09:30:00+00	t	\N	\N
-95c02b5d-0a63-4328-a507-d322cfdff270	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-16 09:30:00+00	2025-10-16 10:30:00+00	t	\N	\N
-e7f37cee-4df1-4290-a161-d2769ab3d3ca	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-16 10:30:00+00	2025-10-16 11:30:00+00	t	\N	\N
-b18cba59-a016-414d-a5aa-0c077fc6a481	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-16 11:30:00+00	2025-10-16 12:30:00+00	t	\N	\N
-5489399b-1a7a-4805-b48e-0bca55fb4693	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-16 12:30:00+00	2025-10-16 13:30:00+00	t	\N	\N
-f4ab1264-38b7-4ad3-965b-dbd1abf9ae56	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-16 13:30:00+00	2025-10-16 14:30:00+00	t	\N	\N
-acbf8f8e-dbbd-4c4c-820f-bee9b5ea3b01	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-16 14:30:00+00	2025-10-16 15:30:00+00	t	\N	\N
-e4c09311-3a4b-461a-b9bd-8a16ecc8ca1d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-17 03:30:00+00	2025-10-17 04:30:00+00	t	\N	\N
-e8609ff6-8eec-4e4f-9566-5bb1e3149d2e	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-17 04:30:00+00	2025-10-17 05:30:00+00	t	\N	\N
-2e465d7c-58dc-43dc-b3e0-6c5a6c131388	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-17 05:30:00+00	2025-10-17 06:30:00+00	t	\N	\N
-195935c8-296c-4b44-899d-f485bccda325	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-17 06:30:00+00	2025-10-17 07:30:00+00	t	\N	\N
-c39d26fc-1cab-467c-a0ec-0dd60dae1497	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-17 07:30:00+00	2025-10-17 08:30:00+00	t	\N	\N
-fb085372-8dd9-41a0-af4e-23a3faeffe46	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-17 08:30:00+00	2025-10-17 09:30:00+00	t	\N	\N
-7fba8cc5-2a54-4430-90b7-855b716799ec	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-17 09:30:00+00	2025-10-17 10:30:00+00	t	\N	\N
-cd2ad71c-2bd2-4dae-8988-5b3a11d4b310	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-17 10:30:00+00	2025-10-17 11:30:00+00	t	\N	\N
-3b26649e-72a2-4650-bfb3-625bdf4a37b3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-17 11:30:00+00	2025-10-17 12:30:00+00	t	\N	\N
-648140c9-2777-4fdd-99b7-e7002daa4a25	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-17 12:30:00+00	2025-10-17 13:30:00+00	t	\N	\N
-1cf7ce0a-cecb-4956-9350-c8ddc3e945c6	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-17 13:30:00+00	2025-10-17 14:30:00+00	t	\N	\N
-394512fb-8079-407f-ac93-a3ba89e8a024	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-17 14:30:00+00	2025-10-17 15:30:00+00	t	\N	\N
-f3158007-df55-4fdf-bcd3-60a032b34707	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-18 03:30:00+00	2025-10-18 04:30:00+00	t	\N	\N
-7253a04d-a07d-4650-a40a-3846c007c7c5	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-18 04:30:00+00	2025-10-18 05:30:00+00	t	\N	\N
-feda4795-f55a-47d8-8b1e-d8074688d809	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-18 05:30:00+00	2025-10-18 06:30:00+00	t	\N	\N
-6adc82ba-bb27-49f4-b26b-f9632479ee76	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-18 06:30:00+00	2025-10-18 07:30:00+00	t	\N	\N
-d5070888-5021-4ad1-8a50-e3e38079f841	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-18 07:30:00+00	2025-10-18 08:30:00+00	t	\N	\N
-1e9df5f4-860f-41e3-86e6-a50915becec2	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-18 08:30:00+00	2025-10-18 09:30:00+00	t	\N	\N
-e0687c28-9b79-4df0-bbde-e5df161f1508	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-18 09:30:00+00	2025-10-18 10:30:00+00	t	\N	\N
-36350fb8-b49b-4868-965b-f36ade4f7817	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-18 10:30:00+00	2025-10-18 11:30:00+00	t	\N	\N
-a4bba4bf-115d-4189-afb7-d7f6fbbc2fc1	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-18 11:30:00+00	2025-10-18 12:30:00+00	t	\N	\N
-7afb1ba5-b652-4804-8062-cf946c36d9de	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-18 12:30:00+00	2025-10-18 13:30:00+00	t	\N	\N
-09ebe0c2-40fc-46c6-b4be-ae25204acaaf	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-18 13:30:00+00	2025-10-18 14:30:00+00	t	\N	\N
-6ac9cdc1-6991-4d0d-bad8-487617f559a8	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-18 14:30:00+00	2025-10-18 15:30:00+00	t	\N	\N
-ae38735b-fcd8-46b8-b57a-a02ccaf04190	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-19 03:30:00+00	2025-10-19 04:30:00+00	t	\N	\N
-57da989e-924e-4468-a439-bc579b883059	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-19 04:30:00+00	2025-10-19 05:30:00+00	t	\N	\N
-b1d2c621-8c2a-4a4d-99a1-0f3f0135dd0f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-19 05:30:00+00	2025-10-19 06:30:00+00	t	\N	\N
-22da8442-4a4b-4f6f-a20f-efa05d2d83e2	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-19 06:30:00+00	2025-10-19 07:30:00+00	t	\N	\N
-3767fb1c-86cb-4868-93e4-057ce708d2c8	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-19 07:30:00+00	2025-10-19 08:30:00+00	t	\N	\N
-8c4d8ad0-84a2-4c58-886e-1dc0194976ff	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-19 08:30:00+00	2025-10-19 09:30:00+00	t	\N	\N
-926680cc-2c06-46c4-9865-4f6701138d40	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-19 09:30:00+00	2025-10-19 10:30:00+00	t	\N	\N
-8ce01fea-eea2-48f1-9aef-73060f4a983d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-19 10:30:00+00	2025-10-19 11:30:00+00	t	\N	\N
-7c503c24-7331-47d6-81d1-d4909b55b1cf	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-19 11:30:00+00	2025-10-19 12:30:00+00	t	\N	\N
-ed1b4160-217f-4be5-92a5-ca9a869e5791	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-19 12:30:00+00	2025-10-19 13:30:00+00	t	\N	\N
-cc82584d-d86d-4a06-bd93-cee62ff37b1b	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-19 13:30:00+00	2025-10-19 14:30:00+00	t	\N	\N
-8cd96bf2-fd58-4380-b5fb-0d33e2f18497	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-19 14:30:00+00	2025-10-19 15:30:00+00	t	\N	\N
-80dfc90f-ec8d-4d87-ab5d-e92fef943d8b	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-20 03:30:00+00	2025-10-20 04:30:00+00	t	\N	\N
-ae7d512e-b94f-4d96-8ac3-ece869918d56	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-20 04:30:00+00	2025-10-20 05:30:00+00	t	\N	\N
-be890b55-e095-4274-9e20-43fe4e9c49fd	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-20 05:30:00+00	2025-10-20 06:30:00+00	t	\N	\N
-38e40f69-3574-4cc2-9123-8c26f0a6a4f8	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-20 06:30:00+00	2025-10-20 07:30:00+00	t	\N	\N
-801795be-0f94-4b2f-b4a2-66af24cb31ee	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-20 07:30:00+00	2025-10-20 08:30:00+00	t	\N	\N
-7a01a6d0-13e5-41ad-bffa-ad37378a3dbf	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-20 08:30:00+00	2025-10-20 09:30:00+00	t	\N	\N
-70478a2d-728d-4bb6-896b-f1cc81595c38	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-20 09:30:00+00	2025-10-20 10:30:00+00	t	\N	\N
-c2578c90-e0d7-47b9-a764-37f639317e43	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-20 10:30:00+00	2025-10-20 11:30:00+00	t	\N	\N
-fa4a35ba-225c-4405-9052-4689055bb9b9	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-20 11:30:00+00	2025-10-20 12:30:00+00	t	\N	\N
-e6146fe6-8978-4de0-b097-9a7b22a3623c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-20 12:30:00+00	2025-10-20 13:30:00+00	t	\N	\N
-cc0004ad-475c-4c17-82a5-e47c764740b8	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-20 13:30:00+00	2025-10-20 14:30:00+00	t	\N	\N
-d589a41e-4f90-4516-b3cc-810aae1984b3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-20 14:30:00+00	2025-10-20 15:30:00+00	t	\N	\N
-4a0a651b-4482-456b-b66d-ea22c893a999	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-21 03:30:00+00	2025-10-21 04:30:00+00	t	\N	\N
-83dd0452-d4a9-4146-87dd-8d8abdf7a1cc	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-21 04:30:00+00	2025-10-21 05:30:00+00	t	\N	\N
-07aa1e95-445a-4563-a5b3-1332dbf234c0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-21 05:30:00+00	2025-10-21 06:30:00+00	t	\N	\N
-9f06ccab-b3e5-4516-88d7-4679d6061838	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-21 06:30:00+00	2025-10-21 07:30:00+00	t	\N	\N
-7cc1b34c-3c39-479b-8f3c-7ecdd4113232	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-21 07:30:00+00	2025-10-21 08:30:00+00	t	\N	\N
-d4254efc-ec3d-4640-90ee-1e53f7b2ada6	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-21 08:30:00+00	2025-10-21 09:30:00+00	t	\N	\N
-dc623c81-4fa7-4128-8ab0-b9c9975aadda	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-21 09:30:00+00	2025-10-21 10:30:00+00	t	\N	\N
-fcd9b8b0-c264-4b08-93b2-38523953f78a	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-21 10:30:00+00	2025-10-21 11:30:00+00	t	\N	\N
-2a66c4ba-9f5c-437d-b741-b57f05134c0a	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-21 11:30:00+00	2025-10-21 12:30:00+00	t	\N	\N
-b1fdda3c-0e35-4ce6-8b8a-8c5c20def5b7	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-21 12:30:00+00	2025-10-21 13:30:00+00	t	\N	\N
-e8e15c58-fe6f-4f91-96d4-248e909dfb33	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-21 13:30:00+00	2025-10-21 14:30:00+00	t	\N	\N
-2cf0e4f5-d333-44fe-937a-1ed40be76c1d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-21 14:30:00+00	2025-10-21 15:30:00+00	t	\N	\N
-40c4a5af-1512-4a4d-9a14-3691f9c907a1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-14 03:30:00+00	2025-10-14 04:30:00+00	t	\N	\N
-e3c5878f-3ded-4383-ba8c-5df40b17062b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-14 04:30:00+00	2025-10-14 05:30:00+00	t	\N	\N
-ca775f2c-3360-4d73-8312-ebb9710fc5bc	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-14 05:30:00+00	2025-10-14 06:30:00+00	t	\N	\N
-9c0e2f73-a407-4920-a10b-2c5047c339e4	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-14 06:30:00+00	2025-10-14 07:30:00+00	t	\N	\N
-a78ebff9-e1c9-4dcf-ac6e-373faf865cca	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-14 07:30:00+00	2025-10-14 08:30:00+00	t	\N	\N
-111c3027-a19b-4249-b02a-4aa74bba0ec5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-14 08:30:00+00	2025-10-14 09:30:00+00	t	\N	\N
-e6f53f1d-4837-46d7-8800-f4d52ba42147	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-14 09:30:00+00	2025-10-14 10:30:00+00	t	\N	\N
-bd74e484-59c7-4f3e-adb8-2e148d351c76	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-14 10:30:00+00	2025-10-14 11:30:00+00	t	\N	\N
-e68271cf-d2a2-4ef5-a72f-19b49ae157c5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-14 11:30:00+00	2025-10-14 12:30:00+00	t	\N	\N
-df69dcf0-1703-41a0-b784-a1552ab3909a	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-14 12:30:00+00	2025-10-14 13:30:00+00	t	\N	\N
-c507db4d-cedb-4dec-a72a-d5084757f843	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-14 13:30:00+00	2025-10-14 14:30:00+00	t	\N	\N
-3fc386e4-876c-4d12-a7c9-24a055f288ea	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-14 14:30:00+00	2025-10-14 15:30:00+00	t	\N	\N
-49ab8be2-0c11-45e5-a2b3-3d3238b511e7	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-15 03:30:00+00	2025-10-15 04:30:00+00	t	\N	\N
-bc67330a-8c8f-4e12-8c46-1f6633fd6dcb	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-15 04:30:00+00	2025-10-15 05:30:00+00	t	\N	\N
-e3220171-be67-4fb2-b0d9-094df066fb3b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-15 05:30:00+00	2025-10-15 06:30:00+00	t	\N	\N
-ca6e9ab7-30e4-4c87-8cb8-1cb171377c19	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-15 06:30:00+00	2025-10-15 07:30:00+00	t	\N	\N
-566d3757-a5d6-41d9-9505-9b956c416596	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-15 07:30:00+00	2025-10-15 08:30:00+00	t	\N	\N
-99ed3dc8-5235-43fc-8648-555e0da47776	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-15 08:30:00+00	2025-10-15 09:30:00+00	t	\N	\N
-7116a924-d21c-42b5-b255-701e5a24bdae	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-15 09:30:00+00	2025-10-15 10:30:00+00	t	\N	\N
-ad0c6a1f-f732-4cdc-8cf9-7bbce5a39d42	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-15 10:30:00+00	2025-10-15 11:30:00+00	t	\N	\N
-9627070c-2376-4fe3-8252-5f8604e7df1b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-15 11:30:00+00	2025-10-15 12:30:00+00	t	\N	\N
-516734c3-c5d0-4cd7-b760-6fdd5ac0b3e5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-15 12:30:00+00	2025-10-15 13:30:00+00	t	\N	\N
-08c1f640-b7c3-4d8e-aa74-fde2c0e7151e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-15 13:30:00+00	2025-10-15 14:30:00+00	t	\N	\N
-c327e710-e84b-4081-b6a4-cd6ef1b67fea	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-15 14:30:00+00	2025-10-15 15:30:00+00	t	\N	\N
-33f726d9-0693-4f0d-a30d-9c228269a46d	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-16 03:30:00+00	2025-10-16 04:30:00+00	t	\N	\N
-d24abe17-961b-49b9-be58-ea5941873c33	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-16 04:30:00+00	2025-10-16 05:30:00+00	t	\N	\N
-55a2127d-d49c-40fa-b3c6-1ca5e7ed0066	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-16 05:30:00+00	2025-10-16 06:30:00+00	t	\N	\N
-1e6f9f7f-bea2-4165-9209-13736afc7dfe	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-16 06:30:00+00	2025-10-16 07:30:00+00	t	\N	\N
-c4da01ea-efc4-49c4-9307-085880ff02b9	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-16 07:30:00+00	2025-10-16 08:30:00+00	t	\N	\N
-b0e358fe-4276-4ea3-96da-224e560bcfdd	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-16 08:30:00+00	2025-10-16 09:30:00+00	t	\N	\N
-802b178f-85dd-4a03-80cf-bedf1cf7b5e7	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-16 09:30:00+00	2025-10-16 10:30:00+00	t	\N	\N
-42028ec7-2201-4d50-aa1e-244f236f44c6	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-16 10:30:00+00	2025-10-16 11:30:00+00	t	\N	\N
-6e53685a-50da-4e07-954c-5807859c16bb	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-16 11:30:00+00	2025-10-16 12:30:00+00	t	\N	\N
-6718af00-8852-445a-864f-042c13cc1bf8	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-16 12:30:00+00	2025-10-16 13:30:00+00	t	\N	\N
-cdd6ea60-15fe-4c6e-a6d6-cc401ee5d358	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-16 13:30:00+00	2025-10-16 14:30:00+00	t	\N	\N
-c6a4d5ef-2a59-4d29-8d3d-6d079271b005	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-16 14:30:00+00	2025-10-16 15:30:00+00	t	\N	\N
-6592c1c5-532f-41fb-99bd-628af3e008b0	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-17 03:30:00+00	2025-10-17 04:30:00+00	t	\N	\N
-6db412f5-e4af-4121-b984-941f304c2c3a	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-17 04:30:00+00	2025-10-17 05:30:00+00	t	\N	\N
-af4259ec-2245-476f-97be-dc3fd9412ce5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-17 05:30:00+00	2025-10-17 06:30:00+00	t	\N	\N
-8e06ab7c-8b11-4c9d-a3a2-9294971d957a	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-17 06:30:00+00	2025-10-17 07:30:00+00	t	\N	\N
-c1ae0eb0-4533-451e-aee4-75a38acb7c90	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-17 07:30:00+00	2025-10-17 08:30:00+00	t	\N	\N
-86f69fcb-6b8f-4f3d-a4bc-a5e453bac911	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-17 08:30:00+00	2025-10-17 09:30:00+00	t	\N	\N
-b99533c1-40ad-4851-a7c5-b9b30ad7de31	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-17 09:30:00+00	2025-10-17 10:30:00+00	t	\N	\N
-3441f95a-d653-40c2-a3b1-84eb50d0c38c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-17 10:30:00+00	2025-10-17 11:30:00+00	t	\N	\N
-64a5abe4-624a-4bb3-8d80-71dc5c88f42d	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-17 11:30:00+00	2025-10-17 12:30:00+00	t	\N	\N
-e537c394-c86b-4736-92f4-df63dec09d6e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-17 12:30:00+00	2025-10-17 13:30:00+00	t	\N	\N
-20d65601-1651-4850-906d-dd641891a02f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-17 13:30:00+00	2025-10-17 14:30:00+00	t	\N	\N
-572bf232-d11e-4859-808b-7383ea10dedb	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-17 14:30:00+00	2025-10-17 15:30:00+00	t	\N	\N
-21ee8679-1184-425f-8920-617fee2298e3	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-18 03:30:00+00	2025-10-18 04:30:00+00	t	\N	\N
-a20698c8-1634-45c0-9ea9-fa2c00ce7fc2	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-18 04:30:00+00	2025-10-18 05:30:00+00	t	\N	\N
-6d7c32f8-0203-4893-ae77-b627fe75f74c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-18 05:30:00+00	2025-10-18 06:30:00+00	t	\N	\N
-2de31d41-c312-44c0-83f1-06ea12a3c063	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-18 06:30:00+00	2025-10-18 07:30:00+00	t	\N	\N
-92fee9f4-d77b-4a3f-b94b-6342af60f03b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-18 07:30:00+00	2025-10-18 08:30:00+00	t	\N	\N
-7a1aede2-3264-47b3-a3f1-b806d38b3af3	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-18 08:30:00+00	2025-10-18 09:30:00+00	t	\N	\N
-e9fa8da9-2452-4e33-ac15-5a89af298440	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-18 09:30:00+00	2025-10-18 10:30:00+00	t	\N	\N
-703b044d-fcd0-4d16-99d6-7372c0fefbef	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-18 10:30:00+00	2025-10-18 11:30:00+00	t	\N	\N
-4134954f-0eda-4960-94f8-0920a18919fe	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-18 11:30:00+00	2025-10-18 12:30:00+00	t	\N	\N
-63286f9c-3df2-405f-8272-c050b420bbe1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-18 12:30:00+00	2025-10-18 13:30:00+00	t	\N	\N
-81bd5c03-2b58-4c2f-b95f-e026e516d04f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-18 13:30:00+00	2025-10-18 14:30:00+00	t	\N	\N
-c51aa42a-2151-4b7b-bbee-5305ea3ac9b8	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-18 14:30:00+00	2025-10-18 15:30:00+00	t	\N	\N
-b8b31f3c-9d99-4d4a-b9b9-2e28ddbaed3b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-19 03:30:00+00	2025-10-19 04:30:00+00	t	\N	\N
-872c59a1-e34d-43d7-ba1e-657b081a4269	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-19 04:30:00+00	2025-10-19 05:30:00+00	t	\N	\N
-4852aed3-503a-41f7-ab43-66efb4c0f2c0	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-19 05:30:00+00	2025-10-19 06:30:00+00	t	\N	\N
-04f4d044-59b0-49f4-86f3-05b948b850eb	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-19 06:30:00+00	2025-10-19 07:30:00+00	t	\N	\N
-9109047e-c418-4407-8d6c-72652151a3d7	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-19 07:30:00+00	2025-10-19 08:30:00+00	t	\N	\N
-ad2062af-f7bc-4a33-a304-a297ef3ebe80	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-19 08:30:00+00	2025-10-19 09:30:00+00	t	\N	\N
-882df336-401b-4e33-aeed-b6a602a9d124	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-19 09:30:00+00	2025-10-19 10:30:00+00	t	\N	\N
-431a2c78-82ea-4c07-8aff-b11620d2a257	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-19 10:30:00+00	2025-10-19 11:30:00+00	t	\N	\N
-024f2897-2bc2-4abf-9075-b8160a61b1d1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-19 11:30:00+00	2025-10-19 12:30:00+00	t	\N	\N
-359fc6a6-7f71-4a4c-bdc5-758235ed4fa5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-19 12:30:00+00	2025-10-19 13:30:00+00	t	\N	\N
-a803b9f2-159d-4f3d-8073-64122f3b7443	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-19 13:30:00+00	2025-10-19 14:30:00+00	t	\N	\N
-c3111ad2-ec97-46ad-917c-ebfbea8151fb	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-19 14:30:00+00	2025-10-19 15:30:00+00	t	\N	\N
-6fd1150f-7f4b-461c-8dea-8f8ba180fef2	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-20 03:30:00+00	2025-10-20 04:30:00+00	t	\N	\N
-9fd69414-2fc3-4717-baf6-a693dceb28a9	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-20 04:30:00+00	2025-10-20 05:30:00+00	t	\N	\N
-cf0dc7a7-e92a-4d83-9928-e2896ef1aa37	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-20 05:30:00+00	2025-10-20 06:30:00+00	t	\N	\N
-f3b784ed-7ad7-449b-91d9-2696e1838b01	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-20 06:30:00+00	2025-10-20 07:30:00+00	t	\N	\N
-57e08af3-3b49-4800-b04a-faa950d37141	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-20 07:30:00+00	2025-10-20 08:30:00+00	t	\N	\N
-c1bf1f84-8ce4-4187-8d70-866fd55ebac2	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-20 08:30:00+00	2025-10-20 09:30:00+00	t	\N	\N
-eb0c176a-d39e-4476-b287-336dde01f0f3	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-20 09:30:00+00	2025-10-20 10:30:00+00	t	\N	\N
-150b8952-3a3c-48e9-939b-efc50f1eccf6	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-20 10:30:00+00	2025-10-20 11:30:00+00	t	\N	\N
-ebd8981e-8e72-43ee-aa53-334281b55299	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-20 11:30:00+00	2025-10-20 12:30:00+00	t	\N	\N
-bc863b96-cb62-480e-b1e5-f34f908c7c8e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-20 12:30:00+00	2025-10-20 13:30:00+00	t	\N	\N
-afe97155-dcd2-4ae6-8bc6-05c5d63f2f9e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-20 13:30:00+00	2025-10-20 14:30:00+00	t	\N	\N
-40b228ae-5122-48cd-90d3-4b3f9f1749fc	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-20 14:30:00+00	2025-10-20 15:30:00+00	t	\N	\N
-1c3dd586-b628-48d3-ba47-f2dcc27b56c0	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-21 03:30:00+00	2025-10-21 04:30:00+00	t	\N	\N
-1c2f38ec-ca5c-41d1-97b3-2b0d7ae081f1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-21 04:30:00+00	2025-10-21 05:30:00+00	t	\N	\N
-c10187b1-654a-4dff-ab82-05d2a1e3329c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-21 05:30:00+00	2025-10-21 06:30:00+00	t	\N	\N
-da8baa49-5e85-48c9-970c-bfed7029c8ec	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-21 06:30:00+00	2025-10-21 07:30:00+00	t	\N	\N
-2b462666-3266-4cd7-bc2f-6cc047e976aa	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-21 07:30:00+00	2025-10-21 08:30:00+00	t	\N	\N
-a0eeb207-49a3-4c83-acaf-b1d44f04832e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-21 08:30:00+00	2025-10-21 09:30:00+00	t	\N	\N
-02e459aa-bc13-4357-b9ee-c7b80fde3394	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-21 09:30:00+00	2025-10-21 10:30:00+00	t	\N	\N
-920cd49a-9374-440b-bb3f-202efda903e9	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-21 10:30:00+00	2025-10-21 11:30:00+00	t	\N	\N
-d99f87b3-1126-468b-b1be-0f1d1b5c19f3	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-21 11:30:00+00	2025-10-21 12:30:00+00	t	\N	\N
-4c7d4d66-a261-47a4-b195-6c9719adb330	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-21 12:30:00+00	2025-10-21 13:30:00+00	t	\N	\N
-b2bea6f7-2fb4-4875-8771-609b05fe258a	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-21 13:30:00+00	2025-10-21 14:30:00+00	t	\N	\N
-459b6244-64b1-47ea-801b-fa953065b6cf	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-21 14:30:00+00	2025-10-21 15:30:00+00	t	\N	\N
-d0a9c8c3-e3b7-46e4-97a9-ff26dada0503	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-12 03:30:00+00	2025-10-12 04:30:00+00	t	\N	\N
-211d277c-be03-4eaf-82ff-bf584cf3854e	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-12 04:30:00+00	2025-10-12 05:30:00+00	t	\N	\N
-55b0e9fe-84b8-4cbe-9a87-b4b48eff25bd	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-12 05:30:00+00	2025-10-12 06:30:00+00	t	\N	\N
-c1df4f80-7038-4997-ad6e-c89da8dc192e	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-12 06:30:00+00	2025-10-12 07:30:00+00	t	\N	\N
-d26bb7d6-5119-4218-aa54-949ec811697e	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-12 07:30:00+00	2025-10-12 08:30:00+00	t	\N	\N
-689796cd-0eb6-4dd8-b456-a8cc84792bc7	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-12 08:30:00+00	2025-10-12 09:30:00+00	t	\N	\N
-e4b46bd6-9840-446f-b681-f52f14c40bcf	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-12 09:30:00+00	2025-10-12 10:30:00+00	t	\N	\N
-e4ffdf9a-1e57-4e31-ad05-8f096ee07ea4	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-12 10:30:00+00	2025-10-12 11:30:00+00	t	\N	\N
-0b4ab5b7-0258-4f53-85b9-faeb7a157e29	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-12 11:30:00+00	2025-10-12 12:30:00+00	t	\N	\N
-55eac0eb-63e8-4ef6-9840-d72b65da5257	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-12 12:30:00+00	2025-10-12 13:30:00+00	t	\N	\N
-b9005440-3edc-4125-ba4f-23494a10c823	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-13 03:30:00+00	2025-10-13 04:30:00+00	t	\N	\N
-d6506e0a-c2d5-400d-8dda-2e1767ef8b2c	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-13 04:30:00+00	2025-10-13 05:30:00+00	t	\N	\N
-0cdf9e2f-a386-4e95-8466-dd26dc3ab6c9	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-13 05:30:00+00	2025-10-13 06:30:00+00	t	\N	\N
-90078e32-5b21-417d-bf90-d3ecbbca326a	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-13 06:30:00+00	2025-10-13 07:30:00+00	t	\N	\N
-1c55d575-8ba7-4a21-8657-9410beb721b3	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-13 07:30:00+00	2025-10-13 08:30:00+00	t	\N	\N
-2be2bce5-b250-49dd-987c-9b789c3db328	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-13 08:30:00+00	2025-10-13 09:30:00+00	t	\N	\N
-a4bf264e-803c-4162-b0b2-bca328c3204c	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-13 09:30:00+00	2025-10-13 10:30:00+00	t	\N	\N
-a3b4fd03-35d2-4a0e-ac83-6acfb8d33dd8	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-13 10:30:00+00	2025-10-13 11:30:00+00	t	\N	\N
-fba19fca-7776-4bf0-ace0-9c3278633f92	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-13 11:30:00+00	2025-10-13 12:30:00+00	t	\N	\N
-2a76c337-7225-4bb3-bf61-a09774e07cb1	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-13 12:30:00+00	2025-10-13 13:30:00+00	t	\N	\N
-7aab4a3e-0fd5-4696-8f32-c8b9c9b0c601	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-13 13:30:00+00	2025-10-13 14:30:00+00	t	\N	\N
-8f516c52-e992-47f9-8d77-524e309894bb	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-13 14:30:00+00	2025-10-13 15:30:00+00	t	\N	\N
-ab5cc9e6-3a1b-4f9f-9302-45471011e702	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-14 03:30:00+00	2025-10-14 04:30:00+00	t	\N	\N
-1f6a4a18-bb82-4ecb-9d46-3177ceedc71a	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-14 04:30:00+00	2025-10-14 05:30:00+00	t	\N	\N
-a1ff0ae6-8f8c-41cc-83bd-600ae215c0d2	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-14 05:30:00+00	2025-10-14 06:30:00+00	t	\N	\N
-355423ef-e563-4f78-928c-bb65b2fb7e6b	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-14 06:30:00+00	2025-10-14 07:30:00+00	t	\N	\N
-e006e816-ed9e-41c4-8801-2c6148461b5e	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-14 07:30:00+00	2025-10-14 08:30:00+00	t	\N	\N
-566e2257-61ef-4e87-a865-0a4c04a1cb59	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-14 08:30:00+00	2025-10-14 09:30:00+00	t	\N	\N
-d11e0932-b868-4c52-a799-8dbc76736d87	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-14 09:30:00+00	2025-10-14 10:30:00+00	t	\N	\N
-95793429-b1ee-41e5-a699-29f15b58f534	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-14 10:30:00+00	2025-10-14 11:30:00+00	t	\N	\N
-ccf9b043-ef82-43de-88f5-a0afcedfc525	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-14 11:30:00+00	2025-10-14 12:30:00+00	t	\N	\N
-bbed50fa-93fc-4fa1-ac57-64c938fba41b	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-14 12:30:00+00	2025-10-14 13:30:00+00	t	\N	\N
-f6444fc2-dfd7-4262-a22f-6dce3147d16e	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-15 03:30:00+00	2025-10-15 04:30:00+00	t	\N	\N
-3847b061-865c-41c2-b56e-7eaa03ddceeb	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-15 04:30:00+00	2025-10-15 05:30:00+00	t	\N	\N
-c7c2c777-1203-49a8-a1a2-991435661898	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-15 05:30:00+00	2025-10-15 06:30:00+00	t	\N	\N
-f10b71f4-dacd-493b-9d1b-76df454e3b88	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-15 06:30:00+00	2025-10-15 07:30:00+00	t	\N	\N
-f9a4b920-15d9-4faf-98ad-612c9bebd790	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-15 07:30:00+00	2025-10-15 08:30:00+00	t	\N	\N
-b9f46088-7472-471e-8db8-56cea05a0c13	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-15 08:30:00+00	2025-10-15 09:30:00+00	t	\N	\N
-b6e9063d-1725-4519-939d-e2f7ad96ae44	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-15 09:30:00+00	2025-10-15 10:30:00+00	t	\N	\N
-478dc903-5d7a-403f-be90-2fe5dc0be972	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-15 10:30:00+00	2025-10-15 11:30:00+00	t	\N	\N
-78ab3ace-710b-4d10-a269-084fe4689d65	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-15 11:30:00+00	2025-10-15 12:30:00+00	t	\N	\N
-30a8db86-7c2e-45d5-bcf9-a14cc56cb91b	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-15 12:30:00+00	2025-10-15 13:30:00+00	t	\N	\N
-d3db5b21-d2ec-47b0-8474-6000aec13427	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-15 13:30:00+00	2025-10-15 14:30:00+00	t	\N	\N
-382ca501-508b-44ea-a350-cfb6d3427be4	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-15 14:30:00+00	2025-10-15 15:30:00+00	t	\N	\N
-b2030830-2079-4445-8204-67d1b6f38daf	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-16 03:30:00+00	2025-10-16 04:30:00+00	t	\N	\N
-4c4309cd-b110-4f7f-b3b1-a15d3758d372	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-16 04:30:00+00	2025-10-16 05:30:00+00	t	\N	\N
-80213768-0c3c-4367-9e8b-5f4184fd6a84	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-16 05:30:00+00	2025-10-16 06:30:00+00	t	\N	\N
-b3bb7bbd-851c-4da1-8c65-2c75d0ea4c76	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-16 06:30:00+00	2025-10-16 07:30:00+00	t	\N	\N
-5524a346-e570-4b4b-98f6-fa6ef991ed9d	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-16 07:30:00+00	2025-10-16 08:30:00+00	t	\N	\N
-8b7159de-1918-4e2a-81dc-d5c0e7754305	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-16 08:30:00+00	2025-10-16 09:30:00+00	t	\N	\N
-74636cc0-4bc0-4249-97fd-099122f5d1ee	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-16 09:30:00+00	2025-10-16 10:30:00+00	t	\N	\N
-ea643596-0628-4c8f-9ac9-d3b314afd6d3	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-16 10:30:00+00	2025-10-16 11:30:00+00	t	\N	\N
-f249784f-04d1-423c-97b1-34be44dbf173	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-16 11:30:00+00	2025-10-16 12:30:00+00	t	\N	\N
-a430f14e-9c2d-4b0d-97e3-5ac69c1730e7	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-16 12:30:00+00	2025-10-16 13:30:00+00	t	\N	\N
-3051962a-790a-4d06-b34d-8dda22e4db47	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-16 13:30:00+00	2025-10-16 14:30:00+00	t	\N	\N
-31bd3cab-9c31-4691-b226-36100012f330	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-16 14:30:00+00	2025-10-16 15:30:00+00	t	\N	\N
-03994654-acf6-400c-91fa-22bdd6a2fa73	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-17 03:30:00+00	2025-10-17 04:30:00+00	t	\N	\N
-eb4a5c43-3715-4fa6-bae1-3ed2f79140e4	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-17 04:30:00+00	2025-10-17 05:30:00+00	t	\N	\N
-3d695654-c134-4daf-9d2e-8fae5b512ded	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-17 05:30:00+00	2025-10-17 06:30:00+00	t	\N	\N
-b085a076-7554-43f5-852f-7e77d052ca7b	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-17 06:30:00+00	2025-10-17 07:30:00+00	t	\N	\N
-52a9c8b3-0026-4a5b-8c18-c4022d2a06ff	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-17 07:30:00+00	2025-10-17 08:30:00+00	t	\N	\N
-2976f87b-0152-4b7c-91b1-3aeec81d5333	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-17 08:30:00+00	2025-10-17 09:30:00+00	t	\N	\N
-b8021859-42cb-4a65-a025-6e71cd5572aa	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-17 09:30:00+00	2025-10-17 10:30:00+00	t	\N	\N
-81663108-0f87-4351-b90e-91e0db0ab102	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-17 10:30:00+00	2025-10-17 11:30:00+00	t	\N	\N
-9e173dcc-8ba7-4677-a09d-6c78ac64b51b	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-17 11:30:00+00	2025-10-17 12:30:00+00	t	\N	\N
-eec407b1-433a-4786-8887-6bac19db9d58	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-17 12:30:00+00	2025-10-17 13:30:00+00	t	\N	\N
-b2d31815-e200-4740-b38d-2e9c4461492d	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-17 13:30:00+00	2025-10-17 14:30:00+00	t	\N	\N
-ed45fed4-c296-4700-a110-495505cb9fbf	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-17 14:30:00+00	2025-10-17 15:30:00+00	t	\N	\N
-ba35c99f-d6fd-4f7b-a175-c7ae4e40d563	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-18 03:30:00+00	2025-10-18 04:30:00+00	t	\N	\N
-9b78cec1-7fbb-48a6-a4f5-42704ed9afab	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-18 04:30:00+00	2025-10-18 05:30:00+00	t	\N	\N
-587aa95f-6152-45d0-8a1a-fc97dd081356	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-18 05:30:00+00	2025-10-18 06:30:00+00	t	\N	\N
-e9b5a9b4-7049-4c50-b45f-84a4266e6455	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-18 06:30:00+00	2025-10-18 07:30:00+00	t	\N	\N
-b3013f52-53ee-4fb7-8424-82b4fd6b16d8	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-18 07:30:00+00	2025-10-18 08:30:00+00	t	\N	\N
-3440508e-0734-4efa-8092-761d4e469790	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-18 08:30:00+00	2025-10-18 09:30:00+00	t	\N	\N
-dd57b990-3aa6-4d51-b2f5-9b3e324e4441	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-18 09:30:00+00	2025-10-18 10:30:00+00	t	\N	\N
-4931825f-ffc4-4c26-9f33-733df790fa12	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-18 10:30:00+00	2025-10-18 11:30:00+00	t	\N	\N
-85d615c4-ee3f-4b12-81dc-7aa2209e6263	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-18 11:30:00+00	2025-10-18 12:30:00+00	t	\N	\N
-85f51fd6-bdba-4000-9beb-345a6f21cb96	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-18 12:30:00+00	2025-10-18 13:30:00+00	t	\N	\N
-d23816fe-9820-4e91-9a44-80d169c70015	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-18 13:30:00+00	2025-10-18 14:30:00+00	t	\N	\N
-a68be27e-b7f6-4e88-a3a1-ca40020f4b6a	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-18 14:30:00+00	2025-10-18 15:30:00+00	t	\N	\N
-1269398d-9321-4ea4-9313-ffe98dd15867	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-19 03:30:00+00	2025-10-19 04:30:00+00	t	\N	\N
-2248bd3d-5c97-4f38-993c-8b5a739f8350	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-19 04:30:00+00	2025-10-19 05:30:00+00	t	\N	\N
-cbfbfca3-ba11-4fc8-83aa-4a55f2ea4b5a	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-19 05:30:00+00	2025-10-19 06:30:00+00	t	\N	\N
-ddf6d8ab-a379-4d10-aa32-7630e631e50e	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-19 06:30:00+00	2025-10-19 07:30:00+00	t	\N	\N
-22133cb5-d6d3-4283-b917-197e2e2ceb6c	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-19 07:30:00+00	2025-10-19 08:30:00+00	t	\N	\N
-fad04bbf-04bb-4952-8bc1-00c6b9486c22	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-12 14:30:00+00	2025-10-12 15:30:00+00	f	\N	\N
-a469ffed-4185-461f-94fd-16d07035859b	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-14 14:30:00+00	2025-10-14 15:30:00+00	f	\N	\N
-662052ed-4b30-4bbc-b118-1953fcbc1413	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-14 13:30:00+00	2025-10-14 14:30:00+00	t	\N	\N
-a00efcac-980c-49e7-88c9-2943636fcebc	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-19 08:30:00+00	2025-10-19 09:30:00+00	t	\N	\N
-9d21bd11-9220-45aa-bdae-5af83ebfca9c	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-19 09:30:00+00	2025-10-19 10:30:00+00	t	\N	\N
-90ccd593-1093-45de-af0a-876bda2e0233	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-19 10:30:00+00	2025-10-19 11:30:00+00	t	\N	\N
-7cd2dda7-435a-4a89-a95a-3f109b733544	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-19 11:30:00+00	2025-10-19 12:30:00+00	t	\N	\N
-5436504d-a6b4-4830-876f-6d315ff38f09	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-19 12:30:00+00	2025-10-19 13:30:00+00	t	\N	\N
-b74fa337-21bf-4224-b551-697cf1c702db	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-19 13:30:00+00	2025-10-19 14:30:00+00	t	\N	\N
-324eb462-80ba-41fd-90e4-330c52a81ae8	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-19 14:30:00+00	2025-10-19 15:30:00+00	t	\N	\N
-f865a58f-6566-4083-9254-2959910dd9d7	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-12 03:30:00+00	2025-10-12 04:30:00+00	t	\N	\N
-88b757ac-f4fd-4ba2-9d05-9c926e2533b8	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-12 04:30:00+00	2025-10-12 05:30:00+00	t	\N	\N
-f3df872e-967c-4d97-bbd2-8c203dba64f7	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-12 05:30:00+00	2025-10-12 06:30:00+00	t	\N	\N
-3e784bf6-cca0-4378-88da-1b35778011ad	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-12 06:30:00+00	2025-10-12 07:30:00+00	t	\N	\N
-93f6d221-9e5c-4747-a0cc-99f7cd6a4d2d	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-12 07:30:00+00	2025-10-12 08:30:00+00	t	\N	\N
-494c2555-741a-4975-b708-c9507e13c7f4	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-12 08:30:00+00	2025-10-12 09:30:00+00	t	\N	\N
-9113f537-f2b6-42aa-b7ad-ece18cd3221c	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-12 09:30:00+00	2025-10-12 10:30:00+00	t	\N	\N
-0a1136de-029f-419b-9e75-f9ed8020c883	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-12 10:30:00+00	2025-10-12 11:30:00+00	t	\N	\N
-9ec04712-f97b-489b-972b-bf9d52dd7179	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-12 11:30:00+00	2025-10-12 12:30:00+00	t	\N	\N
-7ce3b7d6-3e69-441c-aaf4-e1e5212e11e5	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-12 12:30:00+00	2025-10-12 13:30:00+00	t	\N	\N
-68f805f6-db7f-4818-8019-bd5749fddb1e	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-12 13:30:00+00	2025-10-12 14:30:00+00	t	\N	\N
-ef9dff7c-b878-467b-8702-0a1a79968fb2	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-12 14:30:00+00	2025-10-12 15:30:00+00	t	\N	\N
-4966e90f-2cf2-4dbd-9205-e31f75dddd34	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-13 03:30:00+00	2025-10-13 04:30:00+00	t	\N	\N
-bae9a55c-1bce-4b46-bb00-6c109385ae12	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-13 04:30:00+00	2025-10-13 05:30:00+00	t	\N	\N
-a697f762-12c4-467b-a27b-9473a7c6636d	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-13 05:30:00+00	2025-10-13 06:30:00+00	t	\N	\N
-a28db73e-3f83-4e7e-bcd0-544547daef7f	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-13 06:30:00+00	2025-10-13 07:30:00+00	t	\N	\N
-0725f945-fc9f-46e2-b6bf-d541ce384571	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-13 07:30:00+00	2025-10-13 08:30:00+00	t	\N	\N
-77c5ae45-7340-44fc-a341-0e57d5e9c849	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-13 08:30:00+00	2025-10-13 09:30:00+00	t	\N	\N
-4d48d80e-a4d2-4041-808c-714b31a97138	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-13 09:30:00+00	2025-10-13 10:30:00+00	t	\N	\N
-c9040979-6296-4296-947e-f22c6f9bac82	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-13 10:30:00+00	2025-10-13 11:30:00+00	t	\N	\N
-12da81ae-f1c2-4833-9b28-6eb61a9a5abf	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-13 11:30:00+00	2025-10-13 12:30:00+00	t	\N	\N
-819d0496-106e-48cb-b766-67fd72c587ee	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-13 12:30:00+00	2025-10-13 13:30:00+00	t	\N	\N
-29233831-9041-453f-8357-487c6deddb64	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-13 13:30:00+00	2025-10-13 14:30:00+00	t	\N	\N
-71caca02-c777-4023-b937-64eea819a860	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-13 14:30:00+00	2025-10-13 15:30:00+00	t	\N	\N
-467fb9b1-05be-4ebd-8c0d-97db64736550	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-14 03:30:00+00	2025-10-14 04:30:00+00	t	\N	\N
-563b02a5-47fa-4a31-8680-55156e789545	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-14 04:30:00+00	2025-10-14 05:30:00+00	t	\N	\N
-659685b1-e649-41dc-8618-b327457d21c2	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-14 05:30:00+00	2025-10-14 06:30:00+00	t	\N	\N
-b2bd625e-b993-4c27-b255-e62be29812a4	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-14 06:30:00+00	2025-10-14 07:30:00+00	t	\N	\N
-02163204-2edf-401a-a251-1683268e4d24	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-14 07:30:00+00	2025-10-14 08:30:00+00	t	\N	\N
-34a077e2-06b7-4eeb-9bd3-234b99694086	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-14 08:30:00+00	2025-10-14 09:30:00+00	t	\N	\N
-4dd5038c-a154-4f66-829e-183658c84928	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-14 09:30:00+00	2025-10-14 10:30:00+00	t	\N	\N
-327c18ad-0080-4153-a406-7ea04bf1c0ee	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-14 10:30:00+00	2025-10-14 11:30:00+00	t	\N	\N
-dd2dc186-42af-4dcb-b42f-82c06bd9f883	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-14 11:30:00+00	2025-10-14 12:30:00+00	t	\N	\N
-1529422c-bea4-413f-9212-5a3742c6c1d6	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-14 12:30:00+00	2025-10-14 13:30:00+00	t	\N	\N
-75e1e71b-f1e9-41c3-ae38-51a5c2dcc639	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-14 13:30:00+00	2025-10-14 14:30:00+00	t	\N	\N
-432e59f6-2d65-4011-bfc4-ff0921708eb3	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-14 14:30:00+00	2025-10-14 15:30:00+00	t	\N	\N
-cd24a43a-fbec-4236-b837-994646514929	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-15 03:30:00+00	2025-10-15 04:30:00+00	t	\N	\N
-b0e8b64b-8c71-4784-91b7-5740a004e13a	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-15 04:30:00+00	2025-10-15 05:30:00+00	t	\N	\N
-01f1b9e1-488a-409c-8a40-2deca5feb608	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-15 05:30:00+00	2025-10-15 06:30:00+00	t	\N	\N
-fb62b22a-b0a2-4c85-a16e-a133a552f195	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-15 06:30:00+00	2025-10-15 07:30:00+00	t	\N	\N
-9c1dc28c-1bf1-4e00-8108-58fee3c05789	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-15 07:30:00+00	2025-10-15 08:30:00+00	t	\N	\N
-d0223d97-46ef-4986-a9fd-6e331c2fb981	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-15 08:30:00+00	2025-10-15 09:30:00+00	t	\N	\N
-c1e2327e-2acc-4e74-a673-e8bf4542fc06	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-15 09:30:00+00	2025-10-15 10:30:00+00	t	\N	\N
-7ba51ad2-bafc-436f-aaa2-a614533bba97	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-15 10:30:00+00	2025-10-15 11:30:00+00	t	\N	\N
-358330df-a272-44d0-a366-2df2a0203ddc	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-15 11:30:00+00	2025-10-15 12:30:00+00	t	\N	\N
-5bbffd43-8606-4c12-a701-94679bc69d49	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-15 12:30:00+00	2025-10-15 13:30:00+00	t	\N	\N
-b24413ac-6d9c-4bdf-9e68-9c734234358c	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-15 13:30:00+00	2025-10-15 14:30:00+00	t	\N	\N
-d41a42cf-b2d0-401b-9abd-d5e5229f10fd	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-15 14:30:00+00	2025-10-15 15:30:00+00	t	\N	\N
-757add12-1d12-4008-9fe1-1fdbcaad27c3	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-16 03:30:00+00	2025-10-16 04:30:00+00	t	\N	\N
-9156b571-bf03-4145-9b50-6bfb9eb492cb	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-16 04:30:00+00	2025-10-16 05:30:00+00	t	\N	\N
-303c8ef4-c00d-4834-8171-226758b6c388	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-16 05:30:00+00	2025-10-16 06:30:00+00	t	\N	\N
-fca309c3-4e8a-46ea-ba1d-75898bc90a26	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-16 06:30:00+00	2025-10-16 07:30:00+00	t	\N	\N
-a0a01531-be98-4b4f-9f1c-8dd6e367f4f5	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-16 07:30:00+00	2025-10-16 08:30:00+00	t	\N	\N
-ff218c07-1f14-41fc-8e7c-14567666290a	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-16 08:30:00+00	2025-10-16 09:30:00+00	t	\N	\N
-5c338327-86ba-4ea9-a061-015030c788fc	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-16 09:30:00+00	2025-10-16 10:30:00+00	t	\N	\N
-1f1e80ab-f95b-4fe8-8d1a-d77e2eca2177	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-16 10:30:00+00	2025-10-16 11:30:00+00	t	\N	\N
-92c4d650-ebf1-4cc4-ab1e-10a3285eaf05	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-16 11:30:00+00	2025-10-16 12:30:00+00	t	\N	\N
-fde5823a-3d73-4bbe-9b50-8d00c6c4485e	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-16 12:30:00+00	2025-10-16 13:30:00+00	t	\N	\N
-a34c37b1-3cfe-4e88-8fa5-6ffa435eb69e	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-16 13:30:00+00	2025-10-16 14:30:00+00	t	\N	\N
-9c61cdf4-115c-4491-866d-903abd25171e	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-16 14:30:00+00	2025-10-16 15:30:00+00	t	\N	\N
-083069f7-567d-4925-8065-e5dbf59b8fd1	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-17 03:30:00+00	2025-10-17 04:30:00+00	t	\N	\N
-d51a78a5-cd2c-49ba-994e-ebd3be936b78	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-17 04:30:00+00	2025-10-17 05:30:00+00	t	\N	\N
-4093e32e-ac0d-46bc-9624-15e2f22a879f	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-17 05:30:00+00	2025-10-17 06:30:00+00	t	\N	\N
-f74e9ff8-b524-40dc-8d99-352c194cd0ac	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-17 06:30:00+00	2025-10-17 07:30:00+00	t	\N	\N
-0b28b397-323a-4b1f-b206-bdc2efeb68f3	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-17 07:30:00+00	2025-10-17 08:30:00+00	t	\N	\N
-583f1da7-a2f2-4c0b-b136-4b241a4ae0b3	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-17 08:30:00+00	2025-10-17 09:30:00+00	t	\N	\N
-f8efe4b5-1e43-4154-88f6-f6de44798ab5	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-17 09:30:00+00	2025-10-17 10:30:00+00	t	\N	\N
-6bb5832b-6ea8-4bc3-a5f9-25b1be1eee92	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-17 10:30:00+00	2025-10-17 11:30:00+00	t	\N	\N
-8bbd7cab-8c40-41dd-bf4f-453058a2c897	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-17 11:30:00+00	2025-10-17 12:30:00+00	t	\N	\N
-7eb6c8a1-dc29-49f3-9cde-43ff0d5a901a	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-17 12:30:00+00	2025-10-17 13:30:00+00	t	\N	\N
-4416f46c-a0d3-437e-a8d2-49983a048d61	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-17 13:30:00+00	2025-10-17 14:30:00+00	t	\N	\N
-33bb9ab5-f39e-431a-b04b-f38124ab4523	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-17 14:30:00+00	2025-10-17 15:30:00+00	t	\N	\N
-c281c4f3-b4fb-48c3-a052-b399b8716f6d	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-18 03:30:00+00	2025-10-18 04:30:00+00	t	\N	\N
-0d7666b1-f4a8-4aca-bc6f-da3bcb4faab7	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-18 04:30:00+00	2025-10-18 05:30:00+00	t	\N	\N
-99a320d0-7d9c-4689-9536-18023e0e7679	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-18 05:30:00+00	2025-10-18 06:30:00+00	t	\N	\N
-1c83df79-3201-4fd3-bb44-2c363c5da629	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-18 06:30:00+00	2025-10-18 07:30:00+00	t	\N	\N
-e6368f9d-9a3d-45e3-8915-7dcf1b293cc0	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-18 07:30:00+00	2025-10-18 08:30:00+00	t	\N	\N
-f956b39f-e7b4-4a0a-b64d-8e8f9355226a	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-18 08:30:00+00	2025-10-18 09:30:00+00	t	\N	\N
-a334df0a-4dcc-40df-929c-015e5010372d	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-18 09:30:00+00	2025-10-18 10:30:00+00	t	\N	\N
-2d4a01ce-6a81-4cd2-b660-2489d5bc002a	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-18 10:30:00+00	2025-10-18 11:30:00+00	t	\N	\N
-c1eb166d-7c9c-492c-abae-843976e17929	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-18 11:30:00+00	2025-10-18 12:30:00+00	t	\N	\N
-0244589f-f756-4884-89d5-a96425058b52	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-18 12:30:00+00	2025-10-18 13:30:00+00	t	\N	\N
-653b63ea-9f53-4d06-9df8-2c3518023d47	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-18 13:30:00+00	2025-10-18 14:30:00+00	t	\N	\N
-d59816af-d6c0-4ebf-9720-1f9eabdd6b61	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-18 14:30:00+00	2025-10-18 15:30:00+00	t	\N	\N
-58a0f0e3-40a3-4aa2-8dab-1064eb9951e0	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-19 03:30:00+00	2025-10-19 04:30:00+00	t	\N	\N
-a01e8369-6775-4e6e-ae2c-4f8b703870db	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-19 04:30:00+00	2025-10-19 05:30:00+00	t	\N	\N
-282dea07-e804-4482-ac26-70d9c9cb8b47	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-19 05:30:00+00	2025-10-19 06:30:00+00	t	\N	\N
-f838c1d5-3e8f-4bd6-aaf6-353b12f02a3e	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-19 06:30:00+00	2025-10-19 07:30:00+00	t	\N	\N
-4bff4e86-f9cf-4130-ba5f-9e8fdb7878a7	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-19 07:30:00+00	2025-10-19 08:30:00+00	t	\N	\N
-bb04a817-d3e4-4915-b565-df4fefc6e76e	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-19 08:30:00+00	2025-10-19 09:30:00+00	t	\N	\N
-817bc835-69db-43a9-b989-0c42df2b55fe	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-19 09:30:00+00	2025-10-19 10:30:00+00	t	\N	\N
-4ac7cec1-15e8-4b57-80ad-6eacef61a11e	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-19 10:30:00+00	2025-10-19 11:30:00+00	t	\N	\N
-69660f25-ebf0-4c85-a291-0cd9472d08a0	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-19 11:30:00+00	2025-10-19 12:30:00+00	t	\N	\N
-92087bc5-a170-44e5-9a78-d789ebc8ea3c	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-19 12:30:00+00	2025-10-19 13:30:00+00	t	\N	\N
-e0d3c3e8-a25a-4bae-8db1-5d4ccdcc4796	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-19 13:30:00+00	2025-10-19 14:30:00+00	t	\N	\N
-ebe95a38-111a-42a3-b8a5-a4c7f0cef2ee	fb028c96-667c-4fd0-be9f-ffbfb413c8cd	2025-10-19 14:30:00+00	2025-10-19 15:30:00+00	t	\N	\N
-b2215c68-1e94-485a-bc67-a5a03582650b	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-12 03:30:00+00	2025-10-12 04:30:00+00	t	\N	\N
-3091b252-53ef-496b-9e02-a5591f2f9e1e	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-12 04:30:00+00	2025-10-12 05:30:00+00	t	\N	\N
-f9c41e56-fce7-4587-834e-c75ef67dde99	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-12 05:30:00+00	2025-10-12 06:30:00+00	t	\N	\N
-4b929a9f-03d7-4679-9110-31c3bed7b853	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-12 06:30:00+00	2025-10-12 07:30:00+00	t	\N	\N
-ae08cbc0-426b-4c10-a5c7-edb1310a79d2	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-12 07:30:00+00	2025-10-12 08:30:00+00	t	\N	\N
-58abcbd6-8c3b-4612-9ae6-6988450cbbc2	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-12 08:30:00+00	2025-10-12 09:30:00+00	t	\N	\N
-492c0e5d-9942-4f55-b603-693f4bcfd5d8	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-12 09:30:00+00	2025-10-12 10:30:00+00	t	\N	\N
-fbefca39-b740-4202-9a7a-a956b19f215a	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-12 10:30:00+00	2025-10-12 11:30:00+00	t	\N	\N
-6872a87c-5bdf-4707-87ef-528ec804f359	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-12 11:30:00+00	2025-10-12 12:30:00+00	t	\N	\N
-c9ff1ffd-fe41-48eb-8ee8-51520532610e	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-12 12:30:00+00	2025-10-12 13:30:00+00	t	\N	\N
-12315988-8460-4b34-8938-cf4424f65cdb	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-12 13:30:00+00	2025-10-12 14:30:00+00	t	\N	\N
-7811cf02-04f0-4adc-85da-342f1091c57a	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-12 14:30:00+00	2025-10-12 15:30:00+00	t	\N	\N
-6cbc4deb-b82f-49f8-97dd-4fbcbdc5e492	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-13 03:30:00+00	2025-10-13 04:30:00+00	t	\N	\N
-28446810-4ed6-4504-bdba-07a78b40eac2	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-13 04:30:00+00	2025-10-13 05:30:00+00	t	\N	\N
-101ec329-94dc-4e1c-985c-6c7c42c8e7f6	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-13 05:30:00+00	2025-10-13 06:30:00+00	t	\N	\N
-ad78efd3-4ee4-40ac-bc0a-d0bdc1ff8da1	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-13 06:30:00+00	2025-10-13 07:30:00+00	t	\N	\N
-b51d6457-2281-43f5-8577-e6572ec123dd	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-13 07:30:00+00	2025-10-13 08:30:00+00	t	\N	\N
-f3f0a981-87e2-4412-ae3d-251573d0947d	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-13 08:30:00+00	2025-10-13 09:30:00+00	t	\N	\N
-675a476a-1241-4779-932f-46b2109eab25	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-13 09:30:00+00	2025-10-13 10:30:00+00	t	\N	\N
-bb56687c-f479-4846-b64e-2f7d90c55ea5	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-13 10:30:00+00	2025-10-13 11:30:00+00	t	\N	\N
-f3a8c770-fccc-4a1c-9dc7-d5d5a1c3989d	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-13 11:30:00+00	2025-10-13 12:30:00+00	t	\N	\N
-131826f2-f089-4694-8aff-67e0c47a8532	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-13 12:30:00+00	2025-10-13 13:30:00+00	t	\N	\N
-4a0f6331-40ca-41fe-bea9-67167d55e9f6	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-13 13:30:00+00	2025-10-13 14:30:00+00	t	\N	\N
-2bcbf345-d4b5-4f8e-b25e-a887f302bca0	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-13 14:30:00+00	2025-10-13 15:30:00+00	t	\N	\N
-606eec9a-afed-41f2-b4e7-7a795e64c3a4	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-14 03:30:00+00	2025-10-14 04:30:00+00	t	\N	\N
-4102be21-b67c-4f24-b594-76a0d5651794	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-14 04:30:00+00	2025-10-14 05:30:00+00	t	\N	\N
-579ca7fc-d6b7-4635-8a5f-bb1c8496572d	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-14 05:30:00+00	2025-10-14 06:30:00+00	t	\N	\N
-774c1c51-9faf-4216-af9d-e566235b613f	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-14 06:30:00+00	2025-10-14 07:30:00+00	t	\N	\N
-beb99ecc-ae61-4325-8892-e14cec683ea1	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-14 07:30:00+00	2025-10-14 08:30:00+00	t	\N	\N
-193296bf-8e8b-4315-8989-0acf49634999	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-14 08:30:00+00	2025-10-14 09:30:00+00	t	\N	\N
-4d9e7f4a-d9b4-4551-b817-ad6c3b0e0219	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-14 09:30:00+00	2025-10-14 10:30:00+00	t	\N	\N
-ba4b9cf4-d21b-4ae0-bc46-b39c82f4e6f3	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-14 10:30:00+00	2025-10-14 11:30:00+00	t	\N	\N
-d31286a2-eae1-4449-ae27-dad828cce8e6	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-14 11:30:00+00	2025-10-14 12:30:00+00	t	\N	\N
-f4394ebe-cdb4-4d04-b692-1dfdcbbd263a	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-14 12:30:00+00	2025-10-14 13:30:00+00	t	\N	\N
-f2aad867-fee0-40e8-ad5e-0a276e81c892	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-14 13:30:00+00	2025-10-14 14:30:00+00	t	\N	\N
-bdc6bad3-146b-47f6-b186-2bd930b00109	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-14 14:30:00+00	2025-10-14 15:30:00+00	t	\N	\N
-b38f8e12-893a-4763-bf57-1bf131836eaf	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-15 03:30:00+00	2025-10-15 04:30:00+00	t	\N	\N
-93abd968-8033-4537-b673-eefff54397c7	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-15 04:30:00+00	2025-10-15 05:30:00+00	t	\N	\N
-e4b067c2-0973-4ac4-9a42-3107050bd747	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-15 05:30:00+00	2025-10-15 06:30:00+00	t	\N	\N
-e258258b-22fd-48a0-9e34-b649f79af227	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-15 06:30:00+00	2025-10-15 07:30:00+00	t	\N	\N
-299a7f25-0b2f-41e5-8627-18f3ed1cf05e	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-15 07:30:00+00	2025-10-15 08:30:00+00	t	\N	\N
-37e38efb-386d-4ae2-b34f-cce6d46acca2	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-15 08:30:00+00	2025-10-15 09:30:00+00	t	\N	\N
-7fd2affd-d0f3-446d-8b90-c824f46eb20b	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-15 09:30:00+00	2025-10-15 10:30:00+00	t	\N	\N
-9175e5a3-207d-43cd-80e9-f90c5dec24c2	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-15 10:30:00+00	2025-10-15 11:30:00+00	t	\N	\N
-c638fe3a-27cc-408a-87cb-7eb7b265c8f8	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-15 11:30:00+00	2025-10-15 12:30:00+00	t	\N	\N
-3ecd6789-ea71-4447-bb29-49b562aadba4	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-15 12:30:00+00	2025-10-15 13:30:00+00	t	\N	\N
-d30dd877-1970-40bb-a8d7-a8b3037cfcb5	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-15 13:30:00+00	2025-10-15 14:30:00+00	t	\N	\N
-6f8444a2-985e-4039-a9e2-9b5074ba3161	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-15 14:30:00+00	2025-10-15 15:30:00+00	t	\N	\N
-88afd30d-49d3-468c-b687-e9a51d52ff3e	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-16 03:30:00+00	2025-10-16 04:30:00+00	t	\N	\N
-ef45ff54-5bb3-4c48-9ddd-2f5cca58ff18	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-16 04:30:00+00	2025-10-16 05:30:00+00	t	\N	\N
-26f079c4-7ae2-4a5b-9aa9-14d3a76a93b3	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-16 05:30:00+00	2025-10-16 06:30:00+00	t	\N	\N
-26de9954-6516-46c5-b06f-fdc9b245015c	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-16 06:30:00+00	2025-10-16 07:30:00+00	t	\N	\N
-8516ba00-4667-4321-9f32-ab5c2ec5ffae	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-16 07:30:00+00	2025-10-16 08:30:00+00	t	\N	\N
-5ef8281c-18cc-4776-be1a-24f0bf2f4a6c	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-16 08:30:00+00	2025-10-16 09:30:00+00	t	\N	\N
-4faf49a2-7e6d-43f5-885d-03107b50f8ff	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-16 09:30:00+00	2025-10-16 10:30:00+00	t	\N	\N
-ebd0bc0d-73f6-47bf-9142-ed4c91e285b0	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-16 10:30:00+00	2025-10-16 11:30:00+00	t	\N	\N
-d2f2fcde-35ef-4ea5-a4c2-42913d0509e4	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-16 11:30:00+00	2025-10-16 12:30:00+00	t	\N	\N
-c08af30c-1fb6-4ed8-b7ac-936941b56edb	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-16 12:30:00+00	2025-10-16 13:30:00+00	t	\N	\N
-5ec591c4-9778-4f53-b3d3-c493a891b078	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-16 13:30:00+00	2025-10-16 14:30:00+00	t	\N	\N
-38883b4c-fa2c-46bb-8cb4-39a830e62739	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-16 14:30:00+00	2025-10-16 15:30:00+00	t	\N	\N
-078008bd-3556-4f85-910d-72360df1d61d	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-17 03:30:00+00	2025-10-17 04:30:00+00	t	\N	\N
-7345d463-864c-452e-82d1-9bdbb932cb77	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-17 04:30:00+00	2025-10-17 05:30:00+00	t	\N	\N
-012a9868-30cf-4172-a78c-2bf895d8505f	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-17 05:30:00+00	2025-10-17 06:30:00+00	t	\N	\N
-36291b54-f27e-43ce-97a0-01dd0376ec35	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-17 06:30:00+00	2025-10-17 07:30:00+00	t	\N	\N
-ecc60133-b5e0-4f7b-a345-d4b67fab95e6	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-17 07:30:00+00	2025-10-17 08:30:00+00	t	\N	\N
-ef61760b-5aa9-483c-9359-2fa498cc640a	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-17 08:30:00+00	2025-10-17 09:30:00+00	t	\N	\N
-964af4c1-5288-4cdc-a116-fe21fb91e66e	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-17 09:30:00+00	2025-10-17 10:30:00+00	t	\N	\N
-fb0b021f-c9a8-4ce2-8f1b-560f94e79817	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-17 10:30:00+00	2025-10-17 11:30:00+00	t	\N	\N
-6ccfb76e-713b-42f7-840e-a6c5d8282880	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-17 11:30:00+00	2025-10-17 12:30:00+00	t	\N	\N
-8cce526e-5595-4400-9ac3-dffe9c6b560a	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-17 12:30:00+00	2025-10-17 13:30:00+00	t	\N	\N
-09f6015f-6ed8-4c94-979e-87eb79247c35	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-17 13:30:00+00	2025-10-17 14:30:00+00	t	\N	\N
-d5bf8b9b-c870-491f-bfca-e193068b79eb	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-17 14:30:00+00	2025-10-17 15:30:00+00	t	\N	\N
-2c03b61c-ece5-4c4c-8382-2a0665c2cb1a	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-18 03:30:00+00	2025-10-18 04:30:00+00	t	\N	\N
-bd9bed83-ba9e-47f6-acae-437bebd9c084	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-18 04:30:00+00	2025-10-18 05:30:00+00	t	\N	\N
-525f1ed5-3267-4d34-8b48-f2b8e51f4547	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-18 05:30:00+00	2025-10-18 06:30:00+00	t	\N	\N
-e53b7e9b-ebd8-4ff7-b2de-f330bc4b19bf	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-18 06:30:00+00	2025-10-18 07:30:00+00	t	\N	\N
-98ed5501-73b2-4961-a135-60c04514865a	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-18 07:30:00+00	2025-10-18 08:30:00+00	t	\N	\N
-b3a9e791-0e35-4138-95f6-d70c21e7aed2	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-18 08:30:00+00	2025-10-18 09:30:00+00	t	\N	\N
-77d152ab-af9f-4b68-aea8-673b143d1db3	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-18 09:30:00+00	2025-10-18 10:30:00+00	t	\N	\N
-bbaffd71-b935-457a-99ef-529401201fc9	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-18 10:30:00+00	2025-10-18 11:30:00+00	t	\N	\N
-39601301-0c77-4a11-929f-c2fbfe114c0d	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-18 11:30:00+00	2025-10-18 12:30:00+00	t	\N	\N
-649564cc-95dc-4fb9-b984-73a3a6f9b365	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-18 12:30:00+00	2025-10-18 13:30:00+00	t	\N	\N
-cf19a8e0-db2b-4095-a49e-bb110786eca5	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-18 13:30:00+00	2025-10-18 14:30:00+00	t	\N	\N
-6b451937-4fa6-40e7-8f3b-202444e21a0d	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-18 14:30:00+00	2025-10-18 15:30:00+00	t	\N	\N
-da31abc8-22a2-4461-8b0b-c233222f188b	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-19 03:30:00+00	2025-10-19 04:30:00+00	t	\N	\N
-a3956d85-dc97-4112-8b4d-40afae1ce87e	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-19 04:30:00+00	2025-10-19 05:30:00+00	t	\N	\N
-73e32809-c186-4afd-876b-de354a8106ed	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-19 05:30:00+00	2025-10-19 06:30:00+00	t	\N	\N
-3431ebab-ae84-453c-87c6-ca47f87cd5be	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-19 06:30:00+00	2025-10-19 07:30:00+00	t	\N	\N
-dfae9a9d-3ec9-41aa-a938-00259bb6ec2d	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-19 07:30:00+00	2025-10-19 08:30:00+00	t	\N	\N
-a617dbaa-6de1-4bd4-8e74-b8932e51c2c8	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-19 08:30:00+00	2025-10-19 09:30:00+00	t	\N	\N
-4e693969-4b51-4a51-b621-faa60dd4cf70	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-19 09:30:00+00	2025-10-19 10:30:00+00	t	\N	\N
-665adc2f-73b0-4f2e-8924-8ea332b4fbe0	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-19 10:30:00+00	2025-10-19 11:30:00+00	t	\N	\N
-5cfdf787-7ae7-429a-916f-a12996c83df1	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-19 11:30:00+00	2025-10-19 12:30:00+00	t	\N	\N
-f0a68b5e-7566-4baa-87ec-4026af43b0ed	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-19 12:30:00+00	2025-10-19 13:30:00+00	t	\N	\N
-dd3151f0-0c21-44e0-a8e8-a62de6d5d3f2	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-19 13:30:00+00	2025-10-19 14:30:00+00	t	\N	\N
-2c6a149b-6e2b-4d1e-98f7-f72a260ccd2a	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-10-19 14:30:00+00	2025-10-19 15:30:00+00	t	\N	\N
-75ecf729-5179-4dd0-bd72-08df1b29da72	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-12 03:30:00+00	2025-10-12 04:30:00+00	t	\N	\N
-93d43391-d851-4957-bca6-b9ec8ea640d9	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-12 04:30:00+00	2025-10-12 05:30:00+00	t	\N	\N
-4389b1ef-6648-486b-919b-f605c7694831	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-12 05:30:00+00	2025-10-12 06:30:00+00	t	\N	\N
-3341b748-10fb-46f3-985c-b499688a4c1a	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-12 06:30:00+00	2025-10-12 07:30:00+00	t	\N	\N
-42ad9503-2528-4ab7-a487-1920aadf268d	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-12 07:30:00+00	2025-10-12 08:30:00+00	t	\N	\N
-f9ceb99e-63e7-4b1c-ae8d-fe24e2574f19	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-12 08:30:00+00	2025-10-12 09:30:00+00	t	\N	\N
-33d83ae0-649f-454b-9327-217ea6f6b419	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-12 09:30:00+00	2025-10-12 10:30:00+00	t	\N	\N
-bdca4f93-e9a6-47c2-9b77-e42c54960c0e	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-12 10:30:00+00	2025-10-12 11:30:00+00	t	\N	\N
-911a4fde-4f29-4410-8f3d-4c27cb367528	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-12 11:30:00+00	2025-10-12 12:30:00+00	t	\N	\N
-c7d2c696-6382-4b99-881e-0a340ddf093b	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-12 12:30:00+00	2025-10-12 13:30:00+00	t	\N	\N
-926226e6-951f-443d-b717-edfe4a05a245	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-13 04:30:00+00	2025-10-13 05:30:00+00	t	\N	\N
-f758e4de-7ab0-4ae3-8593-dde7b801f3b1	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-13 05:30:00+00	2025-10-13 06:30:00+00	t	\N	\N
-79a61ef9-b5da-4a32-a2f0-e888889c16c5	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-13 06:30:00+00	2025-10-13 07:30:00+00	t	\N	\N
-1c24884a-8d32-4a3d-b20c-faaa402826eb	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-13 07:30:00+00	2025-10-13 08:30:00+00	t	\N	\N
-7820e59b-6e07-49b9-a693-cea4c3e84759	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-13 08:30:00+00	2025-10-13 09:30:00+00	t	\N	\N
-c86546c5-e8ab-4159-bbb8-e80d96679688	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-13 09:30:00+00	2025-10-13 10:30:00+00	t	\N	\N
-6d41d91f-01fe-453e-bb97-19e10f3d1fa2	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-13 10:30:00+00	2025-10-13 11:30:00+00	t	\N	\N
-681a0bd3-930d-43f5-b5c8-1d23ab72a4a0	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-13 11:30:00+00	2025-10-13 12:30:00+00	t	\N	\N
-740ef99b-e14b-4946-b2b3-d9c858924a0d	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-13 12:30:00+00	2025-10-13 13:30:00+00	t	\N	\N
-2ecd6b30-3668-47da-be05-bf36c86e39a7	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-13 13:30:00+00	2025-10-13 14:30:00+00	t	\N	\N
-4ce39c7f-288c-4ad2-8818-18cec02ccc4e	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-14 03:30:00+00	2025-10-14 04:30:00+00	t	\N	\N
-ce42065b-68d7-448c-9d39-77e9101c663b	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-14 04:30:00+00	2025-10-14 05:30:00+00	t	\N	\N
-445f7af8-b849-4301-a4f1-041b60c4086a	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-14 05:30:00+00	2025-10-14 06:30:00+00	t	\N	\N
-140d1b74-6d55-416e-9b29-04079c68470d	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-14 06:30:00+00	2025-10-14 07:30:00+00	t	\N	\N
-0ab57d39-cbaa-4218-ade1-58dd9bcb8c24	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-14 07:30:00+00	2025-10-14 08:30:00+00	t	\N	\N
-f4eb258d-b8bd-43f3-a593-cb7b175d6830	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-14 08:30:00+00	2025-10-14 09:30:00+00	t	\N	\N
-83d625d6-02d8-4db0-af63-650a116c1b6a	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-14 09:30:00+00	2025-10-14 10:30:00+00	t	\N	\N
-7ad9778c-2625-4c55-9ea2-a1da3df10ebf	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-14 10:30:00+00	2025-10-14 11:30:00+00	t	\N	\N
-42660fd4-2db6-403c-9062-09ecf100d3b0	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-14 11:30:00+00	2025-10-14 12:30:00+00	t	\N	\N
-d28a8ce0-e8a5-4ea2-a5d2-b1137fe63376	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-14 12:30:00+00	2025-10-14 13:30:00+00	t	\N	\N
-0b5e6aa7-da7c-46ad-8800-31a90549d69b	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-14 13:30:00+00	2025-10-14 14:30:00+00	t	\N	\N
-093e282d-a49a-448e-a1c1-106a73baac96	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-15 03:30:00+00	2025-10-15 04:30:00+00	t	\N	\N
-a86ce486-0a2d-4247-aa83-c42750f482ad	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-15 04:30:00+00	2025-10-15 05:30:00+00	t	\N	\N
-f864eec2-7e38-45f0-8fd9-b7c6b4ccd4e0	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-15 05:30:00+00	2025-10-15 06:30:00+00	t	\N	\N
-126741c3-5ec3-4094-861e-6ccb5d2bd7de	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-15 06:30:00+00	2025-10-15 07:30:00+00	t	\N	\N
-68fd360d-a2a2-4d7d-805b-f1b966126908	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-15 07:30:00+00	2025-10-15 08:30:00+00	t	\N	\N
-728de6e4-d9ff-4590-9ed9-50f161021066	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-15 08:30:00+00	2025-10-15 09:30:00+00	t	\N	\N
-eb5821ea-2448-4491-ad4a-8b7dafcc49ea	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-15 09:30:00+00	2025-10-15 10:30:00+00	t	\N	\N
-94921023-5568-45bb-a29f-94e54c72c868	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-15 10:30:00+00	2025-10-15 11:30:00+00	t	\N	\N
-0c7289c0-30ea-4deb-990e-61b41dd0482f	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-15 11:30:00+00	2025-10-15 12:30:00+00	t	\N	\N
-6381abcf-9591-469d-be59-1434c78dcf13	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-15 12:30:00+00	2025-10-15 13:30:00+00	t	\N	\N
-89626e2d-d4b5-4f36-bc11-a99c8d03b73b	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-15 13:30:00+00	2025-10-15 14:30:00+00	t	\N	\N
-0b464153-3edd-4dad-8a48-b72638a15c0d	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-15 14:30:00+00	2025-10-15 15:30:00+00	t	\N	\N
-9a516fee-0bc5-4349-bf86-c1c74f53c766	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-16 03:30:00+00	2025-10-16 04:30:00+00	t	\N	\N
-f668af2e-4058-4d0e-9c2a-090396310d5c	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-16 04:30:00+00	2025-10-16 05:30:00+00	t	\N	\N
-3ef280e9-0b4b-4727-b9b8-92c88f249cef	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-16 05:30:00+00	2025-10-16 06:30:00+00	t	\N	\N
-a13d7236-638e-44bd-8ea9-f191516b334b	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-16 06:30:00+00	2025-10-16 07:30:00+00	t	\N	\N
-e0670d4a-4cd8-4a9d-a8f7-a6a4f127b5b5	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-16 07:30:00+00	2025-10-16 08:30:00+00	t	\N	\N
-a9f0eade-1e60-4677-a4aa-b0fa6867269b	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-16 08:30:00+00	2025-10-16 09:30:00+00	t	\N	\N
-f97ec961-4434-409c-b2ae-3c3f14032e72	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-16 09:30:00+00	2025-10-16 10:30:00+00	t	\N	\N
-13340271-7acc-4bf5-b8bc-c25b185d064e	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-16 10:30:00+00	2025-10-16 11:30:00+00	t	\N	\N
-0de6ef04-87c4-49c3-ad8c-ba17d21c969a	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-16 11:30:00+00	2025-10-16 12:30:00+00	t	\N	\N
-16d40c7e-0a5f-41e3-9fc1-195ff08d9438	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-16 12:30:00+00	2025-10-16 13:30:00+00	t	\N	\N
-6fb8822c-1586-47d1-9da5-5e654acf0db9	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-16 13:30:00+00	2025-10-16 14:30:00+00	t	\N	\N
-656d6377-de6e-4d37-a375-37278bb7593b	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-16 14:30:00+00	2025-10-16 15:30:00+00	t	\N	\N
-388df11b-b425-4192-a571-505a30efbdc9	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-17 03:30:00+00	2025-10-17 04:30:00+00	t	\N	\N
-a35549c8-8727-4f32-9913-4e11e43f2e21	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-17 04:30:00+00	2025-10-17 05:30:00+00	t	\N	\N
-17aad385-99e8-4015-bbee-00de1c4984cc	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-17 05:30:00+00	2025-10-17 06:30:00+00	t	\N	\N
-a06c6b24-ef4b-465b-bd09-81d9d4cdfeb4	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-17 06:30:00+00	2025-10-17 07:30:00+00	t	\N	\N
-3d8f0675-cbd6-442a-bf86-063d07315e29	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-17 07:30:00+00	2025-10-17 08:30:00+00	t	\N	\N
-74c48f9e-552d-4eea-8344-035f5d984744	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-17 08:30:00+00	2025-10-17 09:30:00+00	t	\N	\N
-30b9982b-9408-4349-81ec-f642b6d422a3	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-17 09:30:00+00	2025-10-17 10:30:00+00	t	\N	\N
-1f2df6d5-6b6d-42d1-a4e7-d2cde34308e1	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-17 10:30:00+00	2025-10-17 11:30:00+00	t	\N	\N
-96bbcc85-246e-40df-aade-a7b8908d743e	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-17 11:30:00+00	2025-10-17 12:30:00+00	t	\N	\N
-21db23f7-e13d-4057-aa91-93c21ffa649c	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-17 12:30:00+00	2025-10-17 13:30:00+00	t	\N	\N
-5724cbdb-a961-4e2b-ad69-72589368b369	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-17 13:30:00+00	2025-10-17 14:30:00+00	t	\N	\N
-dc3228e9-e77a-4a08-adca-e9836a34c98c	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-17 14:30:00+00	2025-10-17 15:30:00+00	t	\N	\N
-e7e66055-21db-4679-9b33-09698c190bab	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-18 03:30:00+00	2025-10-18 04:30:00+00	t	\N	\N
-4f40ce2a-3122-4582-89ea-5ae6da5d6a34	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-18 04:30:00+00	2025-10-18 05:30:00+00	t	\N	\N
-90ca925f-31e4-4480-90e3-9162ab9b19bb	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-18 05:30:00+00	2025-10-18 06:30:00+00	t	\N	\N
-4344f99b-475f-4156-ad85-f67627551537	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-18 06:30:00+00	2025-10-18 07:30:00+00	t	\N	\N
-c2cf200f-da71-4a0a-9b7e-37f7e5e625c2	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-18 07:30:00+00	2025-10-18 08:30:00+00	t	\N	\N
-a7d94fff-d424-4944-a8f9-92f5e94b7358	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-18 08:30:00+00	2025-10-18 09:30:00+00	t	\N	\N
-f206d5a0-baa7-4186-bed0-a83508b33ca0	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-18 09:30:00+00	2025-10-18 10:30:00+00	t	\N	\N
-7b5992c4-7f40-49e9-9f5c-da008ae3b1ca	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-18 10:30:00+00	2025-10-18 11:30:00+00	t	\N	\N
-342efbdf-ba7e-4d7e-ae9a-f06b9b3f4484	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-18 11:30:00+00	2025-10-18 12:30:00+00	t	\N	\N
-001af226-b076-47bf-ad82-2c1e170a2292	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-18 12:30:00+00	2025-10-18 13:30:00+00	t	\N	\N
-54a26227-a8b9-416e-bf0f-9ff22f79f11c	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-18 13:30:00+00	2025-10-18 14:30:00+00	t	\N	\N
-5408d812-db87-4615-81dd-2fc389dcd51b	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-18 14:30:00+00	2025-10-18 15:30:00+00	t	\N	\N
-f797856d-f834-4b68-949a-7689f89233f7	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-19 03:30:00+00	2025-10-19 04:30:00+00	t	\N	\N
-3e70cf3e-d215-46f6-9b7f-a477b1d51971	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-19 04:30:00+00	2025-10-19 05:30:00+00	t	\N	\N
-e85ce168-f6b7-4d40-b874-777004781311	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-19 05:30:00+00	2025-10-19 06:30:00+00	t	\N	\N
-7f46c524-26cc-4080-80d6-53216cab3133	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-19 06:30:00+00	2025-10-19 07:30:00+00	t	\N	\N
-133354bc-ff51-4719-ad1e-1133cdd02458	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-19 07:30:00+00	2025-10-19 08:30:00+00	t	\N	\N
-395eb04e-5fe3-4bd8-b0a6-c7f4b83dd74b	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-19 08:30:00+00	2025-10-19 09:30:00+00	t	\N	\N
-db0f8e0d-b0a4-4c65-857e-32b9c094e6fa	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-19 09:30:00+00	2025-10-19 10:30:00+00	t	\N	\N
-7f53bb1d-5a69-4ccd-8661-506aa92b0e66	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-19 10:30:00+00	2025-10-19 11:30:00+00	t	\N	\N
-7cfdec1b-0128-4dc0-af8c-08a5c6229e2f	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-12 14:30:00+00	2025-10-12 15:30:00+00	f	\N	\N
-61390823-5cb8-44d6-834d-b73340ddee9b	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-13 03:30:00+00	2025-10-13 04:30:00+00	f	\N	\N
-c702f9c0-57f0-4c7f-9c63-fd3775affb03	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-13 14:30:00+00	2025-10-13 15:30:00+00	t	\N	\N
-100f7f16-2294-4782-ba45-fb39a24d4503	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-14 14:30:00+00	2025-10-14 15:30:00+00	t	\N	\N
-af541bd5-5fbf-4c52-991e-39661c46b6b3	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-19 11:30:00+00	2025-10-19 12:30:00+00	t	\N	\N
-79b167cc-a321-44df-a471-7f78e37157e1	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-19 12:30:00+00	2025-10-19 13:30:00+00	t	\N	\N
-61a36072-b41d-464c-b397-fcddc8380852	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-19 13:30:00+00	2025-10-19 14:30:00+00	t	\N	\N
-7d7e8d40-43d0-40ae-92e9-56e625d7c582	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-19 14:30:00+00	2025-10-19 15:30:00+00	t	\N	\N
-2c9c4972-5506-48d9-a499-bbf178c9288b	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-12 03:30:00+00	2025-10-12 04:30:00+00	t	\N	\N
-00f2cda7-55df-457d-bc59-26531f84f2ce	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-12 04:30:00+00	2025-10-12 05:30:00+00	t	\N	\N
-85cdb678-255c-44d6-993b-2fd7b30803e9	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-12 05:30:00+00	2025-10-12 06:30:00+00	t	\N	\N
-cdfe7f20-e927-4dea-b7e1-6ef151d7af1d	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-12 06:30:00+00	2025-10-12 07:30:00+00	t	\N	\N
-e567d523-abad-4a34-b84f-d8be98a04706	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-12 07:30:00+00	2025-10-12 08:30:00+00	t	\N	\N
-25f7bfd1-be38-4063-81ea-4b6229b7be07	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-12 08:30:00+00	2025-10-12 09:30:00+00	t	\N	\N
-3563929b-8bcf-4021-a9ce-3d5b4871f0e6	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-12 09:30:00+00	2025-10-12 10:30:00+00	t	\N	\N
-fc16b83b-80ef-4315-815d-eb51310442a7	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-12 10:30:00+00	2025-10-12 11:30:00+00	t	\N	\N
-9096af20-1598-4425-b550-35ff14ab7ec9	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-12 11:30:00+00	2025-10-12 12:30:00+00	t	\N	\N
-6dabf675-8698-4cfe-bd10-585793bbe579	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-12 12:30:00+00	2025-10-12 13:30:00+00	t	\N	\N
-1fbb6fe3-9956-47f4-a54c-11e2bddd0a3c	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-12 13:30:00+00	2025-10-12 14:30:00+00	t	\N	\N
-8053b4a0-0b5d-46a0-8a1a-a7bfaff66502	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-12 14:30:00+00	2025-10-12 15:30:00+00	t	\N	\N
-ce5e68ed-db6f-45c5-95a5-bade8fc84b68	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-13 03:30:00+00	2025-10-13 04:30:00+00	t	\N	\N
-bc7c6517-e00e-4bdf-9ba8-1ed222f27c49	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-13 04:30:00+00	2025-10-13 05:30:00+00	t	\N	\N
-54152634-7fbf-40d0-af81-0a6ecc795d12	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-13 05:30:00+00	2025-10-13 06:30:00+00	t	\N	\N
-0b25fd31-8fe7-4c38-b4ab-41396c1fde65	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-13 06:30:00+00	2025-10-13 07:30:00+00	t	\N	\N
-781b883c-2715-4474-b7be-912d8f40ef9c	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-13 07:30:00+00	2025-10-13 08:30:00+00	t	\N	\N
-f9b7abce-f181-4cae-8650-5709576f4809	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-13 08:30:00+00	2025-10-13 09:30:00+00	t	\N	\N
-66cbb624-5cbb-4918-bf6e-d28cdc4d7363	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-13 09:30:00+00	2025-10-13 10:30:00+00	t	\N	\N
-89e9d751-67b4-4a87-a9a2-830963464942	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-13 10:30:00+00	2025-10-13 11:30:00+00	t	\N	\N
-c3e99663-5dbe-4048-a8f0-50d89ab061aa	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-13 11:30:00+00	2025-10-13 12:30:00+00	t	\N	\N
-2ce5518b-47a2-436d-b03c-34c13923fcbc	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-13 12:30:00+00	2025-10-13 13:30:00+00	t	\N	\N
-0b679b3d-145a-47cf-864a-4d1995906cb3	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-13 13:30:00+00	2025-10-13 14:30:00+00	t	\N	\N
-a8761c23-455f-4110-a71c-47dfd2e25700	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-13 14:30:00+00	2025-10-13 15:30:00+00	t	\N	\N
-e18fc55c-c185-42e8-8cb8-ae3b4c3c9690	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-14 03:30:00+00	2025-10-14 04:30:00+00	t	\N	\N
-bd0586a7-b4db-47b5-abfe-5328c79f348a	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-14 04:30:00+00	2025-10-14 05:30:00+00	t	\N	\N
-2250a57d-3573-4628-8daa-5c278db818c4	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-14 05:30:00+00	2025-10-14 06:30:00+00	t	\N	\N
-f5e878ed-f0c1-4c56-bfa3-127a97194b6a	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-14 06:30:00+00	2025-10-14 07:30:00+00	t	\N	\N
-2a34bae4-6942-41e6-b32b-9d8a297e9203	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-14 07:30:00+00	2025-10-14 08:30:00+00	t	\N	\N
-5f516443-e76d-4f73-aac1-652c03f744f4	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-14 08:30:00+00	2025-10-14 09:30:00+00	t	\N	\N
-5f5424a7-468a-451f-91b3-041dd0893233	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-14 09:30:00+00	2025-10-14 10:30:00+00	t	\N	\N
-def91a54-84e7-4df3-9a1f-a896471e7ec7	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-14 10:30:00+00	2025-10-14 11:30:00+00	t	\N	\N
-da6a314c-a4da-4012-a176-ad4865fa4d21	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-14 11:30:00+00	2025-10-14 12:30:00+00	t	\N	\N
-8f61f4d2-2837-46be-8288-1448c522cabf	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-14 12:30:00+00	2025-10-14 13:30:00+00	t	\N	\N
-649b6cbd-99d7-4c20-9b8c-f6819ef50e59	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-14 13:30:00+00	2025-10-14 14:30:00+00	t	\N	\N
-f7f4e95a-5d2b-4053-b4a2-8d5b488441e2	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-14 14:30:00+00	2025-10-14 15:30:00+00	t	\N	\N
-18572fc5-9611-428b-9ad7-0038923d56f0	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-15 03:30:00+00	2025-10-15 04:30:00+00	t	\N	\N
-366528cb-4edd-4494-9ed8-44c11eb82cf4	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-15 04:30:00+00	2025-10-15 05:30:00+00	t	\N	\N
-d1a1fd64-d8ac-4a39-951a-0563d662d8e1	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-15 05:30:00+00	2025-10-15 06:30:00+00	t	\N	\N
-5f47a788-d581-40f2-9bd1-dc576b9ab083	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-15 06:30:00+00	2025-10-15 07:30:00+00	t	\N	\N
-f2433bc2-3310-4967-872d-400190aad8ee	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-15 07:30:00+00	2025-10-15 08:30:00+00	t	\N	\N
-89c3c516-197e-402d-b697-a67478be9f67	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-15 08:30:00+00	2025-10-15 09:30:00+00	t	\N	\N
-eaa13c9a-2353-4b27-9e06-c61c627e2f7c	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-15 09:30:00+00	2025-10-15 10:30:00+00	t	\N	\N
-11ccae51-a96f-41e5-808d-fbb3b02885bd	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-15 10:30:00+00	2025-10-15 11:30:00+00	t	\N	\N
-025f5b81-c600-4cd3-a720-61c81a21df4c	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-15 11:30:00+00	2025-10-15 12:30:00+00	t	\N	\N
-a0e49f42-b31d-4cff-8c53-ebd5f2a5e2c9	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-15 12:30:00+00	2025-10-15 13:30:00+00	t	\N	\N
-9f562653-d406-4849-8352-7dbdb2aeddb4	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-15 13:30:00+00	2025-10-15 14:30:00+00	t	\N	\N
-255634f6-b0c4-4092-8311-adf220ac7342	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-15 14:30:00+00	2025-10-15 15:30:00+00	t	\N	\N
-e12e7751-7140-4c1a-bfe8-c244eae58115	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-16 03:30:00+00	2025-10-16 04:30:00+00	t	\N	\N
-fe873d60-6503-444c-ac7c-14cdb71a6e52	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-16 04:30:00+00	2025-10-16 05:30:00+00	t	\N	\N
-1263c332-b1f1-481c-9a37-07a2651302fd	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-16 05:30:00+00	2025-10-16 06:30:00+00	t	\N	\N
-20f4f485-f810-4646-941d-b8bd16c5923a	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-16 06:30:00+00	2025-10-16 07:30:00+00	t	\N	\N
-c769de42-4562-402b-9a19-ded815982b1f	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-16 07:30:00+00	2025-10-16 08:30:00+00	t	\N	\N
-5562b67f-7d36-41cb-a607-c6a4316a4a02	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-16 08:30:00+00	2025-10-16 09:30:00+00	t	\N	\N
-0f4c6d37-5cae-4cdb-b510-6f4a1959c355	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-16 09:30:00+00	2025-10-16 10:30:00+00	t	\N	\N
-789de60d-360c-49db-86b1-e1119aadb35b	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-16 10:30:00+00	2025-10-16 11:30:00+00	t	\N	\N
-959ab10a-3947-46d8-b2fb-eb075442d572	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-16 11:30:00+00	2025-10-16 12:30:00+00	t	\N	\N
-101e79d2-ca6b-4369-bcdd-a41455898bac	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-16 12:30:00+00	2025-10-16 13:30:00+00	t	\N	\N
-f0241fd5-adc3-499a-b289-c05722dcc032	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-16 13:30:00+00	2025-10-16 14:30:00+00	t	\N	\N
-6bf6e4ad-07ee-4fe9-9700-386ba2524881	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-16 14:30:00+00	2025-10-16 15:30:00+00	t	\N	\N
-27f0263c-51e5-4d7d-9216-79511c039a39	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-17 03:30:00+00	2025-10-17 04:30:00+00	t	\N	\N
-aa1ae0c3-f0ac-475b-841c-da487065b053	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-17 04:30:00+00	2025-10-17 05:30:00+00	t	\N	\N
-ddf169d8-3cbb-4d6f-9ddb-044874c3a42e	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-17 05:30:00+00	2025-10-17 06:30:00+00	t	\N	\N
-cb3f48a3-5670-4654-a610-4529afaedd02	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-17 06:30:00+00	2025-10-17 07:30:00+00	t	\N	\N
-827f6f8e-a381-4292-ab22-5761714e4e0d	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-17 07:30:00+00	2025-10-17 08:30:00+00	t	\N	\N
-973bdb1c-5a5a-4214-a008-f90f45859752	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-17 08:30:00+00	2025-10-17 09:30:00+00	t	\N	\N
-11648bc1-3e77-4088-83d3-c5621550b76d	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-17 09:30:00+00	2025-10-17 10:30:00+00	t	\N	\N
-7594ca99-472f-42e8-92ba-62bd48c61356	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-17 10:30:00+00	2025-10-17 11:30:00+00	t	\N	\N
-c35c34e1-e748-46ba-be48-32076dc4bfd4	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-17 11:30:00+00	2025-10-17 12:30:00+00	t	\N	\N
-cfca320f-fac2-4d33-9676-a57d19dd0efc	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-17 12:30:00+00	2025-10-17 13:30:00+00	t	\N	\N
-c26a3cdb-e8b2-4a0d-9f3a-6e45cf872f52	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-17 13:30:00+00	2025-10-17 14:30:00+00	t	\N	\N
-6d96e059-35af-4732-a45b-4a9a29c5eafb	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-17 14:30:00+00	2025-10-17 15:30:00+00	t	\N	\N
-a8f368f7-6dab-4328-92c7-d420c3bba686	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-18 03:30:00+00	2025-10-18 04:30:00+00	t	\N	\N
-58367ffb-eb88-4307-ab02-aa30f3b8bcb3	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-18 04:30:00+00	2025-10-18 05:30:00+00	t	\N	\N
-dabea045-edbb-4862-9077-2fa6185b588d	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-18 05:30:00+00	2025-10-18 06:30:00+00	t	\N	\N
-55365ece-87a9-47aa-89b7-11c41e018a46	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-18 06:30:00+00	2025-10-18 07:30:00+00	t	\N	\N
-9983c9a3-07e3-496c-9236-9be899c4ad5c	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-18 07:30:00+00	2025-10-18 08:30:00+00	t	\N	\N
-ecffafca-d01c-4a68-8465-25c319480c83	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-18 08:30:00+00	2025-10-18 09:30:00+00	t	\N	\N
-9d7942e1-1e31-4b70-a357-a389124da397	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-18 09:30:00+00	2025-10-18 10:30:00+00	t	\N	\N
-f49260ee-9fbf-4439-8779-857c288fdd74	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-18 10:30:00+00	2025-10-18 11:30:00+00	t	\N	\N
-a7084868-3407-4f38-bebc-ffb8f3f32816	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-18 11:30:00+00	2025-10-18 12:30:00+00	t	\N	\N
-1eee0e6a-eb93-4199-9c74-0d1c8b06ab35	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-18 12:30:00+00	2025-10-18 13:30:00+00	t	\N	\N
-46b32085-87b8-4efc-a9ae-088c216f1b4c	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-18 13:30:00+00	2025-10-18 14:30:00+00	t	\N	\N
-8859248d-427f-4c45-a3b3-9af5e8415ffd	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-18 14:30:00+00	2025-10-18 15:30:00+00	t	\N	\N
-eb9ea642-8f3b-4d95-8f3f-259e37297a96	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-19 03:30:00+00	2025-10-19 04:30:00+00	t	\N	\N
-cb32663e-d3e0-4994-8085-1241b574ed65	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-19 04:30:00+00	2025-10-19 05:30:00+00	t	\N	\N
-6b0c0d72-f9b9-4374-bd9b-df5eec91116c	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-19 05:30:00+00	2025-10-19 06:30:00+00	t	\N	\N
-849b9196-d5bf-4eb0-84c7-f37a81b9a825	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-19 06:30:00+00	2025-10-19 07:30:00+00	t	\N	\N
-acc24bf2-ac12-4a37-aa67-9a38a536df6c	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-19 07:30:00+00	2025-10-19 08:30:00+00	t	\N	\N
-4e343789-e96e-497d-b228-f6c2341acf9f	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-19 08:30:00+00	2025-10-19 09:30:00+00	t	\N	\N
-3b8625e6-e84d-4f60-ba7c-44bac46e3fc8	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-19 09:30:00+00	2025-10-19 10:30:00+00	t	\N	\N
-e6ee2c49-e629-4a6e-93c0-bab861f66ce0	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-19 10:30:00+00	2025-10-19 11:30:00+00	t	\N	\N
-9d3e2cde-20fa-43f9-b275-bb0cd1aae857	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-19 11:30:00+00	2025-10-19 12:30:00+00	t	\N	\N
-1465fc53-49d5-4fba-8301-33b1f82f88c5	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-19 12:30:00+00	2025-10-19 13:30:00+00	t	\N	\N
-86c19f32-6853-42af-975e-d38ef840b60a	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-19 13:30:00+00	2025-10-19 14:30:00+00	t	\N	\N
-88748e53-4b9e-478f-a1b0-980b6ab2b6c5	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-10-19 14:30:00+00	2025-10-19 15:30:00+00	t	\N	\N
-88f46cf1-2220-4bc2-a184-437eab6f6e81	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-12 03:30:00+00	2025-10-12 04:30:00+00	t	\N	\N
-b79d2940-333e-4b45-bb51-124e11bd09ca	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-12 04:30:00+00	2025-10-12 05:30:00+00	t	\N	\N
-2d421dc1-7f8d-4d05-abc2-c4182d1c34c0	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-12 05:30:00+00	2025-10-12 06:30:00+00	t	\N	\N
-a16b305c-f3d2-4672-ae43-095ed0729829	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-12 06:30:00+00	2025-10-12 07:30:00+00	t	\N	\N
-daa7ede1-e17f-4808-adda-4660d9ed04b9	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-12 07:30:00+00	2025-10-12 08:30:00+00	t	\N	\N
-6efca044-6af3-4e51-9265-fce291a6d121	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-12 08:30:00+00	2025-10-12 09:30:00+00	t	\N	\N
-d2ef2e73-209d-4818-931b-056bf2415d3a	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-12 09:30:00+00	2025-10-12 10:30:00+00	t	\N	\N
-ae1b342e-c9d2-4b92-bf1e-611ff010cab2	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-12 10:30:00+00	2025-10-12 11:30:00+00	t	\N	\N
-3f76612c-f297-4f3b-9165-bb1e84cf7f24	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-12 11:30:00+00	2025-10-12 12:30:00+00	t	\N	\N
-f51edb71-da99-4611-baed-e44ec77e0894	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-12 12:30:00+00	2025-10-12 13:30:00+00	t	\N	\N
-e79d9931-175a-4969-9c8c-408b2d52267d	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-12 13:30:00+00	2025-10-12 14:30:00+00	t	\N	\N
-f6ae2371-f5a3-42f3-a831-73540ef86dfd	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-12 14:30:00+00	2025-10-12 15:30:00+00	t	\N	\N
-02b841c7-cced-423e-9d99-a9cbbca91df1	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-13 03:30:00+00	2025-10-13 04:30:00+00	t	\N	\N
-121dbf75-a614-4d17-82d5-e31eb290358c	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-13 04:30:00+00	2025-10-13 05:30:00+00	t	\N	\N
-ba8741c5-a25f-4465-8b02-8e473b366fa2	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-13 05:30:00+00	2025-10-13 06:30:00+00	t	\N	\N
-d78eee64-2c9e-4a97-b66d-80e2d89d08fa	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-13 06:30:00+00	2025-10-13 07:30:00+00	t	\N	\N
-c175b1b1-44d8-4cd5-88f7-c6da33ed44a5	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-13 07:30:00+00	2025-10-13 08:30:00+00	t	\N	\N
-6b1408db-52f3-44bd-b83f-d371c88f13fd	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-13 08:30:00+00	2025-10-13 09:30:00+00	t	\N	\N
-dc262168-c881-469c-84dd-2865881af43a	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-13 09:30:00+00	2025-10-13 10:30:00+00	t	\N	\N
-aa1605de-9b59-435b-94b1-9e9e60f38515	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-13 10:30:00+00	2025-10-13 11:30:00+00	t	\N	\N
-82f92273-cba8-4db2-8006-c7b68fbe8e32	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-13 11:30:00+00	2025-10-13 12:30:00+00	t	\N	\N
-0a8ad3fa-0f8f-4399-adda-a78cf70acf71	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-13 12:30:00+00	2025-10-13 13:30:00+00	t	\N	\N
-806ecf37-2b12-4158-82fc-c0e71a2ea366	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-13 13:30:00+00	2025-10-13 14:30:00+00	t	\N	\N
-85e3c945-1ac8-4a18-a6aa-fd8db0b3ca45	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-13 14:30:00+00	2025-10-13 15:30:00+00	t	\N	\N
-fefb51a5-6661-4495-9be4-8f57e6028ef2	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-14 03:30:00+00	2025-10-14 04:30:00+00	t	\N	\N
-667fa93a-f346-4890-8040-cf78105f1bd5	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-14 04:30:00+00	2025-10-14 05:30:00+00	t	\N	\N
-eca46a28-809d-4acc-b350-bd5c4118c4d1	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-14 05:30:00+00	2025-10-14 06:30:00+00	t	\N	\N
-32d58f32-324d-4cf7-9d2c-1aba6ab7e5ac	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-14 06:30:00+00	2025-10-14 07:30:00+00	t	\N	\N
-4c3242b3-912c-4711-9356-acc3a4b58d53	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-14 07:30:00+00	2025-10-14 08:30:00+00	t	\N	\N
-16befc65-57e4-487a-93ef-108a84454b16	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-14 08:30:00+00	2025-10-14 09:30:00+00	t	\N	\N
-1fc8d3db-44de-4455-8411-926820f24672	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-14 09:30:00+00	2025-10-14 10:30:00+00	t	\N	\N
-76809ba1-1c28-44c4-8d5d-6e31bb25e857	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-14 10:30:00+00	2025-10-14 11:30:00+00	t	\N	\N
-7ae1a055-b60e-47da-87bb-01da3ef37f5a	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-14 11:30:00+00	2025-10-14 12:30:00+00	t	\N	\N
-79d340f0-b8d4-4178-af83-f749f50f1e98	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-14 12:30:00+00	2025-10-14 13:30:00+00	t	\N	\N
-261c6a2c-3180-405f-ad0f-8b1e55eefc2f	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-14 13:30:00+00	2025-10-14 14:30:00+00	t	\N	\N
-43a40f82-ef49-46d0-87f9-d4a921985a87	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-14 14:30:00+00	2025-10-14 15:30:00+00	t	\N	\N
-066b8848-b1ad-4238-b977-81e633f48db0	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-15 03:30:00+00	2025-10-15 04:30:00+00	t	\N	\N
-bee34da5-45a3-492d-ba64-e42cbcfd5e30	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-15 04:30:00+00	2025-10-15 05:30:00+00	t	\N	\N
-512d074f-56cb-47f2-b030-5579c4038762	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-15 05:30:00+00	2025-10-15 06:30:00+00	t	\N	\N
-fe71eda5-fa96-416b-9b81-6ceb9c471fc7	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-15 06:30:00+00	2025-10-15 07:30:00+00	t	\N	\N
-71467cfd-50d1-47ec-aa14-8bb14ec7b7a3	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-15 07:30:00+00	2025-10-15 08:30:00+00	t	\N	\N
-9ad51fea-b1dc-4c80-8a49-c56f197cc3b8	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-15 08:30:00+00	2025-10-15 09:30:00+00	t	\N	\N
-5a82bf6c-226e-4903-b93d-6ba6f1bf7d86	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-15 09:30:00+00	2025-10-15 10:30:00+00	t	\N	\N
-770ed8e9-fdce-4f12-be81-d64a63b352bb	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-15 10:30:00+00	2025-10-15 11:30:00+00	t	\N	\N
-6f7ac5c6-2488-4dbf-838f-4c66a4a3cf00	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-15 11:30:00+00	2025-10-15 12:30:00+00	t	\N	\N
-321e09a9-e636-4066-8f78-716be85327a2	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-15 12:30:00+00	2025-10-15 13:30:00+00	t	\N	\N
-f9fb9a62-8c81-4c03-83cb-49a84b9978d3	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-15 13:30:00+00	2025-10-15 14:30:00+00	t	\N	\N
-cde445ad-e13d-4d14-9c89-9f721f192cee	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-15 14:30:00+00	2025-10-15 15:30:00+00	t	\N	\N
-bd7cfdbe-3b37-48c9-8a7a-5c3dfc7aebef	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-16 03:30:00+00	2025-10-16 04:30:00+00	t	\N	\N
-dc5cc0df-e1dd-4dd1-8a1c-de13b65fa262	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-16 04:30:00+00	2025-10-16 05:30:00+00	t	\N	\N
-6db39914-9562-4fff-b738-27f801402956	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-16 05:30:00+00	2025-10-16 06:30:00+00	t	\N	\N
-951badd7-2795-445c-ab32-9fc1aa78dc8c	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-16 06:30:00+00	2025-10-16 07:30:00+00	t	\N	\N
-050db90c-b8ea-4160-aacf-91860fbd960c	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-16 07:30:00+00	2025-10-16 08:30:00+00	t	\N	\N
-c8cfeb4f-7b72-467e-9aa4-b968358c962c	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-16 08:30:00+00	2025-10-16 09:30:00+00	t	\N	\N
-7d41dd04-e0f5-4702-9c8a-7c56e09fa7ad	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-16 09:30:00+00	2025-10-16 10:30:00+00	t	\N	\N
-4651b248-b819-4ff2-a57a-c2c6a82d4f47	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-16 10:30:00+00	2025-10-16 11:30:00+00	t	\N	\N
-4417d099-34af-410c-8d93-0f42de3b76aa	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-16 11:30:00+00	2025-10-16 12:30:00+00	t	\N	\N
-d78f8788-708d-4031-a115-81a96c53f304	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-16 12:30:00+00	2025-10-16 13:30:00+00	t	\N	\N
-d864e2c6-2c4a-413e-a822-23d632e38b60	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-16 13:30:00+00	2025-10-16 14:30:00+00	t	\N	\N
-538a0e5e-aee8-4189-bfe0-bb8c1bf929eb	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-16 14:30:00+00	2025-10-16 15:30:00+00	t	\N	\N
-8fc95474-c219-4950-9849-9806ca58d06b	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-17 03:30:00+00	2025-10-17 04:30:00+00	t	\N	\N
-aec0b729-d0ac-40a5-806e-707189d351c0	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-17 04:30:00+00	2025-10-17 05:30:00+00	t	\N	\N
-cbb87fdc-38ce-4e85-ab42-a77cdbbc7e7d	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-17 05:30:00+00	2025-10-17 06:30:00+00	t	\N	\N
-b37f7e8e-9747-4968-b981-c667556a9ee3	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-17 06:30:00+00	2025-10-17 07:30:00+00	t	\N	\N
-f9b1b06e-3bcc-4328-b502-c222d18daf4a	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-17 07:30:00+00	2025-10-17 08:30:00+00	t	\N	\N
-036d71e4-d46b-4b8e-b71b-251e9bd83de0	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-17 08:30:00+00	2025-10-17 09:30:00+00	t	\N	\N
-5eba9e61-f3c5-44ca-8773-c13df674fd34	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-17 09:30:00+00	2025-10-17 10:30:00+00	t	\N	\N
-e8aa62a6-9fc2-456d-960e-d9d91fba6168	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-17 10:30:00+00	2025-10-17 11:30:00+00	t	\N	\N
-e250b30d-e710-4aec-aa2d-316aaf71d0e9	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-17 11:30:00+00	2025-10-17 12:30:00+00	t	\N	\N
-0765735e-137d-4575-aff4-583b7677456f	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-17 12:30:00+00	2025-10-17 13:30:00+00	t	\N	\N
-0ff56511-00ea-42b2-b6f0-8b5c3589fe4a	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-17 13:30:00+00	2025-10-17 14:30:00+00	t	\N	\N
-c2aef0ca-ca36-4851-af1e-08908f736726	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-17 14:30:00+00	2025-10-17 15:30:00+00	t	\N	\N
-4c492358-20c8-401b-abdb-6286feb4f8cd	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-18 03:30:00+00	2025-10-18 04:30:00+00	t	\N	\N
-d5e655ea-41cb-4082-ba8d-43217425ed63	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-18 04:30:00+00	2025-10-18 05:30:00+00	t	\N	\N
-32a495d8-1268-4c70-8a1a-bed4b8e8ad8e	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-18 05:30:00+00	2025-10-18 06:30:00+00	t	\N	\N
-9af9e915-ad1c-4538-936a-c1bf148391fb	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-18 06:30:00+00	2025-10-18 07:30:00+00	t	\N	\N
-a4c2ef08-6a03-4aff-bd95-61b9ebde3785	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-18 07:30:00+00	2025-10-18 08:30:00+00	t	\N	\N
-470e6cee-5ffd-43d0-82b3-25d4a48a9019	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-18 08:30:00+00	2025-10-18 09:30:00+00	t	\N	\N
-fba34850-883a-4864-a9c8-1f258461fba2	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-18 09:30:00+00	2025-10-18 10:30:00+00	t	\N	\N
-dfa92b4d-beae-475d-9b31-6c1133730200	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-18 10:30:00+00	2025-10-18 11:30:00+00	t	\N	\N
-da4f5a07-c1ff-4134-8669-6dca971c4b59	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-18 11:30:00+00	2025-10-18 12:30:00+00	t	\N	\N
-40109386-3c27-4184-a028-cfefa16c3f06	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-18 12:30:00+00	2025-10-18 13:30:00+00	t	\N	\N
-033439a5-7462-4a16-84e9-67d811aee132	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-18 13:30:00+00	2025-10-18 14:30:00+00	t	\N	\N
-76c0cf34-d423-4a76-8b94-78e0482c8f62	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-18 14:30:00+00	2025-10-18 15:30:00+00	t	\N	\N
-d787b867-5bc2-4a15-9940-1bc9ada32ead	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-19 03:30:00+00	2025-10-19 04:30:00+00	t	\N	\N
-13e4aba9-5431-4432-b0ec-83b380846977	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-19 04:30:00+00	2025-10-19 05:30:00+00	t	\N	\N
-83197a4b-1dc2-4324-ac2d-bb47af2942d4	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-19 05:30:00+00	2025-10-19 06:30:00+00	t	\N	\N
-d30b67d0-98a6-4556-a6bf-3e5a9e4ad508	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-19 06:30:00+00	2025-10-19 07:30:00+00	t	\N	\N
-25d3c6aa-fc57-40af-b48a-844f746e5eae	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-19 07:30:00+00	2025-10-19 08:30:00+00	t	\N	\N
-59e1c825-15fc-4030-8989-fcd77012cbf6	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-19 08:30:00+00	2025-10-19 09:30:00+00	t	\N	\N
-93c68433-f71f-4373-a1d9-890a6d6599c4	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-19 09:30:00+00	2025-10-19 10:30:00+00	t	\N	\N
-4edd8d69-553f-4c3b-88bd-5ba540f2ca51	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-19 10:30:00+00	2025-10-19 11:30:00+00	t	\N	\N
-34ed5923-297b-457c-9479-903d33ac552e	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-19 11:30:00+00	2025-10-19 12:30:00+00	t	\N	\N
-e33a68e1-dd1b-4704-83dc-2f82fead08c7	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-19 12:30:00+00	2025-10-19 13:30:00+00	t	\N	\N
-bd1ff79a-d6fe-486f-b5bc-e30a28dc5b17	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-19 13:30:00+00	2025-10-19 14:30:00+00	t	\N	\N
-49eabc8a-af64-4f1f-888b-d6d0e087866f	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-19 14:30:00+00	2025-10-19 15:30:00+00	t	\N	\N
-a99225cc-0791-458e-ac69-2a9d37f01c67	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-12 13:30:00+00	2025-10-12 14:30:00+00	t	\N	\N
-fafbb584-999e-4fb9-b9ec-a663cd788197	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-23 13:30:00+00	2025-10-23 14:30:00+00	f	\N	\N
-0b977864-168f-499e-976b-301a08a9f646	857b3a73-e640-4cfd-b886-a96815b6e562	2025-10-12 13:30:00+00	2025-10-12 14:30:00+00	t	\N	\N
-761fa7c6-c790-4937-9106-7f9de91d4116	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-23 14:30:00+00	2025-10-23 15:30:00+00	f	\N	\N
-f1d463a0-b661-4fdc-a556-f01fba3fd29c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-24 03:30:00+00	2025-10-24 04:30:00+00	f	\N	\N
-52de7f59-7814-45cd-8356-8064ac1bcd19	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 03:30:00+00	2025-10-28 04:30:00+00	f	\N	\N
-cef53716-0e39-4518-b5b5-cf4e985b264b	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-13 03:30:00+00	2025-10-13 04:30:00+00	t	\N	\N
-d6036ce2-7259-4d01-8b1a-9b7fb4ecb5c3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-14 14:30:00+00	2025-10-14 15:30:00+00	f	\N	\N
-8d9e7896-f087-4365-b6b8-d61f8081d105	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-23 03:30:00+00	2025-10-23 04:30:00+00	t	\N	\N
-7c2ee7e4-5860-477e-9092-746f6c48a63f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-23 04:30:00+00	2025-10-23 05:30:00+00	t	\N	\N
-30039841-373e-4e0d-83c3-6532163e0c4e	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-23 05:30:00+00	2025-10-23 06:30:00+00	t	\N	\N
-f3dc66b1-0f67-4e16-8b12-3089e09fa18f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-23 06:30:00+00	2025-10-23 07:30:00+00	t	\N	\N
-5f1b1629-1d32-4d4d-871e-83c1cc6ca81d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-23 07:30:00+00	2025-10-23 08:30:00+00	t	\N	\N
-4ac501f7-2fe3-44f7-9104-5023c9879ccf	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-23 08:30:00+00	2025-10-23 09:30:00+00	t	\N	\N
-9665982d-a6f0-4238-8fe7-f7a1e915f015	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-23 09:30:00+00	2025-10-23 10:30:00+00	t	\N	\N
-de97ec73-62bf-4c43-98ef-30b8c5c7049b	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-23 10:30:00+00	2025-10-23 11:30:00+00	t	\N	\N
-1407e9af-be29-43e6-8e23-4632cd4496c9	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-23 11:30:00+00	2025-10-23 12:30:00+00	t	\N	\N
-d4dc88e5-3228-495a-8313-e5a7aa10dd5a	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-23 12:30:00+00	2025-10-23 13:30:00+00	t	\N	\N
-cfdc4dec-da7a-47bc-add6-acdf426720db	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-24 04:30:00+00	2025-10-24 05:30:00+00	t	\N	\N
-3804bbc9-05c8-457c-81a6-d9ac36dbd1a4	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-24 05:30:00+00	2025-10-24 06:30:00+00	t	\N	\N
-665b9fe1-3771-4f6d-ab57-0098aba549c0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-24 06:30:00+00	2025-10-24 07:30:00+00	t	\N	\N
-ea21878a-27b2-450f-9634-38bf81ef734e	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-24 07:30:00+00	2025-10-24 08:30:00+00	t	\N	\N
-95487c4b-a01e-4fbc-b77c-8ec57257a0dd	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-24 08:30:00+00	2025-10-24 09:30:00+00	t	\N	\N
-b77f294b-d3e3-4ff6-83bd-2445fba7506d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-24 09:30:00+00	2025-10-24 10:30:00+00	t	\N	\N
-b957b6c2-ee1f-4b7f-93cf-08ce1736489e	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-24 11:30:00+00	2025-10-24 12:30:00+00	t	\N	\N
-2c3c5f19-198d-43af-bf1d-e24d4ff07bbb	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-24 12:30:00+00	2025-10-24 13:30:00+00	t	\N	\N
-9f8bde59-6557-40bc-8823-d28303c86a10	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-24 13:30:00+00	2025-10-24 14:30:00+00	t	\N	\N
-c71787f1-af04-4a0e-9a03-3157ce987b2d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-24 14:30:00+00	2025-10-24 15:30:00+00	t	\N	\N
-2df94a32-79ac-4b14-af5b-e6ab80b14a0c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-25 03:30:00+00	2025-10-25 04:30:00+00	t	\N	\N
-891d874e-54ea-41f1-bea3-d9b1b8e6e036	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-25 04:30:00+00	2025-10-25 05:30:00+00	t	\N	\N
-7189d4df-cd85-4685-814e-8c510b60a55d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-25 05:30:00+00	2025-10-25 06:30:00+00	t	\N	\N
-254dfac9-67d2-4cc2-b48b-d56ab5a9388b	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-25 06:30:00+00	2025-10-25 07:30:00+00	t	\N	\N
-80f7b920-b5d6-4dcb-a38a-4a3bd24d8b58	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-25 07:30:00+00	2025-10-25 08:30:00+00	t	\N	\N
-a9e742cd-d6f4-4cc8-8928-1bd6907729e3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-25 08:30:00+00	2025-10-25 09:30:00+00	t	\N	\N
-96b84ee3-6df5-49c5-bc8a-0df7d47c2a02	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-25 09:30:00+00	2025-10-25 10:30:00+00	t	\N	\N
-7060940d-06d1-4a6f-8fb9-45ea5980ca19	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-25 10:30:00+00	2025-10-25 11:30:00+00	t	\N	\N
-4b4ae135-8264-4242-82b8-47e4006d155c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-25 11:30:00+00	2025-10-25 12:30:00+00	t	\N	\N
-1a78fa69-c93b-4b00-be0a-ae103d406456	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-25 12:30:00+00	2025-10-25 13:30:00+00	t	\N	\N
-a1e7f478-a8b9-4846-8b12-2f7381097ce4	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-25 13:30:00+00	2025-10-25 14:30:00+00	t	\N	\N
-6ba33a7e-a390-4433-9b45-21d95a1540fc	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-25 14:30:00+00	2025-10-25 15:30:00+00	t	\N	\N
-964cce92-314d-4d8c-9830-794a9136bc61	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 04:30:00+00	2025-10-26 05:30:00+00	t	\N	\N
-dfea4379-36ad-459e-a6fb-03b895339daa	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 05:30:00+00	2025-10-26 06:30:00+00	t	\N	\N
-d3451ba5-8a8f-4775-a421-eb96d3fa38a7	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 06:30:00+00	2025-10-26 07:30:00+00	t	\N	\N
-b5ca3000-32ee-4a67-8001-6eff99cf65a3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 07:30:00+00	2025-10-26 08:30:00+00	t	\N	\N
-7d26493f-7f43-4110-942a-54b4292bdb16	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 08:30:00+00	2025-10-26 09:30:00+00	t	\N	\N
-d639800f-0a3b-4209-8da0-ce74049dcbda	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 09:30:00+00	2025-10-26 10:30:00+00	t	\N	\N
-c4038b61-5521-462b-ab30-02f47a97dc56	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 10:30:00+00	2025-10-26 11:30:00+00	t	\N	\N
-2b07f818-96cc-4d9d-b568-4e6832ec54af	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 11:30:00+00	2025-10-26 12:30:00+00	t	\N	\N
-e6c9582b-f2f6-4b7b-93f5-4a1c8c009157	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 12:30:00+00	2025-10-26 13:30:00+00	t	\N	\N
-3fcfe4ea-bc32-435c-8201-15c09f46e371	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 13:30:00+00	2025-10-26 14:30:00+00	t	\N	\N
-6e7d1b1c-7c63-48fc-9128-08177e6325c8	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 14:30:00+00	2025-10-26 15:30:00+00	t	\N	\N
-5e917bcf-f2de-4375-99df-320f22649432	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 03:30:00+00	2025-10-27 04:30:00+00	t	\N	\N
-a1ae8113-4ce1-44ab-9f4d-111985553df2	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 04:30:00+00	2025-10-27 05:30:00+00	t	\N	\N
-847c3d99-acbf-48dc-bac0-29cc0a0ef8ed	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 05:30:00+00	2025-10-27 06:30:00+00	t	\N	\N
-c8b3cfe3-fde7-43cb-a0d7-c319d8d6e11d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 06:30:00+00	2025-10-27 07:30:00+00	t	\N	\N
-fa2ba820-4c8f-4fe5-8127-c67322e0907c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 07:30:00+00	2025-10-27 08:30:00+00	t	\N	\N
-69f96e25-9614-43da-a5ea-ed5819c24512	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 08:30:00+00	2025-10-27 09:30:00+00	t	\N	\N
-ce125e8b-63c6-4d6b-b7d4-bc07e4b25eb2	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 09:30:00+00	2025-10-27 10:30:00+00	t	\N	\N
-57a4d00e-6987-473a-b45d-912fdce1f963	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 10:30:00+00	2025-10-27 11:30:00+00	t	\N	\N
-80b38729-5d3f-4546-aa45-fc79df3fce9a	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 11:30:00+00	2025-10-27 12:30:00+00	t	\N	\N
-93c9d39b-6d12-408e-b2e2-1280e3cb7450	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 12:30:00+00	2025-10-27 13:30:00+00	t	\N	\N
-26ee0b45-19af-4742-8cc3-e9904156b0a2	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 13:30:00+00	2025-10-27 14:30:00+00	t	\N	\N
-daed2666-b967-45dd-85d9-015a00d9576b	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 14:30:00+00	2025-10-27 15:30:00+00	t	\N	\N
-b48b9c76-267c-4193-874b-c84958130d03	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 04:30:00+00	2025-10-28 05:30:00+00	t	\N	\N
-6a98b7c0-df84-44c0-ba0b-1158759b396a	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 06:30:00+00	2025-10-28 07:30:00+00	t	\N	\N
-40c7cdaa-6ef6-4f98-b071-48e7cf61f132	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 07:30:00+00	2025-10-28 08:30:00+00	t	\N	\N
-d9a916bd-d50a-4771-829d-e4132602de12	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 08:30:00+00	2025-10-28 09:30:00+00	t	\N	\N
-fa5ae45f-6dd4-4986-b8ae-72b67a8bce5f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 09:30:00+00	2025-10-28 10:30:00+00	t	\N	\N
-cf461828-32d9-4649-9077-772848100805	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 10:30:00+00	2025-10-28 11:30:00+00	t	\N	\N
-4373bcae-9b6c-4d9c-9ebd-36b6973064a4	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 11:30:00+00	2025-10-28 12:30:00+00	t	\N	\N
-c31a0446-d84b-4474-972b-93772a5d6402	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 12:30:00+00	2025-10-28 13:30:00+00	t	\N	\N
-7a79a959-8074-4e79-ae8f-0ae4fdc34099	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 13:30:00+00	2025-10-28 14:30:00+00	t	\N	\N
-5e62fe09-c524-497c-bf7f-6ddf13546faf	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 14:30:00+00	2025-10-28 15:30:00+00	t	\N	\N
-d925f80f-eece-4162-8d6d-0a81a63d014d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 03:30:00+00	2025-10-29 04:30:00+00	t	\N	\N
-06e7c440-8cf8-4a2b-8cf4-182bfd1a305b	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 04:30:00+00	2025-10-29 05:30:00+00	t	\N	\N
-05926831-c7a7-467f-b539-4d22b191544f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 05:30:00+00	2025-10-29 06:30:00+00	t	\N	\N
-e4454ef7-9e42-4840-b5fd-da9cbcac32e9	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 06:30:00+00	2025-10-29 07:30:00+00	t	\N	\N
-e62a2f3b-f19b-4a43-b0e5-eaca1f60c78b	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 07:30:00+00	2025-10-29 08:30:00+00	t	\N	\N
-2e6cb9dc-d276-41f1-87d3-56023562eaed	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 08:30:00+00	2025-10-29 09:30:00+00	t	\N	\N
-e12543af-06a4-40e6-88eb-1db4f82a68b3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 09:30:00+00	2025-10-29 10:30:00+00	t	\N	\N
-df588b72-9f39-42bd-97e2-39ce159726f4	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 10:30:00+00	2025-10-29 11:30:00+00	t	\N	\N
-4bfc9135-7ed3-4a61-a52e-4c732e69d383	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 11:30:00+00	2025-10-29 12:30:00+00	t	\N	\N
-65f40259-2c52-4e82-8da4-29094d191f49	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 12:30:00+00	2025-10-29 13:30:00+00	t	\N	\N
-6a8e3e57-c002-487c-85b8-a4a3226d7b1b	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 13:30:00+00	2025-10-29 14:30:00+00	t	\N	\N
-fc726c29-10a3-411a-89d4-4b2577650b38	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 14:30:00+00	2025-10-29 15:30:00+00	t	\N	\N
-92908011-45a0-4afd-9d36-254a0c26a209	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 03:30:00+00	2025-10-26 04:30:00+00	f	\N	\N
-81d1f813-7ae8-43e6-b558-41aeed78feda	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-24 10:30:00+00	2025-10-24 11:30:00+00	f	\N	\N
-652fe316-3d4e-40ac-877d-05f1f0bfed82	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 05:30:00+00	2025-10-28 06:30:00+00	f	\N	\N
-122f9520-032c-49a2-83fe-caebfd94d4bc	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 03:30:00+00	2025-10-30 04:30:00+00	t	\N	\N
-3de05709-b296-4480-a564-9aee24732d5a	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 04:30:00+00	2025-10-30 05:30:00+00	t	\N	\N
-edba70d2-0608-4943-9452-90fea321c1ad	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 05:30:00+00	2025-10-30 06:30:00+00	t	\N	\N
-f2e445c5-8240-4c42-98bd-054690d3f786	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 06:30:00+00	2025-10-30 07:30:00+00	t	\N	\N
-ff868217-938e-4126-80ec-5edac0b94dc8	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 07:30:00+00	2025-10-30 08:30:00+00	t	\N	\N
-d8eb751b-a8ff-484d-a404-1647ef07773e	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 08:30:00+00	2025-10-30 09:30:00+00	t	\N	\N
-06e63ea4-065c-4cd9-9395-5e85aaa52a1c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 09:30:00+00	2025-10-30 10:30:00+00	t	\N	\N
-e1e6b8c7-e1df-4b5a-a3db-ae1f296d2bd7	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 10:30:00+00	2025-10-30 11:30:00+00	t	\N	\N
-5ba6641a-1315-4c03-88b6-11eb626fdbf3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 11:30:00+00	2025-10-30 12:30:00+00	t	\N	\N
-619a9d97-8f12-4f5e-9274-2d02b1fd6946	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 12:30:00+00	2025-10-30 13:30:00+00	t	\N	\N
-f8837e17-d9a7-4822-afe8-6ed5f3d79335	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 13:30:00+00	2025-10-30 14:30:00+00	t	\N	\N
-09d3943a-10de-4191-aa10-6ffba05fa2ba	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 14:30:00+00	2025-10-30 15:30:00+00	t	\N	\N
-67ca3648-87b4-40ac-9224-47eb24732603	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-23 03:30:00+00	2025-10-23 04:30:00+00	t	\N	\N
-82ff7e1f-9cd4-4953-b0c1-96cfe8b095a4	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-23 04:30:00+00	2025-10-23 05:30:00+00	t	\N	\N
-d125d10d-66d1-4ae2-b4ba-49471276fc81	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-23 05:30:00+00	2025-10-23 06:30:00+00	t	\N	\N
-062cf7f6-2d66-4357-aa51-17ec3d3ed902	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-23 06:30:00+00	2025-10-23 07:30:00+00	t	\N	\N
-e5d3dced-7b67-4811-94ee-c88ced868c01	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-23 07:30:00+00	2025-10-23 08:30:00+00	t	\N	\N
-052c2d71-56c7-4c12-be5e-7a3be22acabe	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-23 08:30:00+00	2025-10-23 09:30:00+00	t	\N	\N
-96476356-f18b-4604-9832-1a1a05c3af9c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-23 09:30:00+00	2025-10-23 10:30:00+00	t	\N	\N
-333fa94a-4938-47e3-aeef-11bc1d00fd9f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-23 10:30:00+00	2025-10-23 11:30:00+00	t	\N	\N
-f96460fb-354e-4c18-95ad-82e1260f3078	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-23 11:30:00+00	2025-10-23 12:30:00+00	t	\N	\N
-a8f50826-b095-479c-b3f2-870605ef38a1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-23 12:30:00+00	2025-10-23 13:30:00+00	t	\N	\N
-4ba71e52-208c-4ded-ba1a-4c22bb792c1c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-23 13:30:00+00	2025-10-23 14:30:00+00	t	\N	\N
-60188bc1-5c18-436f-9a83-4c0f8f038e64	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-24 03:30:00+00	2025-10-24 04:30:00+00	t	\N	\N
-49754b65-f337-45eb-9e6c-31c54ba59ad5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-24 04:30:00+00	2025-10-24 05:30:00+00	t	\N	\N
-42bf4be1-12e5-4d23-9c07-39f54b998700	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-24 05:30:00+00	2025-10-24 06:30:00+00	t	\N	\N
-4d940f99-9c8c-45c0-b568-4b3ace363de9	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-24 06:30:00+00	2025-10-24 07:30:00+00	t	\N	\N
-ddd576eb-1d9a-426c-82e4-41b0baaec56d	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-24 07:30:00+00	2025-10-24 08:30:00+00	t	\N	\N
-3d7e6ae4-c460-4287-8925-3a466fc7e813	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-24 08:30:00+00	2025-10-24 09:30:00+00	t	\N	\N
-aa8c2b77-c15b-4ebe-86b4-dfe2401b05dc	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-24 09:30:00+00	2025-10-24 10:30:00+00	t	\N	\N
-ed061c94-509a-4448-937b-4f83dfaaa749	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-24 10:30:00+00	2025-10-24 11:30:00+00	t	\N	\N
-2e49e4bb-0fc3-4cbd-b2dd-eb5fa031ce2f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-24 11:30:00+00	2025-10-24 12:30:00+00	t	\N	\N
-530eaa49-dc84-41a4-8391-1fb63521f616	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-24 12:30:00+00	2025-10-24 13:30:00+00	t	\N	\N
-dec36212-9b09-4740-8c6f-794d69c7cb8c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-24 13:30:00+00	2025-10-24 14:30:00+00	t	\N	\N
-ac3cee85-a72b-4569-bea5-33e2793c76de	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-24 14:30:00+00	2025-10-24 15:30:00+00	t	\N	\N
-f79b2ada-4663-458d-9171-8662978640d7	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-25 03:30:00+00	2025-10-25 04:30:00+00	t	\N	\N
-f6e86ad2-e9e0-4143-8101-97e06a93160f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-25 04:30:00+00	2025-10-25 05:30:00+00	t	\N	\N
-03032384-1285-4e69-a9a6-16835170fbb9	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-25 05:30:00+00	2025-10-25 06:30:00+00	t	\N	\N
-19bb18cf-e802-4f65-88f9-11606e5ab2f1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-25 06:30:00+00	2025-10-25 07:30:00+00	t	\N	\N
-75e39b88-30d7-441a-8a3e-d8a257df9139	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-25 07:30:00+00	2025-10-25 08:30:00+00	t	\N	\N
-6ae16918-2b2d-4715-b3b1-2d8ad9577d36	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-25 08:30:00+00	2025-10-25 09:30:00+00	t	\N	\N
-a4ba877b-e913-4ba6-8400-fc1fcfcc577c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-25 09:30:00+00	2025-10-25 10:30:00+00	t	\N	\N
-59c28a54-bf33-4f0a-b007-cb6daf8c0416	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-25 10:30:00+00	2025-10-25 11:30:00+00	t	\N	\N
-5391f4cb-f270-4410-af2b-2737d6485a48	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-25 11:30:00+00	2025-10-25 12:30:00+00	t	\N	\N
-70ffea8f-7e28-44d2-a48e-d535f9d4fc2d	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-25 12:30:00+00	2025-10-25 13:30:00+00	t	\N	\N
-1e26b343-8c09-46ff-bb23-7502fabcdbad	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-25 13:30:00+00	2025-10-25 14:30:00+00	t	\N	\N
-84634c7b-8b6c-48d5-8f42-634a7e333b76	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-25 14:30:00+00	2025-10-25 15:30:00+00	t	\N	\N
-8fceed98-1f79-4ab0-a234-26f4c2d51357	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 03:30:00+00	2025-10-26 04:30:00+00	t	\N	\N
-9860005d-4a82-4afc-973e-b0afbaa16f36	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 04:30:00+00	2025-10-26 05:30:00+00	t	\N	\N
-c05a9aa5-a32c-4ae2-a978-4201d32a5c5a	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 05:30:00+00	2025-10-26 06:30:00+00	t	\N	\N
-a30ba9b2-cd51-4597-b3e0-fe8aa7db5738	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 06:30:00+00	2025-10-26 07:30:00+00	t	\N	\N
-95ed075c-d82d-4217-b874-270fd0fa59ba	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 07:30:00+00	2025-10-26 08:30:00+00	t	\N	\N
-666196db-fd9e-4958-8222-44b28baeae73	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 08:30:00+00	2025-10-26 09:30:00+00	t	\N	\N
-3e3a6db1-7e32-431d-836e-424ae6a6d38d	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 09:30:00+00	2025-10-26 10:30:00+00	t	\N	\N
-75fbb44f-51d6-44b2-872f-0bb29335bfac	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 10:30:00+00	2025-10-26 11:30:00+00	t	\N	\N
-1b133b5f-80c4-4962-90a1-1d160170d12c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 11:30:00+00	2025-10-26 12:30:00+00	t	\N	\N
-f2d447bc-12d3-4cea-9e30-6c5f524938a1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 12:30:00+00	2025-10-26 13:30:00+00	t	\N	\N
-6f863ee1-d9d2-4143-9121-25bd21747dfb	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 13:30:00+00	2025-10-26 14:30:00+00	t	\N	\N
-e652faa1-5e69-445b-923d-236119cf04a2	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 14:30:00+00	2025-10-26 15:30:00+00	t	\N	\N
-dd5863c4-c872-4d7d-9639-9725dfd89ebb	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 03:30:00+00	2025-10-27 04:30:00+00	t	\N	\N
-a82a3bc5-d776-4406-b266-8d40667dd243	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 04:30:00+00	2025-10-27 05:30:00+00	t	\N	\N
-64bdb0f6-6164-4bb2-a962-584a9dafe3d5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 05:30:00+00	2025-10-27 06:30:00+00	t	\N	\N
-e73645f8-5964-4380-a5b9-a411397f3824	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 06:30:00+00	2025-10-27 07:30:00+00	t	\N	\N
-84f0ff25-51d7-4c00-9098-9c5e703e8cbe	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 07:30:00+00	2025-10-27 08:30:00+00	t	\N	\N
-e0221b23-d8f7-4282-9859-2800f4074bcc	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 08:30:00+00	2025-10-27 09:30:00+00	t	\N	\N
-6314dc8a-7d68-498f-a27e-4be9d65154c5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 09:30:00+00	2025-10-27 10:30:00+00	t	\N	\N
-ae7e8527-6727-44fe-9861-ea3466b45403	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 10:30:00+00	2025-10-27 11:30:00+00	t	\N	\N
-73912f24-a064-4acf-8782-0a6c4e752b49	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 11:30:00+00	2025-10-27 12:30:00+00	t	\N	\N
-b23a42ea-9cc2-450d-9c51-6d24e3eb2836	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 12:30:00+00	2025-10-27 13:30:00+00	t	\N	\N
-0df401aa-8acc-4008-b817-1748ad20256b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 13:30:00+00	2025-10-27 14:30:00+00	t	\N	\N
-3350be08-ea78-42de-a1a2-ec91c9f3d553	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 14:30:00+00	2025-10-27 15:30:00+00	t	\N	\N
-d988b1d0-a8f1-4ade-a908-8bf9a546fa35	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 03:30:00+00	2025-10-28 04:30:00+00	t	\N	\N
-8e09219a-f74e-475a-9041-86fe02562bb7	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 04:30:00+00	2025-10-28 05:30:00+00	t	\N	\N
-6c26167e-5970-4f21-9b38-1afc3a272765	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 05:30:00+00	2025-10-28 06:30:00+00	t	\N	\N
-53f7b3d6-b59d-4fcf-b599-c1b48ec89b19	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 06:30:00+00	2025-10-28 07:30:00+00	t	\N	\N
-0b285b43-97d4-4d70-be76-27fbdda977c1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 07:30:00+00	2025-10-28 08:30:00+00	t	\N	\N
-04bf422d-d669-476c-9df7-481b9933ecdc	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 08:30:00+00	2025-10-28 09:30:00+00	t	\N	\N
-f39b0b4c-2cd9-4078-9c2d-0180ca468018	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 09:30:00+00	2025-10-28 10:30:00+00	t	\N	\N
-008b48aa-d693-4a5b-b7e3-3b26bfc93666	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 10:30:00+00	2025-10-28 11:30:00+00	t	\N	\N
-20f332c9-009d-4a64-baa4-df9a6c1740a4	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 11:30:00+00	2025-10-28 12:30:00+00	t	\N	\N
-6b088dc8-6382-413f-8ae2-2f310a4a7179	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 12:30:00+00	2025-10-28 13:30:00+00	t	\N	\N
-fb6f6e9b-c639-47ae-864e-ba1cd62b25f9	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 13:30:00+00	2025-10-28 14:30:00+00	t	\N	\N
-4e29aaad-3307-449f-bded-4821ede3077d	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 14:30:00+00	2025-10-28 15:30:00+00	t	\N	\N
-a3d6bf99-1636-4ee4-8e59-a83df818c3a2	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 03:30:00+00	2025-10-29 04:30:00+00	t	\N	\N
-4ff89783-0e2c-428a-871d-06fdbbd46623	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 04:30:00+00	2025-10-29 05:30:00+00	t	\N	\N
-25e6bdfd-0153-4af9-a1e9-57eaf77a4a4a	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 05:30:00+00	2025-10-29 06:30:00+00	t	\N	\N
-c7686356-fab3-4d82-ae3e-3f60c4319d75	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 06:30:00+00	2025-10-29 07:30:00+00	t	\N	\N
-4ebf9d4b-7f11-4db0-a3ce-d195167defde	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 07:30:00+00	2025-10-29 08:30:00+00	t	\N	\N
-95320a38-b5f9-4aba-8a27-e8c46ee52479	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 08:30:00+00	2025-10-29 09:30:00+00	t	\N	\N
-74fb431e-6b19-4763-9afb-3ca95a650bd0	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 09:30:00+00	2025-10-29 10:30:00+00	t	\N	\N
-556f16e8-391e-4c3b-82a3-a98255afe9a6	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 10:30:00+00	2025-10-29 11:30:00+00	t	\N	\N
-8fe672c0-81c9-4898-a97f-8aff2f6eda6b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 11:30:00+00	2025-10-29 12:30:00+00	t	\N	\N
-ae07f669-febf-4f53-899f-67266302e5b0	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 12:30:00+00	2025-10-29 13:30:00+00	t	\N	\N
-fab45c26-e06e-4c07-ab2c-c5f904cac691	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 13:30:00+00	2025-10-29 14:30:00+00	t	\N	\N
-7edb5a2e-e5ed-4338-9a17-e433e3bed08f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 14:30:00+00	2025-10-29 15:30:00+00	t	\N	\N
-43e3a2a4-3aa3-4b54-9f0a-f36c3653ebe7	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 03:30:00+00	2025-10-30 04:30:00+00	t	\N	\N
-5d53f31b-37d1-40f4-8525-c66d91739b3e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 04:30:00+00	2025-10-30 05:30:00+00	t	\N	\N
-03fc67ed-8fc4-458f-a2c0-8d68dc45b866	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 05:30:00+00	2025-10-30 06:30:00+00	t	\N	\N
-cd47776e-5daa-4794-801c-207233d77f29	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 06:30:00+00	2025-10-30 07:30:00+00	t	\N	\N
-b8a66c9d-0fef-468c-8909-192414b66aca	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 07:30:00+00	2025-10-30 08:30:00+00	t	\N	\N
-2307b8f8-8162-40cf-adc7-35277a5fe4fb	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 08:30:00+00	2025-10-30 09:30:00+00	t	\N	\N
-50cb711e-f71e-4db9-a5d0-fe5ae9bdb5e1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 09:30:00+00	2025-10-30 10:30:00+00	t	\N	\N
-62705d47-3440-4a03-9e1d-5a5be0576c02	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 10:30:00+00	2025-10-30 11:30:00+00	t	\N	\N
-b94f39df-80d6-4910-a9c7-c6bad9848169	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 11:30:00+00	2025-10-30 12:30:00+00	t	\N	\N
-3185763d-3d69-420b-b9c1-8c23f9bb6019	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 12:30:00+00	2025-10-30 13:30:00+00	t	\N	\N
-a382e076-49ea-4a5f-8f3e-9d8a4bc72394	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 13:30:00+00	2025-10-30 14:30:00+00	t	\N	\N
-ed174fa5-b018-4d87-9083-ebfa4ddd1a50	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 14:30:00+00	2025-10-30 15:30:00+00	t	\N	\N
-ccb0837d-d7d3-4f56-99a7-610e14389e2c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-23 14:30:00+00	2025-10-23 15:30:00+00	f	\N	\N
+9214f176-327a-463d-aeed-ced63fe4fa58	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 03:30:00+00	2025-10-26 04:30:00+00	t	\N	\N
+06348cbb-802f-4c18-aa17-d29ecd299191	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 04:30:00+00	2025-10-26 05:30:00+00	t	\N	\N
+5b8ff74a-6212-4a4a-b402-31b01ed10df2	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 05:30:00+00	2025-10-26 06:30:00+00	t	\N	\N
+a5ac613a-1323-4071-9b35-01d4cc4a2d60	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 06:30:00+00	2025-10-26 07:30:00+00	t	\N	\N
+8fe2fa3d-0db3-4bba-b38b-9ae55710bf0d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 07:30:00+00	2025-10-26 08:30:00+00	t	\N	\N
+d58f715d-d6f4-46e2-a30b-1433be3bfc06	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 08:30:00+00	2025-10-26 09:30:00+00	t	\N	\N
+9a757c9e-5a18-4d8f-9100-c4d254e84c17	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 09:30:00+00	2025-10-26 10:30:00+00	t	\N	\N
+c1e03c28-9b95-46cb-950b-bd646aa20032	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 10:30:00+00	2025-10-26 11:30:00+00	t	\N	\N
+4fcbddfe-d6e4-4ee6-9428-e08d086d1b1e	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 11:30:00+00	2025-10-26 12:30:00+00	t	\N	\N
+f48cffb1-1bc9-4cb9-a62b-f8147081097d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 12:30:00+00	2025-10-26 13:30:00+00	t	\N	\N
+8f124294-637b-4591-ad42-ca33bb6179d9	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 13:30:00+00	2025-10-26 14:30:00+00	t	\N	\N
+6401d921-e38e-47e0-a43d-1d22b6273149	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 14:30:00+00	2025-10-26 15:30:00+00	t	\N	\N
+37a26c29-b46c-4219-9d99-c3bff47149c3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 04:30:00+00	2025-10-27 05:30:00+00	t	\N	\N
+237f88e6-0418-40d5-b413-41f565420c22	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 05:30:00+00	2025-10-27 06:30:00+00	t	\N	\N
+2930c851-94cb-4caa-b02d-18f03028c474	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 06:30:00+00	2025-10-27 07:30:00+00	t	\N	\N
+6ba5e729-2d8e-4885-b967-2d43c9e9671e	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 07:30:00+00	2025-10-27 08:30:00+00	t	\N	\N
+a6b54493-8329-42b9-a806-1ee1a6371fc6	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 08:30:00+00	2025-10-27 09:30:00+00	t	\N	\N
+4b84ea83-0e7d-4434-a711-5c1fe57e6569	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 09:30:00+00	2025-10-27 10:30:00+00	t	\N	\N
+295eda2a-b265-483e-9f3d-7b59423a471f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 10:30:00+00	2025-10-27 11:30:00+00	t	\N	\N
+0d0616a0-231d-4632-b3b5-457e4788aa84	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 11:30:00+00	2025-10-27 12:30:00+00	t	\N	\N
+b68fb6c3-1ee2-4d87-acc3-ffe51b5262af	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 12:30:00+00	2025-10-27 13:30:00+00	t	\N	\N
+bf988186-da29-4d9f-9e28-3da2ad301bfc	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 13:30:00+00	2025-10-27 14:30:00+00	t	\N	\N
+073f2e7a-27a8-4040-9446-81e8d6808407	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 14:30:00+00	2025-10-27 15:30:00+00	t	\N	\N
+3f5c5ee3-6b50-44ba-8f2c-b7b52481bd12	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 03:30:00+00	2025-10-28 04:30:00+00	t	\N	\N
+c1e3ae78-f097-48b0-a002-99e6422f026a	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 04:30:00+00	2025-10-28 05:30:00+00	t	\N	\N
+1e8bee7b-973a-4420-b71c-4a8665c3a478	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 05:30:00+00	2025-10-28 06:30:00+00	t	\N	\N
+471525f8-89c0-4b3f-a4a7-9280b23642a0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 06:30:00+00	2025-10-28 07:30:00+00	t	\N	\N
+f277244a-8c47-4fa8-b8fd-245715b36efb	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 07:30:00+00	2025-10-28 08:30:00+00	t	\N	\N
+e7311a19-9efb-45c3-a8ff-dafd7f958367	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 08:30:00+00	2025-10-28 09:30:00+00	t	\N	\N
+53a6bb73-25ca-40be-b128-c6ed90b18b18	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 09:30:00+00	2025-10-28 10:30:00+00	t	\N	\N
+0986b751-6f3f-43d5-9041-32313fbff48d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 10:30:00+00	2025-10-28 11:30:00+00	t	\N	\N
+5a790352-a3c8-4dea-9f60-02ec56b6ec78	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 11:30:00+00	2025-10-28 12:30:00+00	t	\N	\N
+e2cad07b-a04d-4236-ab02-893680be28a0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 12:30:00+00	2025-10-28 13:30:00+00	t	\N	\N
+57fa299c-5d2d-49bd-ae1a-bc80c26c6249	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 13:30:00+00	2025-10-28 14:30:00+00	t	\N	\N
+a7e964ae-dffa-4146-9659-c762462d9fa0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 14:30:00+00	2025-10-28 15:30:00+00	t	\N	\N
+cae19458-7879-4f70-83ab-f9a38d5f6007	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 03:30:00+00	2025-10-29 04:30:00+00	t	\N	\N
+a0c4e332-09f2-4f2d-a0a2-ed7d7b34ad25	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 04:30:00+00	2025-10-29 05:30:00+00	t	\N	\N
+605e89e8-8fb0-491b-88ac-3dce2320cea9	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 05:30:00+00	2025-10-29 06:30:00+00	t	\N	\N
+97b53bdd-c5a9-4d8f-ae26-54cea43e2db1	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 06:30:00+00	2025-10-29 07:30:00+00	t	\N	\N
+e6e47737-53e3-47c7-b5ac-7faa67507521	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 07:30:00+00	2025-10-29 08:30:00+00	t	\N	\N
+54d3df35-cbdd-44c5-9dc2-4c6294f94ad7	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 08:30:00+00	2025-10-29 09:30:00+00	t	\N	\N
+ff753ed2-1829-4f15-b8ff-a6dddc95b343	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 09:30:00+00	2025-10-29 10:30:00+00	t	\N	\N
+f40cf04c-cea3-4841-8cd7-12664b15fbca	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 10:30:00+00	2025-10-29 11:30:00+00	t	\N	\N
+fbd7a2a6-b17c-4fc9-b75d-352d0eac4872	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 11:30:00+00	2025-10-29 12:30:00+00	t	\N	\N
+d5436dd9-6b97-4ac9-951e-3709ff7fe9e4	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 12:30:00+00	2025-10-29 13:30:00+00	t	\N	\N
+f4998bb3-9b6f-4232-a0cc-e461fe248b86	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 13:30:00+00	2025-10-29 14:30:00+00	t	\N	\N
+a951903e-0710-4328-8ddb-b75d99cdc707	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-29 14:30:00+00	2025-10-29 15:30:00+00	t	\N	\N
+b5f47fa1-beb4-456c-a0a6-62e0e90f1960	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 03:30:00+00	2025-10-30 04:30:00+00	t	\N	\N
+264f4688-0df8-4403-a379-bc89dd4ab49d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 04:30:00+00	2025-10-30 05:30:00+00	t	\N	\N
+3336df81-481f-450e-b44e-c6b98ff83052	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 05:30:00+00	2025-10-30 06:30:00+00	t	\N	\N
+4ac48a58-8e34-41ba-9092-da4b25c12f64	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 06:30:00+00	2025-10-30 07:30:00+00	t	\N	\N
+5358f932-1899-487f-839b-5e376f4c3fa0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 07:30:00+00	2025-10-30 08:30:00+00	t	\N	\N
+a840e077-421d-46d8-b28d-1d8f1e70dbb3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 08:30:00+00	2025-10-30 09:30:00+00	t	\N	\N
+85ca102e-dca1-41df-862c-b9e7982a125c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 09:30:00+00	2025-10-30 10:30:00+00	t	\N	\N
+09f6adec-079f-43d1-838d-aadc5aa11579	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 10:30:00+00	2025-10-30 11:30:00+00	t	\N	\N
+906485e3-371d-4442-bf17-502863e23082	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 11:30:00+00	2025-10-30 12:30:00+00	t	\N	\N
+907c5818-f7fc-4748-9739-96b8cf6ba0c0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 12:30:00+00	2025-10-30 13:30:00+00	t	\N	\N
+ba5609cd-2c80-4712-9f3a-0acb0307f9c0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 13:30:00+00	2025-10-30 14:30:00+00	t	\N	\N
+b0c47b8d-47eb-4d6a-a1cb-8a7c22ea886c	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-30 14:30:00+00	2025-10-30 15:30:00+00	t	\N	\N
+511018e2-c50f-4f1f-b2b1-9a0e6e4dd892	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-31 03:30:00+00	2025-10-31 04:30:00+00	t	\N	\N
+23c4d9e0-79ea-4666-aeeb-0d056f44352f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-31 04:30:00+00	2025-10-31 05:30:00+00	t	\N	\N
+aeedc1ac-251a-48e1-8c90-a92cd7d87d95	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-31 05:30:00+00	2025-10-31 06:30:00+00	t	\N	\N
+bfdc6711-a7d1-413a-bf66-fa175836ddd0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-31 06:30:00+00	2025-10-31 07:30:00+00	t	\N	\N
+316dba80-96c0-4618-a3c3-0f3ccd17dea7	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-31 07:30:00+00	2025-10-31 08:30:00+00	t	\N	\N
+a3f184a1-a44b-4220-9fb1-b3d9ad5a77f4	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-31 08:30:00+00	2025-10-31 09:30:00+00	t	\N	\N
+d2339a6e-ccd6-435d-934a-790863eb3429	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-31 09:30:00+00	2025-10-31 10:30:00+00	t	\N	\N
+fb86442a-a2af-4cea-a5d4-69cb823ebc1d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-31 10:30:00+00	2025-10-31 11:30:00+00	t	\N	\N
+06057619-923f-483b-8d66-419c7d3b5dad	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-31 11:30:00+00	2025-10-31 12:30:00+00	t	\N	\N
+29d96349-4c1f-43d4-a233-05dc9115caed	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-31 12:30:00+00	2025-10-31 13:30:00+00	t	\N	\N
+590dd746-4d4c-4c1e-ad2f-fdc88868afb5	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-31 13:30:00+00	2025-10-31 14:30:00+00	t	\N	\N
+a53003fc-b007-405b-b023-48ff7d627e70	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-31 14:30:00+00	2025-10-31 15:30:00+00	t	\N	\N
+2ac5465b-e554-4cab-a4f9-98e2a29027db	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-01 03:30:00+00	2025-11-01 04:30:00+00	t	\N	\N
+ab1ba6c6-cb2c-42b7-81f0-aac6ce2532c3	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-01 04:30:00+00	2025-11-01 05:30:00+00	t	\N	\N
+c93b0fd2-0021-44d0-b2d0-9537c7b31cd5	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-01 05:30:00+00	2025-11-01 06:30:00+00	t	\N	\N
+6974fcf6-f509-4fc5-a9ce-6405aa6c647e	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-01 06:30:00+00	2025-11-01 07:30:00+00	t	\N	\N
+3169e146-c443-4852-9ac2-2387fd88bdcf	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-01 07:30:00+00	2025-11-01 08:30:00+00	t	\N	\N
+abae4606-0b7e-4d65-a3cd-98345882aaaa	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-01 08:30:00+00	2025-11-01 09:30:00+00	t	\N	\N
+aaf4960a-55b2-43eb-8cb8-dac9ce3c0a2f	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-01 09:30:00+00	2025-11-01 10:30:00+00	t	\N	\N
+6e0536a3-34ab-40e0-a025-a139e2dfa9f2	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-01 10:30:00+00	2025-11-01 11:30:00+00	t	\N	\N
+33db2f52-8429-4b54-a339-f7c0a04f5cfc	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-01 11:30:00+00	2025-11-01 12:30:00+00	t	\N	\N
+a3c74726-3658-4b42-9255-1bd498ec2b4b	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-01 12:30:00+00	2025-11-01 13:30:00+00	t	\N	\N
+57da149f-8628-4282-9618-a48d00f64acf	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-01 13:30:00+00	2025-11-01 14:30:00+00	t	\N	\N
+71099af5-c5c2-4af2-9996-f2916d533096	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-01 14:30:00+00	2025-11-01 15:30:00+00	t	\N	\N
+3882c7b8-1bb2-4538-adcb-4acb2a95f03c	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 03:30:00+00	2025-11-02 04:30:00+00	t	\N	\N
+fcfc3e87-d1af-4732-b7dd-b917b958b3b1	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 04:30:00+00	2025-11-02 05:30:00+00	t	\N	\N
+9296c366-3162-4550-b7c7-52cd93cdf96d	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 05:30:00+00	2025-11-02 06:30:00+00	t	\N	\N
+a758e0c9-0284-488f-8798-0a658de59d6c	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 06:30:00+00	2025-11-02 07:30:00+00	t	\N	\N
+4f77fce2-c775-430b-873f-05629a371217	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 07:30:00+00	2025-11-02 08:30:00+00	t	\N	\N
+35015c2b-0c36-4447-a98c-0de01b5a3d2f	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 08:30:00+00	2025-11-02 09:30:00+00	t	\N	\N
+edf75837-11ab-4a3c-9f90-b8d026980e70	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 09:30:00+00	2025-11-02 10:30:00+00	t	\N	\N
+6ea42d4b-2715-4ff2-95f8-d45638fbbd51	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 10:30:00+00	2025-11-02 11:30:00+00	t	\N	\N
+5f2e1997-8b91-43f6-a592-97e970d4622f	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 11:30:00+00	2025-11-02 12:30:00+00	t	\N	\N
+85e23961-682a-4b88-b2fd-7d913c43e8d7	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 12:30:00+00	2025-11-02 13:30:00+00	t	\N	\N
+f02fb62a-19af-4a23-8e56-113fd423834f	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 13:30:00+00	2025-11-02 14:30:00+00	t	\N	\N
+46e38576-d7a2-466a-852a-ac3a79d34f32	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 14:30:00+00	2025-11-02 15:30:00+00	t	\N	\N
+57a8cca2-0a96-457b-b988-a0c2e4d6edaa	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 03:30:00+00	2025-10-26 04:30:00+00	t	\N	\N
+f9429817-c9e8-4cde-9f95-b9d9be7ddda4	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 04:30:00+00	2025-10-26 05:30:00+00	t	\N	\N
+7ee44d0a-867c-4167-840d-0bfdb5537e4b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 05:30:00+00	2025-10-26 06:30:00+00	t	\N	\N
+a95ebaaa-f068-4af1-bd43-47ab927ba56f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 06:30:00+00	2025-10-26 07:30:00+00	t	\N	\N
+e4fcbd1d-48d0-4482-b682-022890dc5cad	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 07:30:00+00	2025-10-26 08:30:00+00	t	\N	\N
+447c617b-e426-4452-a069-cb7bd83d3f4c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 08:30:00+00	2025-10-26 09:30:00+00	t	\N	\N
+d50031d8-6ca5-4eb4-9c3a-c17d9fdbd54e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 09:30:00+00	2025-10-26 10:30:00+00	t	\N	\N
+e5fc3e33-4f32-4037-ad11-11600cb8e8ca	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 10:30:00+00	2025-10-26 11:30:00+00	t	\N	\N
+234897d0-0b64-4c70-ae5a-61bb8fc0ace9	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 11:30:00+00	2025-10-26 12:30:00+00	t	\N	\N
+0a527def-13ff-4168-8e7a-acb30099ae28	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 12:30:00+00	2025-10-26 13:30:00+00	t	\N	\N
+a91b3fef-0c35-470a-b75f-44e0a5481995	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 13:30:00+00	2025-10-26 14:30:00+00	t	\N	\N
+bf42fc79-c4ae-4c5b-bd65-bc1c1ea096f4	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 14:30:00+00	2025-10-26 15:30:00+00	t	\N	\N
+a6f5729a-05a4-494d-8352-e34c067dfe85	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 03:30:00+00	2025-10-27 04:30:00+00	t	\N	\N
+8ee4a731-dbd6-4600-af0e-8dc78570e869	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 04:30:00+00	2025-10-27 05:30:00+00	t	\N	\N
+ffb3917a-8636-492d-a4df-1ec1206055d8	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 05:30:00+00	2025-10-27 06:30:00+00	t	\N	\N
+f57d52f4-bd58-4457-973a-bf202d9f71f2	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 06:30:00+00	2025-10-27 07:30:00+00	t	\N	\N
+78ff08e7-03ff-468c-8130-57670a469294	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 07:30:00+00	2025-10-27 08:30:00+00	t	\N	\N
+7145582b-a26b-4b9f-ac27-dfd06152232b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 08:30:00+00	2025-10-27 09:30:00+00	t	\N	\N
+e73d88e6-5474-487d-9b77-0a65ae47c7cd	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 09:30:00+00	2025-10-27 10:30:00+00	t	\N	\N
+eb70c922-e2a7-4688-b480-e1e145961ed0	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 10:30:00+00	2025-10-27 11:30:00+00	t	\N	\N
+7f69e636-5f55-4d8a-a13e-bbfe3996946e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 11:30:00+00	2025-10-27 12:30:00+00	t	\N	\N
+d9386125-62f5-4b7c-b639-de5f7c5939af	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 12:30:00+00	2025-10-27 13:30:00+00	t	\N	\N
+b4319adf-b490-4071-86d3-2d10edc3af9c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 13:30:00+00	2025-10-27 14:30:00+00	t	\N	\N
+cc947569-e44f-4e55-af4e-bc1130fc88d2	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-27 14:30:00+00	2025-10-27 15:30:00+00	t	\N	\N
+eccad7c9-a8dd-43ff-aba4-e0fd011106a6	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 03:30:00+00	2025-10-28 04:30:00+00	t	\N	\N
+9dd17f7e-05e2-43ca-af90-5d310587641b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 04:30:00+00	2025-10-28 05:30:00+00	t	\N	\N
+b6fd5096-be22-4751-ad8a-f0746fca8904	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 05:30:00+00	2025-10-28 06:30:00+00	t	\N	\N
+14c52e66-1458-4556-ae1c-7ecb97d37db7	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 06:30:00+00	2025-10-28 07:30:00+00	t	\N	\N
+6caef0a4-0e37-49ba-aaad-7b0b836acbdd	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 07:30:00+00	2025-10-28 08:30:00+00	t	\N	\N
+d2a50e6c-a808-4aec-9714-f3d58639d2c5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 08:30:00+00	2025-10-28 09:30:00+00	t	\N	\N
+96cd46b6-c900-45d4-a683-cad5f871223c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 09:30:00+00	2025-10-28 10:30:00+00	t	\N	\N
+41f5fcde-a60e-4a41-8f51-ad645a30ea6f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 10:30:00+00	2025-10-28 11:30:00+00	t	\N	\N
+b75c8982-7740-4205-9319-e6f3718e7a33	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 11:30:00+00	2025-10-28 12:30:00+00	t	\N	\N
+8c4126e5-fef0-4e1d-9424-34e108430a99	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 12:30:00+00	2025-10-28 13:30:00+00	t	\N	\N
+8c651d6b-2d37-4c34-87a0-d1acce5891f5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 13:30:00+00	2025-10-28 14:30:00+00	t	\N	\N
+4f94ded5-4843-4989-ac30-94fd68924fd1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-28 14:30:00+00	2025-10-28 15:30:00+00	t	\N	\N
+94109eba-6e28-47d9-9aa9-cfe8a7f036c1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 03:30:00+00	2025-10-29 04:30:00+00	t	\N	\N
+f05db634-61c1-4858-b562-ef0a18bb1ada	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 04:30:00+00	2025-10-29 05:30:00+00	t	\N	\N
+5503a116-d7df-40f5-bffd-6e374bedf999	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 05:30:00+00	2025-10-29 06:30:00+00	t	\N	\N
+017d9c24-1b07-469a-85e4-1d18805001f8	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 06:30:00+00	2025-10-29 07:30:00+00	t	\N	\N
+a1fadc6c-1fd4-4870-9ba1-a3322af91b10	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 07:30:00+00	2025-10-29 08:30:00+00	t	\N	\N
+cb214d4a-a267-4ec8-bfa4-5b527fbdcfad	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 08:30:00+00	2025-10-29 09:30:00+00	t	\N	\N
+650c96c3-2fd2-4a06-80f3-cab158cbf335	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 09:30:00+00	2025-10-29 10:30:00+00	t	\N	\N
+282eadf0-e7a5-44fe-97c4-dfd833d8e7c3	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 10:30:00+00	2025-10-29 11:30:00+00	t	\N	\N
+89572caa-cb15-46f3-b4b5-49f620427708	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 11:30:00+00	2025-10-29 12:30:00+00	t	\N	\N
+667b2cae-8467-4b64-9b75-b5c471b9b354	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 12:30:00+00	2025-10-29 13:30:00+00	t	\N	\N
+2b608a8d-b9a5-4f8f-8951-decbf99d43d9	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 13:30:00+00	2025-10-29 14:30:00+00	t	\N	\N
+99ce2d5f-e407-452e-bef8-7639597bc8fd	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-29 14:30:00+00	2025-10-29 15:30:00+00	t	\N	\N
+fa9ae53f-7074-407a-ae00-c40293e50659	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 03:30:00+00	2025-10-30 04:30:00+00	t	\N	\N
+53bfb698-310e-40a3-9b9c-9ff217782895	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 04:30:00+00	2025-10-30 05:30:00+00	t	\N	\N
+3530c888-2725-47bf-b089-bfabf2220b5d	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 05:30:00+00	2025-10-30 06:30:00+00	t	\N	\N
+48635d1a-5e1c-4c75-9eb6-062abad31ca3	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 06:30:00+00	2025-10-30 07:30:00+00	t	\N	\N
+8dc008f8-b6e4-4829-8be6-69086fa03c0f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 07:30:00+00	2025-10-30 08:30:00+00	t	\N	\N
+5d34a3ea-bade-4e76-b654-9d6452d2cda5	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 08:30:00+00	2025-10-30 09:30:00+00	t	\N	\N
+76eecb84-88b4-4132-a976-63fbd08ed789	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 09:30:00+00	2025-10-30 10:30:00+00	t	\N	\N
+25aa1542-1985-4b4d-8f21-e073943922da	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 10:30:00+00	2025-10-30 11:30:00+00	t	\N	\N
+b768ca5a-87f5-4115-bdf7-a30894c35425	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 11:30:00+00	2025-10-30 12:30:00+00	t	\N	\N
+11d32bb4-924b-40c3-a51f-f89b5263e68b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 12:30:00+00	2025-10-30 13:30:00+00	t	\N	\N
+a8f26120-f0d9-4154-b882-93e0ff14d678	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 13:30:00+00	2025-10-30 14:30:00+00	t	\N	\N
+0785851d-3775-464e-9b94-769aa540da66	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-30 14:30:00+00	2025-10-30 15:30:00+00	t	\N	\N
+3e8514c5-06a2-40d9-8a8d-38704edfcba3	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-31 03:30:00+00	2025-10-31 04:30:00+00	t	\N	\N
+26395979-e6b3-4d72-8084-4d36caa6d373	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-31 04:30:00+00	2025-10-31 05:30:00+00	t	\N	\N
+14c05878-8993-4f0d-a150-a325639831c1	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-31 05:30:00+00	2025-10-31 06:30:00+00	t	\N	\N
+c7de8efe-8ca5-4d89-b4b3-090fa0474056	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-31 06:30:00+00	2025-10-31 07:30:00+00	t	\N	\N
+d0e2b333-7532-4df0-86c9-613b812609e3	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-31 07:30:00+00	2025-10-31 08:30:00+00	t	\N	\N
+ea405d06-9e1c-41b7-aa4e-266b8bc1801c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-31 08:30:00+00	2025-10-31 09:30:00+00	t	\N	\N
+b7f2663a-d84e-4610-a27a-591ab9aabec4	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-31 09:30:00+00	2025-10-31 10:30:00+00	t	\N	\N
+72c92cd6-1884-483e-ab7e-47f15b026d28	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-31 10:30:00+00	2025-10-31 11:30:00+00	t	\N	\N
+51617986-d0c1-4f53-9e94-108397347e30	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-31 11:30:00+00	2025-10-31 12:30:00+00	t	\N	\N
+75f40381-c449-4780-8d53-a4c084b7a32d	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-31 12:30:00+00	2025-10-31 13:30:00+00	t	\N	\N
+c1b419c5-51e0-4e25-8c18-873dcb644067	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-31 13:30:00+00	2025-10-31 14:30:00+00	t	\N	\N
+cc707f10-bfc4-495e-9bfa-657b12b3a801	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-31 14:30:00+00	2025-10-31 15:30:00+00	t	\N	\N
+4981f2fc-66cd-40d8-b866-21faea986daa	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-01 03:30:00+00	2025-11-01 04:30:00+00	t	\N	\N
+005a3f36-3821-4f4f-bb65-5078239d9e21	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-01 04:30:00+00	2025-11-01 05:30:00+00	t	\N	\N
+b8f6e7d0-2cf4-476a-b1f5-24ed9504db0e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-01 05:30:00+00	2025-11-01 06:30:00+00	t	\N	\N
+21f6a337-1c4a-4425-a73e-8b5f93af0278	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-01 06:30:00+00	2025-11-01 07:30:00+00	t	\N	\N
+af1f6e65-a3bd-407b-8c7a-f048a10e36f6	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-01 07:30:00+00	2025-11-01 08:30:00+00	t	\N	\N
+93d9d04f-0c73-48c9-8b67-e8ebf0d7b60d	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-01 08:30:00+00	2025-11-01 09:30:00+00	t	\N	\N
+8ce6bf41-fc90-4b7f-9d30-a44e778a989a	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-01 09:30:00+00	2025-11-01 10:30:00+00	t	\N	\N
+99f93528-c7ff-4b30-8944-5b1526f39e79	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-01 10:30:00+00	2025-11-01 11:30:00+00	t	\N	\N
+114a9674-0c0d-4408-a4d1-8cade9659050	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-01 11:30:00+00	2025-11-01 12:30:00+00	t	\N	\N
+d71022b4-5ec9-45c2-95fc-2adaa07b4533	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-01 12:30:00+00	2025-11-01 13:30:00+00	t	\N	\N
+6aa4c1f0-5750-455f-b00e-e9ab9b872708	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-01 13:30:00+00	2025-11-01 14:30:00+00	t	\N	\N
+10f8b6c8-b7c2-4b0b-a3b0-0ce0100429fe	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-01 14:30:00+00	2025-11-01 15:30:00+00	t	\N	\N
+c798f4ec-787c-4d9d-be42-3186bdc1b110	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 03:30:00+00	2025-11-02 04:30:00+00	t	\N	\N
+13757792-68b5-48db-9aa1-473521bee0fe	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 04:30:00+00	2025-11-02 05:30:00+00	t	\N	\N
+f10709fb-f51d-4658-8a54-60d7a1f7a47e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 05:30:00+00	2025-11-02 06:30:00+00	t	\N	\N
+0b0a9d6c-c9c9-4b07-9ae8-1f44be91a50e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 06:30:00+00	2025-11-02 07:30:00+00	t	\N	\N
+2d07085c-3261-4ddb-b015-78b4ee752c99	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 07:30:00+00	2025-11-02 08:30:00+00	t	\N	\N
+62326d66-cb7c-4d2c-b0ee-afbdf52a646f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 08:30:00+00	2025-11-02 09:30:00+00	t	\N	\N
+29ce962e-5492-4c9b-8b77-1fb017f66d8a	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 09:30:00+00	2025-11-02 10:30:00+00	t	\N	\N
+8d22343b-4a43-45a5-83a8-34b79ad25a63	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 10:30:00+00	2025-11-02 11:30:00+00	t	\N	\N
+6ea228ab-24d4-41fb-ba50-162150f6aab0	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 11:30:00+00	2025-11-02 12:30:00+00	t	\N	\N
+84ca38c4-d508-45ce-9b3d-dc84ffeab464	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 12:30:00+00	2025-11-02 13:30:00+00	t	\N	\N
+244d03ce-f04f-452a-9990-4468142a7f2c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 13:30:00+00	2025-11-02 14:30:00+00	t	\N	\N
+f6e3e707-e682-4fcc-9949-05dfb649dbde	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 14:30:00+00	2025-11-02 15:30:00+00	t	\N	\N
+1d488336-490b-4799-976e-d82aa4498eeb	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 03:30:00+00	2025-10-27 04:30:00+00	f	\N	\N
 \.
 
 
@@ -7622,7 +6658,7 @@ COPY vault.secrets (id, name, description, secret, key_id, nonce, created_at, up
 -- Name: refresh_tokens_id_seq; Type: SEQUENCE SET; Schema: auth; Owner: supabase_auth_admin
 --
 
-SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 713, true);
+SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 725, true);
 
 
 --
@@ -7886,6 +6922,14 @@ ALTER TABLE ONLY public.amenities
 
 ALTER TABLE ONLY public.bookings
     ADD CONSTRAINT bookings_pkey PRIMARY KEY (booking_id);
+
+
+--
+-- Name: bookings bookings_slot_id_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.bookings
+    ADD CONSTRAINT bookings_slot_id_unique UNIQUE (slot_id);
 
 
 --
@@ -8949,6 +7993,14 @@ ALTER TABLE ONLY public.bookings
 
 ALTER TABLE ONLY public.bookings
     ADD CONSTRAINT bookings_facility_id_fkey FOREIGN KEY (facility_id) REFERENCES public.facilities(facility_id) ON DELETE CASCADE;
+
+
+--
+-- Name: bookings bookings_offer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.bookings
+    ADD CONSTRAINT bookings_offer_id_fkey FOREIGN KEY (offer_id) REFERENCES public.offers(offer_id) ON DELETE SET NULL;
 
 
 --
