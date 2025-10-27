@@ -511,7 +511,7 @@ function VenuePage() {
         </div>
       )}
 
-      <style jsx>{`
+      <style>{`
         .venue-image-swiper .swiper-pagination-bullet {
           background: white;
           opacity: 0.7;
