@@ -3839,7 +3839,8 @@ CREATE TABLE public.bookings (
     cancelled_at timestamp with time zone,
     cancelled_by uuid,
     cancellation_reason text,
-    offer_id uuid
+    offer_id uuid,
+    discount_amount numeric(10,2) DEFAULT 0.00
 );
 
 
@@ -3925,6 +3926,22 @@ CREATE TABLE public.favorites (
 ALTER TABLE public.favorites OWNER TO postgres;
 
 --
+-- Name: offer_redemptions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.offer_redemptions (
+    redemption_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    offer_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    booking_id uuid NOT NULL,
+    redeemed_at timestamp with time zone DEFAULT now(),
+    discount_amount numeric(10,2) NOT NULL
+);
+
+
+ALTER TABLE public.offer_redemptions OWNER TO postgres;
+
+--
 -- Name: offer_sports; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -3953,7 +3970,13 @@ CREATE TABLE public.offers (
     is_global boolean DEFAULT false,
     background_image_url text,
     offer_code character varying(50),
-    applies_to_all_sports boolean DEFAULT false
+    applies_to_all_sports boolean DEFAULT false,
+    offer_type text DEFAULT 'percentage_discount'::text,
+    fixed_discount_amount numeric(10,2),
+    max_uses integer,
+    max_uses_per_user integer,
+    min_booking_value numeric(10,2),
+    CONSTRAINT offers_offer_type_check CHECK ((offer_type = ANY (ARRAY['percentage_discount'::text, 'fixed_amount_discount'::text])))
 );
 
 
@@ -5736,6 +5759,34 @@ COPY auth.audit_log_entries (instance_id, id, payload, created_at, ip_address) F
 00000000-0000-0000-0000-000000000000	0df913e3-d312-4332-99a3-d98698ee4510	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-26 16:12:23.091999+00	
 00000000-0000-0000-0000-000000000000	93d36b60-9890-4340-a132-5f3f305caad2	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-26 16:13:46.303727+00	
 00000000-0000-0000-0000-000000000000	0ace1d6f-fa4c-4740-9100-36af1dcd276d	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-26 16:13:50.844488+00	
+00000000-0000-0000-0000-000000000000	98a201a2-df16-4898-8ca5-4390203c31a2	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-26 16:50:36.230736+00	
+00000000-0000-0000-0000-000000000000	3cb54149-4e63-4db4-9ef5-3eb0e53194d7	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-26 16:50:41.027353+00	
+00000000-0000-0000-0000-000000000000	cb45298c-b8fe-48b4-a8a4-424bb676896c	{"action":"token_refreshed","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-10-26 18:21:13.127832+00	
+00000000-0000-0000-0000-000000000000	fcb7d5e1-3b78-4d89-8978-02dae58915b3	{"action":"token_revoked","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-10-26 18:21:13.15359+00	
+00000000-0000-0000-0000-000000000000	20cb115c-bf28-4f94-a933-5c29a45dba39	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-26 18:24:03.308595+00	
+00000000-0000-0000-0000-000000000000	fcf90247-4dcd-4775-857c-9e37e0c76bfc	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-26 18:24:09.282296+00	
+00000000-0000-0000-0000-000000000000	6a413d67-6ff8-4b2f-861d-92ede5fbec81	{"action":"token_refreshed","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-10-27 04:57:48.716301+00	
+00000000-0000-0000-0000-000000000000	62da7965-d6dd-4393-8531-23c1078825ff	{"action":"token_revoked","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-10-27 04:57:48.747391+00	
+00000000-0000-0000-0000-000000000000	70ed2bcd-f8b3-4815-b237-3108f0808921	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-27 05:04:56.191779+00	
+00000000-0000-0000-0000-000000000000	a9d34dd1-e4b1-4fbf-a65e-fc0b69e8f746	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-27 05:05:00.13479+00	
+00000000-0000-0000-0000-000000000000	464de899-30d3-46dd-8d6d-ada15df5a25d	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-27 05:08:25.757678+00	
+00000000-0000-0000-0000-000000000000	faf054bc-fdde-4549-9bd1-56351239304a	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-27 05:08:30.017581+00	
+00000000-0000-0000-0000-000000000000	9b5a9a2c-4151-41ec-8aa0-8f229438a409	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-27 05:36:40.935604+00	
+00000000-0000-0000-0000-000000000000	ca2b8534-e14c-4d30-92f1-5b856bf5a8d7	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-27 05:36:46.649404+00	
+00000000-0000-0000-0000-000000000000	b10eef91-a4a5-41e7-a977-d7dab801c123	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-27 05:38:08.209852+00	
+00000000-0000-0000-0000-000000000000	bdba6011-2ed2-4668-b708-2051bb4d2599	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-27 05:38:22.954326+00	
+00000000-0000-0000-0000-000000000000	2cb392d3-57eb-4e27-9f8c-28cbcbef28c2	{"action":"token_refreshed","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-10-27 08:54:19.423066+00	
+00000000-0000-0000-0000-000000000000	e8afe5c5-8de7-4a6d-b36f-3d1ea83c9872	{"action":"token_revoked","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-10-27 08:54:19.459612+00	
+00000000-0000-0000-0000-000000000000	f112dc53-e9b7-4fd7-8344-c33f190855df	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-27 09:21:45.029626+00	
+00000000-0000-0000-0000-000000000000	4ee82e0e-7eba-404e-8d02-bf5253b458c2	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-27 09:22:02.335564+00	
+00000000-0000-0000-0000-000000000000	4c81446e-5b7b-479c-a116-120235f58eb0	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-10-27 09:23:05.088388+00	
+00000000-0000-0000-0000-000000000000	2bed5832-fc34-4340-ae84-906c1ba0033d	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-27 09:23:10.104558+00	
+00000000-0000-0000-0000-000000000000	38b865bf-57f8-4228-b027-08eff287d590	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-10-27 09:24:36.848447+00	
+00000000-0000-0000-0000-000000000000	90828ad8-54ce-4601-bd93-2d955a94df63	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-27 09:24:41.301277+00	
+00000000-0000-0000-0000-000000000000	ebd9fa43-1ad8-4e6b-9159-37297a374865	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-10-27 09:24:55.310633+00	
+00000000-0000-0000-0000-000000000000	db38a841-d17b-4414-9eed-205f546ea512	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-10-27 09:25:00.430385+00	
+00000000-0000-0000-0000-000000000000	f75fc8f9-e73f-4f9e-8568-f6ce106564f2	{"action":"token_refreshed","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-10-28 07:56:56.563399+00	
+00000000-0000-0000-0000-000000000000	1f710ae7-c7a3-4183-bcb1-7685b6dccb3e	{"action":"token_revoked","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-10-28 07:56:56.59878+00	
 \.
 
 
@@ -5773,7 +5824,7 @@ COPY auth.instances (id, uuid, raw_base_config, created_at, updated_at) FROM std
 --
 
 COPY auth.mfa_amr_claims (session_id, created_at, updated_at, authentication_method, id) FROM stdin;
-64fbc8b6-4530-4432-befa-8ce49eba4b9c	2025-10-26 16:13:50.87246+00	2025-10-26 16:13:50.87246+00	password	aba4018b-e409-4fb2-8e90-37cd9fee9c46
+dec831f4-dc37-468a-9cf6-5b544e22dc33	2025-10-27 09:25:00.444984+00	2025-10-27 09:25:00.444984+00	password	69c2d168-a8e1-4e0b-87df-2b98a8133370
 \.
 
 
@@ -5830,7 +5881,8 @@ COPY auth.one_time_tokens (id, user_id, token_type, token_hash, relates_to, crea
 --
 
 COPY auth.refresh_tokens (instance_id, id, token, user_id, revoked, created_at, updated_at, parent, session_id) FROM stdin;
-00000000-0000-0000-0000-000000000000	725	6e2hxwvptrnb	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f	2025-10-26 16:13:50.859554+00	2025-10-26 16:13:50.859554+00	\N	64fbc8b6-4530-4432-befa-8ce49eba4b9c
+00000000-0000-0000-0000-000000000000	738	3fockkr6br4y	c90139a0-2de3-4237-89b8-032367f73a37	t	2025-10-27 09:25:00.442517+00	2025-10-28 07:56:56.601474+00	\N	dec831f4-dc37-468a-9cf6-5b544e22dc33
+00000000-0000-0000-0000-000000000000	739	lnhrszs2k3ni	c90139a0-2de3-4237-89b8-032367f73a37	f	2025-10-28 07:56:56.626445+00	2025-10-28 07:56:56.626445+00	3fockkr6br4y	dec831f4-dc37-468a-9cf6-5b544e22dc33
 \.
 
 
@@ -5930,7 +5982,7 @@ COPY auth.schema_migrations (version) FROM stdin;
 --
 
 COPY auth.sessions (id, user_id, created_at, updated_at, factor_id, aal, not_after, refreshed_at, user_agent, ip, tag, oauth_client_id) FROM stdin;
-64fbc8b6-4530-4432-befa-8ce49eba4b9c	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2025-10-26 16:13:50.850743+00	2025-10-26 16:13:50.850743+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0	49.36.89.20	\N	\N
+dec831f4-dc37-468a-9cf6-5b544e22dc33	c90139a0-2de3-4237-89b8-032367f73a37	2025-10-27 09:25:00.441585+00	2025-10-28 07:56:56.660394+00	\N	aal1	\N	2025-10-28 07:56:56.660302	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0	49.36.89.152	\N	\N
 \.
 
 
@@ -5955,10 +6007,10 @@ COPY auth.sso_providers (id, resource_id, created_at, updated_at, disabled) FROM
 --
 
 COPY auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, invited_at, confirmation_token, confirmation_sent_at, recovery_token, recovery_sent_at, email_change_token_new, email_change, email_change_sent_at, last_sign_in_at, raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at, phone, phone_confirmed_at, phone_change, phone_change_token, phone_change_sent_at, email_change_token_current, email_change_confirm_status, banned_until, reauthentication_token, reauthentication_sent_at, is_sso_user, deleted_at, is_anonymous) FROM stdin;
-00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$IAvXmD9RhMUIQWJlFk8BY.MkX1opB5IqVu4w7nJ63C/TMcq0aH66i	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-10-26 16:13:50.850645+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-10-26 16:13:50.871687+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	e86f726e-9210-47ca-8dc7-c84d46cc55e2	authenticated	authenticated	admin@playnation.com	$2a$10$Odpx/MPYwsSsCf4Uiywd1OgDxHtZ8IXE7531egy3pILZ0da.1sAMu	2025-08-10 08:50:46.562958+00	\N		\N		\N			\N	2025-10-24 13:55:17.168679+00	{"provider": "email", "providers": ["email"]}	{"email_verified": true}	\N	2025-08-10 08:50:46.541627+00	2025-10-24 13:55:17.175115+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	e86f726e-9210-47ca-8dc7-c84d46cc55e2	authenticated	authenticated	admin@playnation.com	$2a$10$Odpx/MPYwsSsCf4Uiywd1OgDxHtZ8IXE7531egy3pILZ0da.1sAMu	2025-08-10 08:50:46.562958+00	\N		\N		\N			\N	2025-10-27 09:24:41.309021+00	{"provider": "email", "providers": ["email"]}	{"email_verified": true}	\N	2025-08-10 08:50:46.541627+00	2025-10-27 09:24:41.3296+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-10-27 09:25:00.441477+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-10-28 07:56:56.641142+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	073c625c-eb02-45e8-9c67-50acbdc72cd6	authenticated	authenticated	harsh@gmail.com	$2a$10$4KK/J4ROUoG4YacY/9oQluMayEemAbAWOSoXzXwIOg53cosk3zCLm	2025-08-10 08:14:37.525903+00	\N		\N		\N			\N	2025-10-12 20:33:30.8828+00	{"provider": "email", "providers": ["email"]}	{"sub": "073c625c-eb02-45e8-9c67-50acbdc72cd6", "email": "harsh@gmail.com", "last_name": "shah", "first_name": "harsh", "email_verified": true, "phone_verified": false}	\N	2025-08-10 08:14:37.499555+00	2025-10-12 20:33:30.884608+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-10-26 16:12:23.098548+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-10-26 16:12:23.104515+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$IAvXmD9RhMUIQWJlFk8BY.MkX1opB5IqVu4w7nJ63C/TMcq0aH66i	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-10-27 05:38:22.955203+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-10-27 08:54:19.505079+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	38f0c23d-4d25-42cd-8ec0-426d6636eecd	authenticated	authenticated	fenil@gmail.com	$2a$10$wC5LDx6u5k8FTIHrKPOEwOm1f21cVE8.SfhPAjB.W6wxEek7Ig9ZC	2025-10-12 09:33:09.062174+00	\N		\N		\N			\N	2025-10-12 09:37:48.705186+00	{"provider": "email", "providers": ["email"]}	{"sub": "38f0c23d-4d25-42cd-8ec0-426d6636eecd", "role": "player", "email": "fenil@gmail.com", "username": "fenill", "last_name": "pastagia", "first_name": "fenil", "phone_number": "7586214860", "email_verified": true, "phone_verified": false}	\N	2025-10-12 09:33:09.015285+00	2025-10-12 11:24:56.534367+00	\N	\N			\N		0	\N		\N	f	\N	f
 \.
 
@@ -6010,8 +6062,19 @@ COPY public.backup_reviews (review_id, user_id, venue_id, rating, comment, creat
 -- Data for Name: bookings; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.bookings (booking_id, user_id, facility_id, slot_id, start_time, end_time, total_amount, status, payment_status, customer_name, customer_phone, created_at, has_been_reviewed, cancelled_at, cancelled_by, cancellation_reason, offer_id) FROM stdin;
-aefa391c-a40e-49a4-be71-947e5a2eb8bc	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	1d488336-490b-4799-976e-d82aa4498eeb	2025-10-27 03:30:00+00	2025-10-27 04:30:00+00	1500	confirmed	paid	\N	\N	2025-10-26 16:02:22.32131+00	f	\N	\N	\N	\N
+COPY public.bookings (booking_id, user_id, facility_id, slot_id, start_time, end_time, total_amount, status, payment_status, customer_name, customer_phone, created_at, has_been_reviewed, cancelled_at, cancelled_by, cancellation_reason, offer_id, discount_amount) FROM stdin;
+aefa391c-a40e-49a4-be71-947e5a2eb8bc	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	1d488336-490b-4799-976e-d82aa4498eeb	2025-10-27 03:30:00+00	2025-10-27 04:30:00+00	1500	cancelled	paid	\N	\N	2025-10-26 16:02:22.32131+00	f	2025-10-26 18:36:31.131169+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	can not attend	\N	0.00
+dbe0ef3b-1715-4353-b13a-16a94fc57bd6	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	37a26c29-b46c-4219-9d99-c3bff47149c3	2025-10-27 04:30:00+00	2025-10-27 05:30:00+00	1500	cancelled	paid	\N	\N	2025-10-26 18:24:46.24013+00	f	2025-10-26 18:36:41.94325+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	mood change	\N	0.00
+ce4cd75f-5cb7-481f-bdc4-2ee118dca2d1	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	c1e3ae78-f097-48b0-a002-99e6422f026a	2025-10-28 04:30:00+00	2025-10-28 05:30:00+00	1500	cancelled	paid	\N	\N	2025-10-26 18:28:21.780572+00	f	2025-10-26 18:36:59.133708+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	plan canceled	\N	0.00
+9ec08b36-b4a8-4615-b9b4-dac2cae7cded	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	237f88e6-0418-40d5-b413-41f565420c22	2025-10-27 05:30:00+00	2025-10-27 06:30:00+00	1500	confirmed	paid	\N	\N	2025-10-26 18:37:23.450715+00	f	\N	\N	\N	\N	0.00
+48319894-70bd-4a7a-87a9-b06dded181db	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	6ba5e729-2d8e-4885-b967-2d43c9e9671e	2025-10-27 07:30:00+00	2025-10-27 08:30:00+00	1500	confirmed	paid	\N	\N	2025-10-26 18:46:18.568882+00	f	\N	\N	\N	\N	0.00
+2dec1e79-b258-41b1-ba00-8de78f9177ea	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	a6b54493-8329-42b9-a806-1ee1a6371fc6	2025-10-27 08:30:00+00	2025-10-27 09:30:00+00	1500	confirmed	paid	\N	\N	2025-10-26 18:51:45.89385+00	f	\N	\N	\N	\N	0.00
+c4af0782-0710-4677-b9be-a59c43f5b0da	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	073f2e7a-27a8-4040-9446-81e8d6808407	2025-10-27 14:30:00+00	2025-10-27 15:30:00+00	1500	confirmed	paid	\N	\N	2025-10-26 18:58:47.005517+00	f	\N	\N	\N	\N	0.00
+6b983ade-46b7-449d-9656-16f490b7479f	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	4b84ea83-0e7d-4434-a711-5c1fe57e6569	2025-10-27 09:30:00+00	2025-10-27 10:30:00+00	1500	confirmed	paid	\N	\N	2025-10-27 04:58:06.82174+00	f	\N	\N	\N	\N	0.00
+2f117542-9589-4892-bd79-eb34ff95963f	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	295eda2a-b265-483e-9f3d-7b59423a471f	2025-10-27 10:30:00+00	2025-10-27 11:30:00+00	1500	cancelled	paid	\N	\N	2025-10-27 05:09:19.555863+00	f	2025-10-27 05:10:42.063087+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	change of plans	\N	0.00
+1ec59150-b23a-47c6-87f6-3b70cdbaf8d1	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	0d0616a0-231d-4632-b3b5-457e4788aa84	2025-10-27 11:30:00+00	2025-10-27 12:30:00+00	750	confirmed	paid	\N	\N	2025-10-27 05:28:22.278736+00	f	\N	\N	\N	d56674f1-84c3-45a7-83aa-0a69cbcc4b67	750.00
+b550beba-247f-47e7-bae1-796b6775cdce	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	bf988186-da29-4d9f-9e28-3da2ad301bfc	2025-10-27 13:30:00+00	2025-10-27 14:30:00+00	750	confirmed	paid	\N	\N	2025-10-27 05:34:02.824486+00	f	\N	\N	\N	d56674f1-84c3-45a7-83aa-0a69cbcc4b67	750.00
+2a005364-fd54-460c-b85e-c8114bb7dc77	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	b68fb6c3-1ee2-4d87-acc3-ffe51b5262af	2025-10-27 12:30:00+00	2025-10-27 13:30:00+00	1125	confirmed	paid	\N	\N	2025-10-27 05:38:41.720094+00	f	\N	\N	\N	989fcd98-02f3-40ad-ab3d-60618faeee84	375.00
 \.
 
 
@@ -6094,6 +6157,17 @@ COPY public.favorites (user_id, venue_id, created_at) FROM stdin;
 
 
 --
+-- Data for Name: offer_redemptions; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.offer_redemptions (redemption_id, offer_id, user_id, booking_id, redeemed_at, discount_amount) FROM stdin;
+a640fda2-e454-48ff-b3bb-a856f9f72576	d56674f1-84c3-45a7-83aa-0a69cbcc4b67	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	1ec59150-b23a-47c6-87f6-3b70cdbaf8d1	2025-10-27 05:28:22.321766+00	750.00
+c8cc1ef0-506b-4b5b-b7a2-1caef7799ec1	d56674f1-84c3-45a7-83aa-0a69cbcc4b67	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	b550beba-247f-47e7-bae1-796b6775cdce	2025-10-27 05:34:02.873129+00	750.00
+94ad9ac0-3519-4bc7-8db8-46b9edaa56c0	989fcd98-02f3-40ad-ab3d-60618faeee84	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2a005364-fd54-460c-b85e-c8114bb7dc77	2025-10-27 05:38:41.757346+00	375.00
+\.
+
+
+--
 -- Data for Name: offer_sports; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -6105,10 +6179,9 @@ COPY public.offer_sports (offer_id, sport_id) FROM stdin;
 -- Data for Name: offers; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.offers (offer_id, venue_id, title, description, discount_percentage, is_active, valid_from, valid_until, created_at, is_global, background_image_url, offer_code, applies_to_all_sports) FROM stdin;
-0f575722-8123-4148-8525-b25950cd972d	\N	25% Off on weekdays	25% off on all venues for weekdays	25.00	t	2025-10-06 00:00:00+00	2025-10-13 00:00:00+00	2025-10-06 11:30:13.341723+00	t	\N	25WEEK	t
-dd592e08-0f54-4de3-8024-6c524a4f8e2b	1f72fb3d-916d-477a-9e2e-5abd9e21c4da	10% OFF	10% off on Fun & play	10.00	t	2025-10-06 00:00:00+00	2025-10-11 00:00:00+00	2025-10-06 12:17:10.792218+00	f		\N	f
-cd02944b-a06e-432c-a76f-12551906592a	1f72fb3d-916d-477a-9e2e-5abd9e21c4da	50% OFF	Get 50% off on selected venues	9.00	t	2025-10-26 00:00:00+00	2025-11-08 00:00:00+00	2025-10-26 16:13:34.324773+00	f		\N	f
+COPY public.offers (offer_id, venue_id, title, description, discount_percentage, is_active, valid_from, valid_until, created_at, is_global, background_image_url, offer_code, applies_to_all_sports, offer_type, fixed_discount_amount, max_uses, max_uses_per_user, min_booking_value) FROM stdin;
+989fcd98-02f3-40ad-ab3d-60618faeee84	1f72fb3d-916d-477a-9e2e-5abd9e21c4da	25% off	Get 25% off	25.00	t	2025-10-27 00:00:00+00	2025-11-01 00:00:00+00	2025-10-27 05:37:56.285755+00	f	\N	25OFF	t	percentage_discount	\N	\N	1	\N
+d56674f1-84c3-45a7-83aa-0a69cbcc4b67	1f72fb3d-916d-477a-9e2e-5abd9e21c4da	50% Off 	Get flat 50% off on all the bookings	50.00	f	\N	\N	2025-10-27 05:08:11.496475+00	f	\N	50OFF	t	percentage_discount	\N	\N	\N	\N
 \.
 
 
@@ -6170,19 +6243,8 @@ c1e03c28-9b95-46cb-950b-bd646aa20032	9566ee54-1213-482b-b766-6d0f87c88776	2025-1
 f48cffb1-1bc9-4cb9-a62b-f8147081097d	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 12:30:00+00	2025-10-26 13:30:00+00	t	\N	\N
 8f124294-637b-4591-ad42-ca33bb6179d9	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 13:30:00+00	2025-10-26 14:30:00+00	t	\N	\N
 6401d921-e38e-47e0-a43d-1d22b6273149	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-26 14:30:00+00	2025-10-26 15:30:00+00	t	\N	\N
-37a26c29-b46c-4219-9d99-c3bff47149c3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 04:30:00+00	2025-10-27 05:30:00+00	t	\N	\N
-237f88e6-0418-40d5-b413-41f565420c22	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 05:30:00+00	2025-10-27 06:30:00+00	t	\N	\N
 2930c851-94cb-4caa-b02d-18f03028c474	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 06:30:00+00	2025-10-27 07:30:00+00	t	\N	\N
-6ba5e729-2d8e-4885-b967-2d43c9e9671e	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 07:30:00+00	2025-10-27 08:30:00+00	t	\N	\N
-a6b54493-8329-42b9-a806-1ee1a6371fc6	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 08:30:00+00	2025-10-27 09:30:00+00	t	\N	\N
-4b84ea83-0e7d-4434-a711-5c1fe57e6569	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 09:30:00+00	2025-10-27 10:30:00+00	t	\N	\N
-295eda2a-b265-483e-9f3d-7b59423a471f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 10:30:00+00	2025-10-27 11:30:00+00	t	\N	\N
-0d0616a0-231d-4632-b3b5-457e4788aa84	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 11:30:00+00	2025-10-27 12:30:00+00	t	\N	\N
-b68fb6c3-1ee2-4d87-acc3-ffe51b5262af	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 12:30:00+00	2025-10-27 13:30:00+00	t	\N	\N
-bf988186-da29-4d9f-9e28-3da2ad301bfc	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 13:30:00+00	2025-10-27 14:30:00+00	t	\N	\N
-073f2e7a-27a8-4040-9446-81e8d6808407	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 14:30:00+00	2025-10-27 15:30:00+00	t	\N	\N
 3f5c5ee3-6b50-44ba-8f2c-b7b52481bd12	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 03:30:00+00	2025-10-28 04:30:00+00	t	\N	\N
-c1e3ae78-f097-48b0-a002-99e6422f026a	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 04:30:00+00	2025-10-28 05:30:00+00	t	\N	\N
 1e8bee7b-973a-4420-b71c-4a8665c3a478	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 05:30:00+00	2025-10-28 06:30:00+00	t	\N	\N
 471525f8-89c0-4b3f-a4a7-9280b23642a0	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 06:30:00+00	2025-10-28 07:30:00+00	t	\N	\N
 f277244a-8c47-4fa8-b8fd-245715b36efb	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 07:30:00+00	2025-10-28 08:30:00+00	t	\N	\N
@@ -6254,6 +6316,16 @@ edf75837-11ab-4a3c-9f90-b8d026980e70	9566ee54-1213-482b-b766-6d0f87c88776	2025-1
 f02fb62a-19af-4a23-8e56-113fd423834f	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 13:30:00+00	2025-11-02 14:30:00+00	t	\N	\N
 46e38576-d7a2-466a-852a-ac3a79d34f32	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-02 14:30:00+00	2025-11-02 15:30:00+00	t	\N	\N
 57a8cca2-0a96-457b-b988-a0c2e4d6edaa	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 03:30:00+00	2025-10-26 04:30:00+00	t	\N	\N
+37a26c29-b46c-4219-9d99-c3bff47149c3	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 04:30:00+00	2025-10-27 05:30:00+00	f	\N	\N
+237f88e6-0418-40d5-b413-41f565420c22	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 05:30:00+00	2025-10-27 06:30:00+00	f	\N	\N
+6ba5e729-2d8e-4885-b967-2d43c9e9671e	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 07:30:00+00	2025-10-27 08:30:00+00	f	\N	\N
+a6b54493-8329-42b9-a806-1ee1a6371fc6	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 08:30:00+00	2025-10-27 09:30:00+00	f	\N	\N
+4b84ea83-0e7d-4434-a711-5c1fe57e6569	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 09:30:00+00	2025-10-27 10:30:00+00	f	\N	\N
+295eda2a-b265-483e-9f3d-7b59423a471f	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 10:30:00+00	2025-10-27 11:30:00+00	f	\N	\N
+0d0616a0-231d-4632-b3b5-457e4788aa84	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 11:30:00+00	2025-10-27 12:30:00+00	f	\N	\N
+bf988186-da29-4d9f-9e28-3da2ad301bfc	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 13:30:00+00	2025-10-27 14:30:00+00	f	\N	\N
+b68fb6c3-1ee2-4d87-acc3-ffe51b5262af	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 12:30:00+00	2025-10-27 13:30:00+00	f	\N	\N
+c1e3ae78-f097-48b0-a002-99e6422f026a	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-28 04:30:00+00	2025-10-28 05:30:00+00	t	\N	\N
 f9429817-c9e8-4cde-9f95-b9d9be7ddda4	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 04:30:00+00	2025-10-26 05:30:00+00	t	\N	\N
 7ee44d0a-867c-4167-840d-0bfdb5537e4b	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 05:30:00+00	2025-10-26 06:30:00+00	t	\N	\N
 a95ebaaa-f068-4af1-bd43-47ab927ba56f	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-10-26 06:30:00+00	2025-10-26 07:30:00+00	t	\N	\N
@@ -6350,6 +6422,7 @@ f10709fb-f51d-4658-8a54-60d7a1f7a47e	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-1
 244d03ce-f04f-452a-9990-4468142a7f2c	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 13:30:00+00	2025-11-02 14:30:00+00	t	\N	\N
 f6e3e707-e682-4fcc-9949-05dfb649dbde	ac55c1c9-cfb3-4ad6-a099-ffaee8470547	2025-11-02 14:30:00+00	2025-11-02 15:30:00+00	t	\N	\N
 1d488336-490b-4799-976e-d82aa4498eeb	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 03:30:00+00	2025-10-27 04:30:00+00	f	\N	\N
+073f2e7a-27a8-4040-9446-81e8d6808407	9566ee54-1213-482b-b766-6d0f87c88776	2025-10-27 14:30:00+00	2025-10-27 15:30:00+00	f	\N	\N
 \.
 
 
@@ -6658,7 +6731,7 @@ COPY vault.secrets (id, name, description, secret, key_id, nonce, created_at, up
 -- Name: refresh_tokens_id_seq; Type: SEQUENCE SET; Schema: auth; Owner: supabase_auth_admin
 --
 
-SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 725, true);
+SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 739, true);
 
 
 --
@@ -6973,11 +7046,35 @@ ALTER TABLE ONLY public.favorites
 
 
 --
+-- Name: offer_redemptions offer_redemptions_offer_id_user_id_booking_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.offer_redemptions
+    ADD CONSTRAINT offer_redemptions_offer_id_user_id_booking_id_key UNIQUE (offer_id, user_id, booking_id);
+
+
+--
+-- Name: offer_redemptions offer_redemptions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.offer_redemptions
+    ADD CONSTRAINT offer_redemptions_pkey PRIMARY KEY (redemption_id);
+
+
+--
 -- Name: offer_sports offer_sports_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.offer_sports
     ADD CONSTRAINT offer_sports_pkey PRIMARY KEY (offer_id, sport_id);
+
+
+--
+-- Name: offers offers_offer_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.offers
+    ADD CONSTRAINT offers_offer_code_key UNIQUE (offer_code);
 
 
 --
@@ -7621,6 +7718,20 @@ CREATE INDEX idx_favorites_user_id ON public.favorites USING btree (user_id);
 
 
 --
+-- Name: idx_offer_redemptions_offer_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_offer_redemptions_offer_id ON public.offer_redemptions USING btree (offer_id);
+
+
+--
+-- Name: idx_offer_redemptions_user_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_offer_redemptions_user_id ON public.offer_redemptions USING btree (user_id);
+
+
+--
 -- Name: idx_offers_venue_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -8073,6 +8184,30 @@ ALTER TABLE ONLY public.favorites
 
 ALTER TABLE ONLY public.favorites
     ADD CONSTRAINT favorites_venue_id_fkey FOREIGN KEY (venue_id) REFERENCES public.venues(venue_id) ON DELETE CASCADE;
+
+
+--
+-- Name: offer_redemptions offer_redemptions_booking_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.offer_redemptions
+    ADD CONSTRAINT offer_redemptions_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES public.bookings(booking_id) ON DELETE CASCADE;
+
+
+--
+-- Name: offer_redemptions offer_redemptions_offer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.offer_redemptions
+    ADD CONSTRAINT offer_redemptions_offer_id_fkey FOREIGN KEY (offer_id) REFERENCES public.offers(offer_id) ON DELETE CASCADE;
+
+
+--
+-- Name: offer_redemptions offer_redemptions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.offer_redemptions
+    ADD CONSTRAINT offer_redemptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE;
 
 
 --
@@ -9932,6 +10067,15 @@ GRANT ALL ON TABLE public.facility_amenities TO service_role;
 GRANT ALL ON TABLE public.favorites TO anon;
 GRANT ALL ON TABLE public.favorites TO authenticated;
 GRANT ALL ON TABLE public.favorites TO service_role;
+
+
+--
+-- Name: TABLE offer_redemptions; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.offer_redemptions TO anon;
+GRANT ALL ON TABLE public.offer_redemptions TO authenticated;
+GRANT ALL ON TABLE public.offer_redemptions TO service_role;
 
 
 --
