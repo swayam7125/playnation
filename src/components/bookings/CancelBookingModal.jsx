@@ -10,6 +10,11 @@ const CancelBookingModal = ({ booking, isOpen, onClose, onSubmit }) => {
 
   if (!isOpen) return null;
 
+  // --- START OF CHANGE ---
+  // Get the dynamic cancellation policy from the booking object
+  const cutoffHours = booking?.facilities?.venues?.cancellation_cutoff_hours ?? 24; // Default to 24 if not found
+  // --- END OF CHANGE ---
+
   const handleSubmit = async () => {
     if (!reason.trim()) {
       setError("Please provide a reason for cancellation.");
@@ -52,17 +57,20 @@ const CancelBookingModal = ({ booking, isOpen, onClose, onSubmit }) => {
 
         {/* Body */}
         <div className="p-6 space-y-4">
-          {/* Cancellation Policy */}
+          
+          {/* --- START OF CHANGE: Dynamic Cancellation Policy --- */}
           <div className="flex items-start gap-3 rounded-lg border border-yellow-300 bg-yellow-50 p-4">
             <AlertTriangle className="h-5 w-5 flex-shrink-0 text-yellow-500" />
             <div>
               <h4 className="font-semibold text-yellow-800">Cancellation Policy</h4>
               <p className="mt-1 text-sm text-yellow-700">
-                Please note: All cancellations are final. As per our policy, 
-                **no refund will be issued** for this cancellation.
+                This venue allows free cancellation up to 
+                <strong> {cutoffHours} {cutoffHours === 1 ? 'hour' : 'hours'} </strong> 
+                before the booking time. Please note: All cancellations are final.
               </p>
             </div>
           </div>
+          {/* --- END OF CHANGE --- */}
 
           {/* Reason Textbox */}
           <div>

@@ -7,7 +7,7 @@ import { useModal } from '../../ModalContext';
 import {
   FaTrash, FaPlus, FaEdit, FaSave, FaTimes, FaMapMarkerAlt,
   FaClock, FaPhone, FaEnvelope, FaUpload, FaEye, FaUsers,
-  FaRupeeSign, FaStar
+  FaRupeeSign, FaStar, FaShieldAlt // 👈 Import new icon
 } from 'react-icons/fa';
 import { v4 as uuidv4 } from 'uuid'; // Import uuid for unique filenames
 import LocationPickerMap from '../../components/maps/LocationPickerMap'; // Import map picker
@@ -70,8 +70,8 @@ function EditVenuePage() {
     const [activeTab, setActiveTab] = useState('details');
     const [venueDetails, setVenueDetails] = useState({
         name: '', address: '', city: '', state: '', zip_code: '', description: '',
-        contact_email: '', contact_phone: '', opening_time: '', closing_time: '', google_maps_url: ''
-        // Removed latitude, longitude - will be handled by map state
+        contact_email: '', contact_phone: '', opening_time: '', closing_time: '', google_maps_url: '',
+        cancellation_cutoff_hours: 24 // 👈 Add default value
     });
 
     // State to manage images
@@ -96,7 +96,7 @@ function EditVenuePage() {
 
             const { data: venueData, error } = await supabase
                 .from('venues')
-                .select(`*, facilities(*, sports(name), time_slots(count))`)
+                .select(`*, facilities(*, sports(name), time_slots(count))`) // 👈 `*` will get the new policy column
                 .eq('venue_id', venueId)
                 .single();
 
@@ -124,8 +124,8 @@ function EditVenuePage() {
                 contact_phone: venueData.contact_phone || '',
                 opening_time: venueData.opening_time || '',
                 closing_time: venueData.closing_time || '',
-                google_maps_url: venueData.google_maps_url || ''
-                // Don't set lat/lng in venueDetails directly anymore
+                google_maps_url: venueData.google_maps_url || '',
+                cancellation_cutoff_hours: venueData.cancellation_cutoff_hours ?? 24 // 👈 Set from fetched data
             });
             // Set initial map position if coordinates exist
              if (venueData.latitude && venueData.longitude) {
@@ -290,7 +290,8 @@ function EditVenuePage() {
                  throw new Error("Venue must have at least one image."); // Prevent saving with no images
              }
 
-
+            // The venueDetails state now includes cancellation_cutoff_hours
+            // so it will be saved automatically with the spread operator.
             const { error: updateError } = await supabase
                 .from('venues')
                  .update({
@@ -623,7 +624,33 @@ function EditVenuePage() {
                                     />
                                 </div>
 
-                                {/* Replace Lat/Lng inputs with Map Picker */}
+                                {/* --- CANCELLATION POLICY INPUT --- */}
+                                <div className="md:col-span-2 pt-4 border-t border-slate-200">
+                                     <label 
+                                        htmlFor="cancellation_cutoff_hours" 
+                                        className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"
+                                     >
+                                        <FaShieldAlt className="text-blue-500" />
+                                        Cancellation Policy
+                                     </label>
+                                     <input 
+                                        id="cancellation_cutoff_hours"
+                                        name="cancellation_cutoff_hours" 
+                                        type="number" 
+                                        value={venueDetails.cancellation_cutoff_hours} 
+                                        onChange={handleDetailsChange} 
+                                        required 
+                                        min="0"
+                                        className="w-full py-3 px-4 bg-white/50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-green/30 focus:border-primary-green transition-all"
+                                        placeholder="e.g., 24" 
+                                      />
+                                      <p className="text-xs text-slate-500 mt-2">
+                                        Time in hours before a booking that a player can cancel (e.g., 24).
+                                      </p>
+                                </div>
+                                {/* --- END OF CANCELLATION POLICY --- */}
+
+                                {/* Map Picker */}
                                 <div className="md:col-span-2">
                                     <LocationPickerMap
                                         initialPosition={initialMapPosition}

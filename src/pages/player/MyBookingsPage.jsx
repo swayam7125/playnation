@@ -33,7 +33,7 @@ function MyBookingsPage() {
         .select(
           `
           booking_id, start_time, end_time, total_amount, status, has_been_reviewed,
-          facilities ( name, sports ( name ), venues ( venue_id, name, address, city, image_url ) ),
+          facilities ( name, sports ( name ), venues ( venue_id, name, address, city, image_url, cancellation_cutoff_hours ) ),
           reviews ( review_id )
         `
         ) //

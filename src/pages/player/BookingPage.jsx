@@ -274,8 +274,8 @@ function BookingPage() {
  };
 
   // --- Booking Confirmation Function ---
+  // --- Booking Confirmation Function ---
   const handleConfirmBooking = async () => {
-    // ... (existing confirmation logic remains the same) ...
      if (!user) {
       showModal({
         title: "Login Required",
@@ -326,18 +326,19 @@ function BookingPage() {
         throw new Error("Booking confirmation ID not received.");
       }
 
-      await showModal({
-        title: "Success!",
-        message: data?.message || `Your slot at ${venue.name} has been reserved.`,
-        confirmText: "Go to My Bookings",
-      });
+      // --- THIS IS THE CHANGE ---
+      // Show success toast instead of modal
+      toast.success(data?.message || `Your slot at ${venue.name} has been reserved.`);
 
+      // Navigate immediately to My Bookings
       navigate("/my-bookings", { state: { highlightedId: newBookingId } });
+      // --- END OF CHANGE ---
 
     } catch (err) {
       console.error("Booking Confirmation Error:", err);
       const errorMessage = err.message || "An unexpected error occurred. Please try again.";
       setConfirmError(errorMessage);
+      // We still use the modal for failure, as that's an important stop for the user
       showModal({ title: "Booking Failed", message: errorMessage, confirmText: "Close", confirmStyle: "danger" });
     } finally {
       setConfirmLoading(false);

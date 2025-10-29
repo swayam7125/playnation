@@ -2,11 +2,18 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../supabaseClient";
-import { FaClock, FaStar, FaChevronLeft, FaChevronRight, FaMapMarkerAlt, FaExternalLinkAlt } from "react-icons/fa"; // Added FaMapMarkerAlt, FaExternalLinkAlt
+import { 
+  FaClock, 
+  FaStar, 
+  FaChevronLeft, 
+  FaChevronRight, 
+  FaMapMarkerAlt, 
+  FaExternalLinkAlt,
+  FaShieldAlt // Icon for policy
+} from "react-icons/fa";
 import StarRating from "../components/reviews/StarRating";
 import OfferCard from "../components/offers/OfferCard";
-// Removed: import VenueLocationMap from "../components/maps/VenueLocationMap"; // Removed Map component import
-import DOMPurify from "dompurify"; // Import DOMPurify
+import DOMPurify from "dompurify";
 
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
@@ -17,7 +24,6 @@ import "swiper/css/pagination";
 
 import { useAuth } from "../AuthContext";
 import { useModal } from "../ModalContext";
-// -----------------------
 
 const placeholderImage =
   "https://images.unsplash.com/photo-1593341646782-e02a_a4ff2ab?w=800";
@@ -66,46 +72,38 @@ function VenuePage() {
   const [selectedDate, setSelectedDate] = useState(getTodayString());
   const [visibleReviews, setVisibleReviews] = useState(5);
 
-  // --- NEW STATE for dynamic slot loading ---
   const [slots, setSlots] = useState([]);
-  const [slotsLoading, setSlotsLoading] = useState(false); // Default to false initially
-  // ------------------------------------------
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
   useEffect(() => {
     const fetchVenueData = async () => {
       setLoading(true);
       setError(null);
-      setVenue(null); // Reset venue on new fetch
+      setVenue(null);
       setReviews([]);
       setOffers([]);
       setSelectedFacilityId(null);
-      setSlots([]); // Reset slots
+      setSlots([]);
       try {
-        // --- Fetch venue data including coordinates ---
         const { data: venueData, error: venueError } = await supabase
           .from("venues")
           .select(
             `*, facilities (*, sports (name), facility_amenities (*, amenities (name)))`
           )
           .eq("venue_id", venueId)
-          .maybeSingle(); // Use maybeSingle to handle null return without error
+          .maybeSingle(); 
 
         if (venueError) throw venueError;
-        // Check if venue exists and is approved (or if owner is viewing)
-        // Adjust this logic based on your RLS policies if needed
         if (!venueData || (!venueData.is_approved && venueData.owner_id !== user?.id)) {
             throw new Error("Venue not found or may not be approved yet.");
         }
 
-
         setVenue(venueData);
-        // Set initial selected facility ONLY if facilities exist
         if (venueData.facilities && venueData.facilities.length > 0) {
           setSelectedFacilityId(venueData.facilities[0].facility_id);
         } else {
-            setSelectedFacilityId(null); // Explicitly set to null if no facilities
+            setSelectedFacilityId(null);
         }
-
 
         const { data: reviewData, error: reviewError } = await supabase
           .from("reviews")
@@ -118,9 +116,7 @@ function VenuePage() {
         const { data: offerData, error: offerError } = await supabase
           .from("offers")
           .select("*")
-          // Fetch both global offers AND venue-specific offers that are active
           .or(`and(venue_id.eq.${venueId},is_active.eq.true),and(is_global.eq.true,is_active.eq.true)`)
-          // Filter out expired offers (where valid_until is in the past)
           .or(`valid_until.is.null,valid_until.gt.${new Date().toISOString()}`)
           .order("created_at", { ascending: false });
 
@@ -135,62 +131,52 @@ function VenuePage() {
       }
     };
 
-     // Only fetch if venueId is present
     if (venueId) {
         fetchVenueData();
     } else {
         setError("No Venue ID provided.");
         setLoading(false);
     }
-  }, [venueId, user?.id]); // Re-fetch if venueId or user changes
+  }, [venueId, user?.id]);
 
-  // --- useEffect to fetch slots dynamically ---
   useEffect(() => {
-    // Don't fetch if we don't have a facility or date selected
     if (!selectedFacilityId || !selectedDate) {
       setSlots([]);
-      setSlotsLoading(false); // Ensure loading is set to false
+      setSlotsLoading(false);
       return;
     }
 
     const fetchSlots = async () => {
       setSlotsLoading(true);
-      setSlots([]); // Clear previous slots
-      setSelectedSlot(null); // Clear selected slot
+      setSlots([]);
+      setSelectedSlot(null);
 
       try {
-         // --- RPC Call ---
          const { data: slotData, error: slotError } = await supabase
              .rpc('get_slots_for_facility', {
                  p_facility_id: selectedFacilityId,
                  p_date: selectedDate
              });
 
-
         if (slotError) throw slotError;
 
-        const now = new Date(); // Get current time
-
-        // Filter out past slots and then sort
+        const now = new Date(); 
         const futureSlots = (slotData || [])
-          .filter(slot => new Date(slot.start_time) > now) // <<< ONLY KEEP FUTURE SLOTS
+          .filter(slot => new Date(slot.start_time) > now)
           .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
 
-        setSlots(futureSlots); // Set the filtered and sorted slots
+        setSlots(futureSlots);
 
       } catch (err) {
         console.error("Error fetching time slots:", err.message);
-        // Optionally set a slot-specific error state if needed
       } finally {
         setSlotsLoading(false);
       }
     };
 
     fetchSlots();
-  }, [selectedFacilityId, selectedDate]); // Re-run when facility or date changes
-  // ------------------------------------------------
+  }, [selectedFacilityId, selectedDate]);
 
-  // --- Memoized calculations ---
   const selectedFacility = useMemo(() => {
       return venue?.facilities?.find((f) => f.facility_id === selectedFacilityId);
   }, [venue?.facilities, selectedFacilityId]);
@@ -198,7 +184,7 @@ function VenuePage() {
   const averageRating = useMemo(() => {
     if (!reviews || reviews.length === 0) return 0;
     const total = reviews.reduce((sum, review) => sum + (review.rating || 0), 0);
-    return (total / reviews.length).toFixed(1);
+    return (total / reviews.length); // Return number
   }, [reviews]);
 
   const venueImages = useMemo(() => {
@@ -212,19 +198,16 @@ function VenuePage() {
        ...new Set(
            venue?.facilities
                ?.flatMap(f => f.facility_amenities?.map(fa => fa.amenities?.name) ?? [])
-               .filter(Boolean) // Filter out null/undefined names
+               .filter(Boolean)
         )
     ], [venue?.facilities]);
 
-   const displayPrice = selectedSlot?.price ?? selectedFacility?.hourly_rate; // Use slot.price from RPC
+   const displayPrice = selectedSlot?.price ?? selectedFacility?.hourly_rate;
 
-  // --- Helper/Handler functions ---
   const getImageUrl = (url) => {
        if (!url || typeof url !== 'string') return placeholderImage;
        try {
-           // Basic check if it looks like a Supabase storage URL
            if (url.includes('supabase.co/storage/v1/object/public/')) {
-               // Append transform params if not already present
                const urlObj = new URL(url);
                if (!urlObj.searchParams.has('width')) {
                    urlObj.searchParams.set('width', '800');
@@ -233,20 +216,17 @@ function VenuePage() {
                    return urlObj.toString();
                }
            }
-           return url; // Return original URL if not Supabase or params exist
+           return url;
        } catch (e) {
            console.error("Error processing image URL:", url, e);
-           return placeholderImage; // Fallback on error
+           return placeholderImage;
        }
    };
 
-  // Function to generate the Google Maps link - CORRECTED
   const getMapLink = () => {
-    // Priority 1: Use the specific Google Maps Share URL if provided and valid
     if (venue?.google_maps_url) {
       try {
-        new URL(venue.google_maps_url); // Validate URL format
-        // Ensure it's a Google Maps link (basic check)
+        new URL(venue.google_maps_url);
         if (venue.google_maps_url.includes("google.com/maps") || venue.google_maps_url.includes("goo.gl/maps")) {
           return venue.google_maps_url;
         }
@@ -254,66 +234,52 @@ function VenuePage() {
         console.warn("Invalid google_maps_url stored:", venue.google_maps_url);
       }
     }
-    // Priority 2: Use latitude and longitude if available
     if (venue?.latitude && venue?.longitude) {
        const lat = parseFloat(venue.latitude);
        const lng = parseFloat(venue.longitude);
        if (!isNaN(lat) && !isNaN(lng)) {
-          // **FIXED:** Correct string interpolation using backticks (`)
           return `https://www.google.com/maps?q=${lat},${lng}`;
        }
     }
-     // Priority 3: Fallback to searching by name and address (less precise)
     if (venue?.name && venue?.address && venue?.city) {
       const query = encodeURIComponent(`${venue.name}, ${venue.address}, ${venue.city}`);
-       // **FIXED:** Correct string interpolation using backticks (`)
       return `https://www.google.com/maps?q=LATITUDE,LONGITUDE`
     }
-    return null; // No usable map data available
+    return null;
   };
 
-
-  const mapLink = getMapLink(); // Generate the link
+  const mapLink = getMapLink();
 
   const handleFacilityChange = (facility) => {
     setSelectedFacilityId(facility.facility_id);
-    setSelectedSlot(null); // Reset selected slot when facility changes
+    setSelectedSlot(null);
   };
 
   const handleSlotSelect = (slot) => {
     if (slot.is_available) {
-        // Ensure the slot is still in the future right before selection
         if (new Date(slot.start_time) > new Date()) {
             setSelectedSlot(slot);
         } else {
              showModal({ title: "Slot Expired", message: "This time slot has just passed." });
-             // Optionally refetch slots here if needed
-             // fetchSlots(); // Assuming fetchSlots is accessible or defined within scope
          }
-
     } else {
-        // Optionally show a message that the slot is booked
         showModal({ title: "Slot Unavailable", message: "This slot is already booked or unavailable." });
     }
   };
 
   const handleDateChange = (daysToAdd) => {
-      const currentDate = new Date(selectedDate + 'T00:00:00'); // Use T00:00:00 to avoid timezone shifts affecting the date part
+      const currentDate = new Date(selectedDate + 'T00:00:00');
       currentDate.setDate(currentDate.getDate() + daysToAdd);
       const today = new Date(getTodayString() + 'T00:00:00');
-      if (currentDate < today) return; // Prevent going before today
+      if (currentDate < today) return;
       setSelectedDate(getDateString(currentDate));
   };
-
 
   const handleProceedToBook = () => {
     if (!selectedSlot || !selectedFacility) return;
 
-     // Double-check if the slot is still in the future before navigating
     if (new Date(selectedSlot.start_time) <= new Date()) {
         showModal({ title: "Slot Expired", message: "This time slot has just passed while you were deciding." });
-        // Optionally refetch slots
-        // fetchSlots();
         return;
     }
 
@@ -325,8 +291,8 @@ function VenuePage() {
         onConfirm: () => {
           navigate("/login", {
             state: {
-              from: location.pathname, // Pass current path
-               search: location.search // Pass current query params if any
+              from: location.pathname, 
+               search: location.search
             },
           });
         },
@@ -334,9 +300,7 @@ function VenuePage() {
       return;
     }
 
-     // Use the price from the fetched slot data (which considers override)
     const finalPrice = selectedSlot.price;
-
 
     navigate(
       `/booking/${selectedFacility.facility_id}?slot_id=${selectedSlot.slot_id}`,
@@ -346,7 +310,7 @@ function VenuePage() {
           facility: selectedFacility,
           slot: selectedSlot,
           price: finalPrice,
-          selectedDate: selectedDate, // Pass the selected date
+          selectedDate: selectedDate,
         },
       }
     );
@@ -367,7 +331,7 @@ function VenuePage() {
          <button onClick={() => navigate('/explore')} className="mt-4 bg-primary-green text-white px-4 py-2 rounded-lg">Back to Explore</button>
       </div>
     );
-  if (!venue) // Should be handled by error state now, but kept as safeguard
+  if (!venue)
     return (
       <p className="container mx-auto text-center p-12">Venue not found.</p>
     );
@@ -411,26 +375,41 @@ function VenuePage() {
             ) : (
               <img src={getImageUrl(venueImages[0])} alt={venue.name} className="w-full h-full object-cover" onError={(e) => { e.target.src = placeholderImage; }}/>
             )}
-             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6">
-                 <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{venue.name}</h1>
-                 {reviews.length > 0 && (
-                     <div className="flex items-center gap-2">
-                         <StarRating rating={Number(averageRating)} />
-                         <span className="font-bold text-white">{averageRating}</span>
-                         <span className="text-white/80">({reviews.length} review{reviews.length !== 1 ? 's' : ''})</span>
-                     </div>
-                 )}
+             {/* Gradient overlay, but no text */}
+             <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/60 to-transparent">
              </div>
           </div>
 
           <div className="p-6 md:p-8">
-            {/* --- Venue Address & Map Link --- */}
+            {/* --- Venue Name, Address, Rating, & Policy --- */}
             <div className="venue-header mb-8">
+                {/* 1. Venue Name */}
+                <h1 className="text-3xl md:text-4xl font-bold text-dark-text mb-4">{venue.name}</h1>
+                
+                {/* Address */}
                 <p className="text-lg text-medium-text mb-2">
                     <FaMapMarkerAlt className="inline mr-2 text-primary-green" />
                     {venue.address}, {venue.city}, {venue.state} {venue.zip_code}
                 </p>
-                {/* Google Maps Hyperlink - Uses corrected mapLink */}
+
+                {/* 2. Average Rating */}
+                <div className="flex items-center gap-2 mb-4">
+                     <StarRating rating={Number(averageRating)} />
+                     <span className="font-bold text-dark-text">{Number(averageRating).toFixed(1)}</span>
+                     <span className="text-medium-text">({reviews.length} review{reviews.length !== 1 ? 's' : ''})</span>
+                </div>
+
+                {/* 3. Cancellation Policy */}
+                <div className="flex items-center gap-2 mb-4 text-sm text-medium-text">
+                  <FaShieldAlt className="inline mr-1 text-blue-500" />
+                  <span>
+                    Free cancellation up to 
+                    <strong className="text-dark-text"> {venue.cancellation_cutoff_hours || 24} hours</strong> 
+                    {' '}before your booking.
+                  </span>
+                </div>
+
+                {/* Google Maps Link */}
                 {mapLink && (
                    <a
                      href={mapLink}
@@ -442,6 +421,7 @@ function VenuePage() {
                      <FaExternalLinkAlt size="0.8em" className="opacity-70"/>
                    </a>
                 )}
+                {/* Description */}
                {venue.description && (
                    <div className="mt-4 prose prose-sm max-w-none text-light-text">
                         <p>{venue.description}</p>
@@ -533,14 +513,13 @@ function VenuePage() {
                            <FaChevronRight size="0.8em"/>
                       </button>
                   </div>
-                  {/* -- End Date Picker -- */}
 
                   {/* Slot Grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                     {slotsLoading ? (
                       <div className="col-span-full text-center py-4"><div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary-green"></div><p className="text-medium-text text-sm mt-2">Loading slots...</p></div>
                     ) : slots.length > 0 ? (
-                      slots.map((slot) => ( // 'slots' state now only contains future slots
+                      slots.map((slot) => (
                         <button
                           key={slot.slot_id}
                           onClick={() => handleSlotSelect(slot)}

@@ -70,7 +70,7 @@ const AppLayout = () => {
 
   // Check for exact paths or if it's a dynamic venue page
   const shouldShowFooter =
-    showFooterOnPaths.includes(pathname) || pathname.startsWith("/venues/");
+    showFooterOnPaths.includes(pathname);
 
   return (
     <div className="flex flex-col min-h-screen bg-background font-sans">

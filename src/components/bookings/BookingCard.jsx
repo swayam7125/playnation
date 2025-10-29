@@ -2,8 +2,6 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-// We no longer need useModal for cancellation
-// import { useModal } from "../../ModalContext"; 
 import {
   MapPin,
   Calendar,
@@ -12,9 +10,10 @@ import {
   XCircle,
   CheckCircle,
   MessageSquare,
+  AlertOctagon, // Icon for "too late"
 } from "lucide-react";
 import ReviewModal from "../reviews/ReviewModal";
-import CancelBookingModal from "./CancelBookingModal"; // This import is correct
+import CancelBookingModal from "./CancelBookingModal";
 
 // --- Helper Functions for Formatting ---
 const formatDate = (dateString) => {
@@ -55,7 +54,7 @@ const BookingStatusBadge = ({ status }) => {
       bgColor = "bg-red-100";
       textColor = "text-red-800";
       text = "Cancelled";
-Icon = XCircle;
+      Icon = XCircle;
       break;
     default:
       bgColor = "bg-yellow-100";
@@ -81,9 +80,8 @@ function BookingCard({
   onCancelBooking,
   isHighlighted = false,
 }) {
-  // const { showModal } = useModal(); // No longer needed
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
-  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false); // This is correct
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const cardRef = useRef(null);
 
   // Auto-scroll to the card if it's highlighted
@@ -110,26 +108,36 @@ function BookingCard({
     facilities,
   } = booking;
   const { name: facilityName, sports } = facilities;
-  const { venue_id, name: venueName, address, image_url } = facilities.venues;
+  
+  // Destructure policy from venue
+  const {
+    venue_id,
+    name: venueName,
+    address,
+    cancellation_cutoff_hours,
+  } = facilities.venues;
 
-  const isUpcoming = new Date(start_time) >= new Date() && status === "confirmed"; //
+  const isUpcoming = new Date(start_time) >= new Date() && status === "confirmed";
   const isPast = new Date(start_time) < new Date() && status === "confirmed";
   const hasBeenReviewed = booking.reviews && booking.reviews.length > 0;
 
+  // --- Cancellation Logic ---
+  const now = new Date();
+  const startTime = new Date(booking.start_time);
+  const cutoffHours = cancellation_cutoff_hours ?? 24; // Default to 24 if null
+  const cutoffTime = new Date(startTime.getTime() - cutoffHours * 60 * 60 * 1000);
+  const isCancellable = now < cutoffTime;
+  // --- End Cancellation Logic ---
+
   // --- Handlers ---
-
   const handleCancelClick = () => {
-    setIsCancelModalOpen(true); // This is correct
+    setIsCancelModalOpen(true);
   };
 
-  // 👇 --- THIS FUNCTION WAS MISSING ---
-  // This function is passed to CancelBookingModal's onSubmit
-  // It receives the (booking_id, reason) and passes them up to MyBookingsPage
   const handleConfirmCancel = async (bookingId, reason) => {
-    await onCancelBooking(bookingId, reason); // Call the main function from props
-    setIsCancelModalOpen(false); // Close modal on success
+    await onCancelBooking(bookingId, reason);
+    setIsCancelModalOpen(false);
   };
-  // 👆 --- END OF MISSING FUNCTION ---
 
   const handleReviewClick = () => {
     setIsReviewModalOpen(true);
@@ -137,7 +145,7 @@ function BookingCard({
 
   const handleReviewSuccess = () => {
     setIsReviewModalOpen(false);
-    onReviewSubmitted(); // Refresh the bookings list in the parent
+    onReviewSubmitted();
   };
 
   return (
@@ -150,28 +158,20 @@ function BookingCard({
             : "border border-border-color-light hover:shadow-xl"
         }`}
       >
-        {/* --- Image and Header --- */}
-        <div className="relative">
-          <Link to={`/venues/${venue_id}`}>
-            <img
-              src={image_url || "https://via.placeholder.com/400x200?text=Venue"}
-              alt={venueName}
-              className="h-48 w-full object-cover"
-            />
-          </Link>
-          <div className="absolute top-3 right-3">
-            <BookingStatusBadge status={status} />
-          </div>
-        </div>
-
-        {/* --- Card Content --- */}
+        {/* --- Card Content (No Image) --- */}
         <div className="flex flex-1 flex-col p-5">
-          <div className="flex-1">
+          {/* --- Header --- */}
+          <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-semibold text-primary-green">
               {sports.name.toUpperCase()}
             </p>
+            <BookingStatusBadge status={status} />
+          </div>
+
+          {/* --- Details --- */}
+          <div className="flex-1">
             <Link to={`/venues/${venue_id}`}>
-              <h3 className="mt-1 text-xl font-bold text-dark-text hover:text-primary-green">
+              <h3 className="text-xl font-bold text-dark-text hover:text-primary-green">
                 {venueName}
               </h3>
             </Link>
@@ -203,12 +203,23 @@ function BookingCard({
 
             {/* --- Action Buttons --- */}
             <div className="flex w-full gap-3">
-              {isUpcoming && ( //
+              {isUpcoming && isCancellable && (
                 <button
                   onClick={handleCancelClick}
                   className="flex-1 rounded-lg border-2 border-red-500 bg-red-50 px-4 py-2.5 text-center text-sm font-semibold text-red-600 transition hover:bg-red-100"
                 >
                   Cancel Booking
+                </button>
+              )}
+
+              {isUpcoming && !isCancellable && (
+                <button
+                  disabled
+                  title="The cancellation period for this booking has passed."
+                  className="flex-1 rounded-lg border-2 border-border-color bg-hover-bg px-4 py-2.5 text-center text-sm font-semibold text-medium-text flex items-center justify-center gap-1.5 cursor-not-allowed"
+                >
+                  <AlertOctagon className="h-4 w-4" />
+                  Too late to cancel
                 </button>
               )}
 
@@ -248,17 +259,14 @@ function BookingCard({
       </div>
 
       {/* --- Modals --- */}
-      
-      {/* 👇 --- THIS COMPONENT RENDER WAS MISSING --- */}
-      {isUpcoming && (
+      {isUpcoming && isCancellable && (
         <CancelBookingModal
           isOpen={isCancelModalOpen}
           onClose={() => setIsCancelModalOpen(false)}
           booking={booking}
-          onSubmit={handleConfirmCancel} 
+          onSubmit={handleConfirmCancel}
         />
       )}
-      {/* 👆 --- END OF MISSING COMPONENT --- */}
 
       {isPast && (
         <ReviewModal

@@ -22,7 +22,8 @@ const useVenues = (options = {}) => {
               *,
               sports(*),
               facility_amenities(amenities(name))
-            )
+            ),
+            reviews ( rating )
           `)
           .eq("is_approved", true);
 
@@ -42,9 +43,28 @@ const useVenues = (options = {}) => {
         const { data, error: fetchError } = await query;
 
         if (fetchError) throw fetchError;
+        
+        // --- START FIX: Calculate average rating ---
+        const venuesWithRating = (data || []).map(venue => {
+          let avg_rating = 0;
+          let review_count = 0;
+          
+          if (venue.reviews && venue.reviews.length > 0) {
+            const totalRating = venue.reviews.reduce((acc, review) => acc + (review.rating || 0), 0);
+            avg_rating = totalRating / venue.reviews.length;
+            review_count = venue.reviews.length;
+          }
+
+          return {
+            ...venue,
+            avg_rating: avg_rating, // New calculated property
+            review_count: review_count // New calculated property
+          };
+        });
+        // --- END FIX ---
 
         // Client-side filtering by sport (since Supabase doesn't support nested filtering easily)
-        let filteredVenues = data || [];
+        let filteredVenues = venuesWithRating; // Use the new processed array
         
         if (selectedSport && selectedSport !== 'all') {
           filteredVenues = filteredVenues.filter(venue => {
@@ -63,12 +83,13 @@ const useVenues = (options = {}) => {
             return nameA.localeCompare(nameB);
           });
         } else if (sortBy === 'rating') {
-          // Sort by average rating from reviews (if available)
+          // --- START FIX: Sort by new 'avg_rating' property ---
           filteredVenues.sort((a, b) => {
-            const ratingA = a.rating || 0;
-            const ratingB = b.rating || 0;
+            const ratingA = a.avg_rating || 0;
+            const ratingB = b.avg_rating || 0;
             return ratingB - ratingA; // Descending
           });
+          // --- END FIX ---
         } else if (sortBy === 'price') {
           // Sort by minimum hourly rate from facilities
           filteredVenues.sort((a, b) => {

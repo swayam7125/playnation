@@ -28,8 +28,10 @@ function AddVenuePage() {
       contact_phone: "",
       opening_time: "06:00",
       closing_time: "23:00",
-      google_maps_url: "" // Optional Google Maps URL field
+      google_maps_url: "", // Optional Google Maps URL field
       // Latitude and Longitude will be handled by the map component state now
+      cancellation_cutoff_hours: 24, // Default 24 hours
+      // cancellation_fee_percentage: 0, // We'll just use the cutoff for now
     }
   );
 
@@ -169,6 +171,31 @@ function AddVenuePage() {
                 <div className="relative"><FaClock className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-green text-xs" /><label className="sr-only" htmlFor="opening_time">Opening Time</label><input id="opening_time" name="opening_time" type="time" value={venueDetails.opening_time} onChange={handleVenueChange} required className="w-full py-2 pl-8 pr-3 bg-white/50 border rounded-lg text-sm" /></div>
                 <div className="relative"><FaClock className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-green text-xs" /><label className="sr-only" htmlFor="closing_time">Closing Time</label><input id="closing_time" name="closing_time" type="time" value={venueDetails.closing_time} onChange={handleVenueChange} required className="w-full py-2 pl-8 pr-3 bg-white/50 border rounded-lg text-sm" /></div>
                 <div className="md:col-span-2"><textarea name="description" rows="2" value={venueDetails.description} onChange={handleVenueChange} className="w-full py-2 px-3 bg-white/50 border rounded-lg resize-none text-sm" placeholder="Describe your venue..."></textarea></div>
+                <div className="pt-4 border-t border-gray-200">
+                 <h3 className="text-md font-semibold text-slate-800 mb-2">Cancellation Policy</h3>
+                 <div>
+                    <label 
+                      htmlFor="cancellation_cutoff_hours" 
+                      className="block text-xs font-semibold text-slate-700 mb-1.5"
+                    >
+                      Cancellation Cutoff (in hours)
+                    </label>
+                    <input 
+                      id="cancellation_cutoff_hours"
+                      name="cancellation_cutoff_hours" 
+                      type="number" 
+                      value={venueDetails.cancellation_cutoff_hours} 
+                      onChange={handleVenueChange} 
+                      required 
+                      min="0"
+                      className="w-full py-2 px-3 bg-white/50 border rounded-lg text-sm" 
+                      placeholder="e.g., 24" 
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Time in hours before a booking that a player can cancel (e.g., 24).
+                    </p>
+                 </div>
+              </div>
               </div>
 
                {/* Add the Location Picker Map */}

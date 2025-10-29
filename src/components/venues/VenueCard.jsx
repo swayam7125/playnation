@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { FaMapMarkerAlt } from "react-icons/fa";
+import { FaMapMarkerAlt, FaStar } from "react-icons/fa"; // Import FaStar
 
 // Import Swiper React components and modules
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -55,7 +55,11 @@ function VenueCard({ venue, viewMode = "grid" }) {
         className={`bg-card-bg rounded-lg shadow-sm border border-border-color-light 
           hover:shadow-md hover:border-primary-green/30 transition-all duration-300 
           group overflow-hidden cursor-pointer
-          ${viewMode === "grid" ? "flex flex-col w-full h-full" : "flex flex-row w-full h-40"}`}
+          ${
+            viewMode === "grid"
+              ? "flex flex-col w-full h-full"
+              : "flex flex-row w-full h-40"
+          }`}
       >
         {/* IMAGE */}
         <div
@@ -112,9 +116,27 @@ function VenueCard({ venue, viewMode = "grid" }) {
               {venue.name}
             </h3>
             <p className="text-xs text-medium-text flex items-center line-clamp-1">
-              <FaMapMarkerAlt className="mr-1 text-primary-green flex-shrink-0" size={10} />
-              <span className="truncate">{venue.address}, {venue.city}</span>
+              <FaMapMarkerAlt
+                className="mr-1 text-primary-green flex-shrink-0"
+                size={10}
+              />
+              <span className="truncate">
+                {venue.address}, {venue.city}
+              </span>
             </p>
+
+            {/* --- START FIX: Use 'avg_rating' and 'review_count' --- */}
+            <div className="flex items-center gap-1 mt-1.5">
+              <FaStar className={`text-sm ${venue.avg_rating > 0 ? 'text-yellow-400' : 'text-gray-300'}`} size={12} />
+              <span className="text-xs font-bold text-dark-text">
+                {Number(venue.avg_rating)}
+              </span>
+              <span className="text-xs text-medium-text">
+                ({venue.review_count})
+              </span>
+            </div>
+            {/* --- END FIX --- */}
+            
           </div>
 
           {/* Sports Tags */}
