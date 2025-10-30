@@ -19,7 +19,8 @@ import {
   FaClock,
   FaCheckCircle,
   FaQuoteLeft,
-  FaAngleRight // Icon for dashboard link
+  FaAngleRight,
+  FaTag
 } from "react-icons/fa";
 
 export default function HomePage() {
@@ -200,6 +201,26 @@ export default function HomePage() {
   const isPlayer = user && profile?.role === 'player';
 
   const formatTime = (dateString) => new Date(dateString).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  
+  // --- NEW HELPER FUNCTIONS FOR DATE AND DAY ---
+  const formatDay = (dateString) => {
+      const date = new Date(dateString);
+      const today = new Date();
+      const tomorrow = new Date();
+      tomorrow.setDate(today.getDate() + 1);
+
+      if (date.toDateString() === today.toDateString()) return 'TODAY';
+      if (date.toDateString() === tomorrow.toDateString()) return 'TOMORROW';
+      
+      return date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+  };
+  
+  const formatDate = (dateString) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+  // --- END NEW HELPER FUNCTIONS ---
+
 
   return (
     <div className="bg-background">
@@ -213,32 +234,31 @@ export default function HomePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
-              {/* Card 1: Your Next Game (Hover working) */}
-              <div className="md:col-span-1 bg-gradient-to-br from-white to-blue-50 rounded-2xl p-6 shadow-xl border border-primary-green/20 
+              {/* Card 1: Your Next Game (Next Booking) */}
+              <div className="md:col-span-1 bg-gradient-to-br from-white to-blue-50 rounded-2xl p-6 shadow-xl border border-blue-300/50 
                              group transform transition duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer">
-               {loadingPersonalData ? (
+                {loadingPersonalData ? (
                   <div className="h-24 animate-pulse bg-gray-100 rounded-lg"></div>
                 ) : nextBooking ? (
                   <>
-                    <h3 className="text-sm font-semibold text-primary-green flex items-center gap-2 mb-3">
-                      <FaCalendarAlt className="text-xl" /> YOUR NEXT GAME
+                    {/* ENHANCED DATE DISPLAY */}
+                    <h3 className="text-sm font-extrabold text-blue-600 flex items-center gap-2 mb-3">
+                      <FaCalendarAlt className="text-xl" /> 
+                      {formatDay(nextBooking.start_time)} | {formatDate(nextBooking.start_time)}
                     </h3>
+                    
                     <p className="text-3xl font-extrabold text-dark-text leading-snug truncate">
                       {nextBooking.facilities.name} 
                     </p>
                     <p className="text-medium-text mt-1 text-sm truncate">
                       {nextBooking.facilities.venues.name}, {nextBooking.facilities.venues.city}
                     </p>
-                    {/* Highlight the Time/Status prominently */}
+                    {/* ENHANCED TIME BADGE */}
                     <div className="mt-4">
                         <span className="text-lg font-bold text-white bg-primary-green px-4 py-2 rounded-full w-fit 
-                                       inline-flex items-center gap-2 shadow-md group-hover:bg-primary-green-dark transition-colors">
+                                       inline-flex items-center gap-2 shadow-lg shadow-primary-green/50 group-hover:bg-primary-green-dark transition-colors">
                           <FaClock className="text-sm" /> 
-                          {/* Display time and check if it's today */}
-                          {new Date(nextBooking.start_time).toDateString() === new Date().toDateString() 
-                             ? `${formatTime(nextBooking.start_time)} today` 
-                             : formatTime(nextBooking.start_time)
-                          }
+                          {formatTime(nextBooking.start_time)}
                         </span>
                     </div>
                   </>
@@ -255,81 +275,80 @@ export default function HomePage() {
                     </Link>
                   </>
                 )}
-              
               </div>
               
-              {/* Card 2 & 3: Favorites Suggestion & Offers */}
-              <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
-                {/* Card 2: Favorites Suggestion (FIXED HOVER) */}
-                <div className="bg-card-bg rounded-2xl p-6 shadow-lg border border-border-color-light 
+              {/* Card 2: Favorites Suggestion (Enhanced List Items) */}
+              <div className="bg-card-bg rounded-2xl p-6 shadow-xl border border-border-color-light 
                              group transform transition duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer"> 
-                    <h3 className="text-xl font-bold text-dark-text mb-4 border-b border-border-color-light pb-3">
-                      Book Your Favorites Again:
-                    </h3>
-                    {loadingPersonalData ? (
-                        <div className="h-20 animate-pulse bg-gray-100 rounded-lg"></div>
-                    ) : favoriteVenues.length > 0 ? (
-                        <div className="space-y-3 pt-2">
-                        {favoriteVenues.map((venue) => (
-                            <Link 
-                            key={venue.venue_id}
-                            to={`/venues/${venue.venue_id}`}
-                            // Hover effect for links is set inside the map
-                            className="flex items-center justify-between p-3 rounded-lg hover:bg-hover-bg transition-colors no-underline"
-                            >
-                            <div className="flex items-center gap-3">
-                                <FaStar className="text-yellow-500 text-base" />
-                                <span className="font-medium text-dark-text group-hover:text-primary-green transition-colors">
-                                    {venue.name}
-                                </span>
-                            </div>
-                            
-                            {/* Display Booking Count as a Badge */}
-                            <span className="text-xs font-bold text-white bg-blue-500 px-3 py-1 rounded-full flex-shrink-0">
-                                {venue.booking_count} bookings
-                            </span>
-                            
-                            <FaArrowRight className="text-primary-green w-3 h-3 transition-transform" />
-                            </Link>
-                        ))}
-                        </div>
-                    ) : (
-                        <p className="text-medium-text text-sm">Book more venues to see your favorites here!</p>
-                    )}
-                </div>
-                
-                {/* Card 3: New Offers Available (FIXED HOVER) */}
-                <div className="bg-gradient-to-tr from-cyan-50 to-indigo-50 rounded-2xl p-6 shadow-lg border border-indigo-200 flex flex-col justify-between
-                             group transform transition duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer">
-                    
-                    {/* Icon or Graphic Placeholder */}
-                    <div className="text-4xl text-cyan-600 mb-3">🏷️</div> 
-                    
-                    <div>
-                        <h3 className="text-xl font-bold text-dark-text mb-2">
-                            New Offers Available!
-                        </h3>
-                        <p className="text-medium-text mb-4">
-                            Don't miss out on special discounts! Find deals on courts and fields near you.
-                        </p>
-                    </div>
-                    
-                    {/* Link Button */}
-                    <Link 
-                        to="/explore" 
-                        className="text-primary-green font-medium flex items-center gap-2 hover:gap-3 transition-all text-sm w-fit mt-3"
-                    >
-                        See Latest Deals 
-                        <FaAngleRight className="w-4 h-4" />
-                    </Link>
-                </div>
+                  <h3 className="text-xl font-bold text-dark-text mb-4 border-b border-border-color-light pb-3">
+                    Book Your Favorites Again:
+                  </h3>
+                  {loadingPersonalData ? (
+                      <div className="h-20 animate-pulse bg-gray-100 rounded-lg"></div>
+                  ) : favoriteVenues.length > 0 ? (
+                      <div className="space-y-3 pt-2">
+                      {favoriteVenues.map((venue) => (
+                          <Link 
+                          key={venue.venue_id}
+                          to={`/venues/${venue.venue_id}`}
+                          // Enhanced hover and styling for individual links
+                          className="flex items-center justify-between p-3 rounded-xl hover:bg-light-green-bg transition-colors no-underline group-inner"
+                          >
+                          <div className="flex items-center gap-3">
+                              <FaStar className="text-yellow-500 text-base" />
+                              <span className="font-medium text-dark-text group-inner-hover:text-primary-green transition-colors">
+                                  {venue.name}
+                              </span>
+                          </div>
+                          
+                          {/* Display Booking Count as a Badge */}
+                          <span className="text-xs font-bold text-white bg-blue-500 px-3 py-1 rounded-full flex-shrink-0 shadow-sm">
+                              {venue.booking_count} bookings
+                          </span>
+                          
+                          <FaArrowRight className="text-primary-green w-3 h-3 transition-transform group-inner-hover:translate-x-1" />
+                          </Link>
+                      ))}
+                      </div>
+                  ) : (
+                      <p className="text-medium-text text-sm">Book more venues to see your favorites here!</p>
+                  )}
+              </div>
+              
+              {/* Card 3: New Offers Available (Soft Gradient + Icon Pop) */}
+              <div className="bg-gradient-to-tr from-cyan-50 to-indigo-50 rounded-2xl p-6 shadow-xl border border-indigo-200 flex flex-col justify-between
+                           group transform transition duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer">
+                  
+                  {/* ICON ENHANCEMENT */}
+                  <div className="relative">
+                      <span className="p-3 bg-yellow-300/50 rounded-full inline-block mb-3 transition-all duration-300 group-hover:scale-110">
+                          <FaTag className="text-3xl text-yellow-700" /> 
+                      </span>
+                  </div>
+                  
+                  <div>
+                      <h3 className="text-xl font-bold text-dark-text mb-2">
+                          New Offers Available!
+                      </h3>
+                      <p className="text-medium-text mb-4">
+                          Don't miss out on special discounts! Find deals on courts and fields near you.
+                      </p>
+                  </div>
+                  
+                  {/* Link Button */}
+                  <Link 
+                      to="/explore" 
+                      className="text-blue-600 font-bold flex items-center gap-2 hover:gap-3 transition-all text-sm w-fit mt-3"
+                  >
+                      See Latest Deals 
+                      <FaAngleRight className="w-4 h-4" />
+                  </Link>
               </div>
             </div>
           </div>
         </section>
       )}
-
+      
       {/* --- 2. HERO/MARKETING SECTION (FOR GUESTS/FALLBACK) --- */}
       {(!isPlayer || loadingPersonalData) && ( // Show this if not a player, or while player data is loading
         <section className="relative overflow-hidden">
