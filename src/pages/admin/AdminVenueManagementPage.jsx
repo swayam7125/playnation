@@ -1,5 +1,5 @@
 // src/pages/admin/AdminVenueManagementPage.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../supabaseClient";
 import {
   FaCheckCircle,
@@ -12,10 +12,14 @@ import {
   FaMapMarkerAlt,
   FaClock,
   FaEye,
+  FaSpinner,
 } from "react-icons/fa";
 import { useModal } from "../../ModalContext";
 import VenueDetailsModal from "../admin/VenueDetailsModal";
+import RejectVenueModal from "../admin/RejectVenueModal";
+import toast from "react-hot-toast";
 
+// --- No changes to ClickableStatsCard ---
 const ClickableStatsCard = ({
   title,
   count,
@@ -62,8 +66,9 @@ const ClickableStatsCard = ({
   );
 };
 
+// --- No changes to VenueCard ---
 const VenueCard = ({ venue, onApprove, onDecline, onView }) => {
-  const owner = venue.owner_id;
+  const owner = venue.users;
   const isApproved = venue.is_approved;
   const isDeclined = !isApproved && venue.rejection_reason;
 
@@ -97,7 +102,7 @@ const VenueCard = ({ venue, onApprove, onDecline, onView }) => {
             <div className="flex items-center gap-4 text-sm text-medium-text mb-3">
               <div className="flex items-center gap-2">
                 <FaUser className="text-xs" />
-                <span>{owner?.username || owner?.email}</span>
+                <span>{owner?.username || owner?.email || "Owner"}</span>
               </div>
             </div>
             <div className="flex items-center gap-2 text-sm text-light-text">
@@ -146,7 +151,7 @@ const VenueCard = ({ venue, onApprove, onDecline, onView }) => {
           {isApproved ? (
             <>
               <button
-                onClick={() => onDecline(venue.venue_id)}
+                onClick={() => onDecline(venue)}
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5"
               >
                 <FaTimesCircle /> Restrict Venue
@@ -161,7 +166,7 @@ const VenueCard = ({ venue, onApprove, onDecline, onView }) => {
           ) : isDeclined ? (
             <>
               <button
-                onClick={() => onApprove(venue.venue_id)}
+                onClick={() => onApprove(venue)}
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-green hover:bg-primary-green-dark text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5"
               >
                 <FaCheckCircle /> Approve Venue
@@ -176,13 +181,13 @@ const VenueCard = ({ venue, onApprove, onDecline, onView }) => {
           ) : (
             <>
               <button
-                onClick={() => onApprove(venue.venue_id)}
+                onClick={() => onApprove(venue)}
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-green hover:bg-primary-green-dark text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5"
               >
                 <FaCheckCircle /> Approve
               </button>
               <button
-                onClick={() => onDecline(venue.venue_id)}
+                onClick={() => onDecline(venue)}
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5"
               >
                 <FaTimesCircle /> Restrict
@@ -201,6 +206,7 @@ const VenueCard = ({ venue, onApprove, onDecline, onView }) => {
   );
 };
 
+// --- No changes to EmptyState ---
 const EmptyState = ({ activeTab }) => {
   const config = {
     pending: {
@@ -255,89 +261,130 @@ function AdminVenueManagementPage() {
   const [activeTab, setActiveTab] = useState("pending");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedVenue, setSelectedVenue] = useState(null);
+  const [venueToReject, setVenueToReject] = useState(null);
   const { showModal } = useModal();
 
-  const fetchAllVenues = async () => {
+  // --- No changes to fetchAllVenues ---
+  const fetchAllVenues = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const { data, error } = await supabase
         .from("venues")
-        .select(`*, owner_id (username, email)`)
+        .select(`*, users!venues_owner_id_fkey(username, email)`)
         .order("created_at", { ascending: false });
+
       if (error) throw error;
       setVenues(data || []);
     } catch (err) {
       setError(err.message);
+      toast.error(`Failed to fetch venues: ${err.message}`);
       console.error("Error fetching venues:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchAllVenues();
-  }, []);
+  }, [fetchAllVenues]);
 
-  const handleApproval = async (venueId) => {
-    if (
-      await showModal({
-        title: "Approve Venue",
-        message: "Are you sure you want to approve this venue?",
-      })
-    ) {
-      try {
-        const { error } = await supabase
-          .from("venues")
-          .update({ is_approved: true, rejection_reason: null })
-          .eq("venue_id", venueId);
-        if (error) throw error;
-        fetchAllVenues();
-      } catch (err) {
-        showModal({
-          title: "Error",
-          message: `Failed to approve venue: ${err.message}`,
-        });
-      }
+  // --- ⬇⬇⬇ LOGIC FIX IS HERE ⬇⬇⬇ ---
+
+  // Step 1: Create a new function that contains the *actual* approval logic.
+  // This logic was moved from inside the `if (await showModal...` block.
+  const executeApproval = async (venue) => {
+    const loadingToast = toast.loading("Approving venue...");
+    try {
+      const { error } = await supabase
+        .from("venues")
+        .update({ is_approved: true, rejection_reason: null })
+        .eq("venue_id", venue.venue_id);
+      if (error) throw error;
+
+      // Send notification
+      await supabase.from("notifications").insert({
+        user_id: venue.owner_id,
+        title: "Your venue has been approved! 🥳",
+        message: `Congratulations! Your venue "${venue.name}" is now live on PlayNation.`,
+        type: "success",
+      });
+
+      toast.success("Venue approved!", { id: loadingToast });
+      fetchAllVenues(); // Refresh list
+    } catch (err) {
+      toast.error(`Error: ${err.message}`, { id: loadingToast });
+      showModal({
+        title: "Error",
+        message: `Failed to approve venue: ${err.message}`,
+        confirmText: "OK", // Use a simple confirm for the error
+        showCancel: false, // No cancel button needed for an error
+      });
     }
   };
 
-  const handleDecline = async (venueId) => {
-    const rejectionReason = await showModal({
-      title: "Restrict Venue",
-      message: "Please provide a reason for restricting this venue.",
-      isInput: true,
-      inputPlaceholder: "Reason for restriction (required)",
-      confirmText: "Confirm Restriction",
-      confirmStyle: "danger",
+  // Step 2: Change handleApproval to just *show* the modal.
+  // It is no longer `async`.
+  const handleApproval = (venue) => {
+    // We call showModal, which just sets state and returns nothing.
+    showModal({
+      title: "Approve Venue",
+      message: `Are you sure you want to approve "${venue.name}"?`,
+      confirmText: "Approve",
+      // Pass our new function as the onConfirm callback.
+      // This will be executed when the user clicks "Approve" in the modal.
+      onConfirm: () => executeApproval(venue),
+      // We must explicitly tell the modal to show a "Cancel" button,
+      // as per your Modal.jsx props.
+      showCancel: true,
+      cancelText: "Cancel",
     });
+  };
 
-    if (rejectionReason) {
-      if (!rejectionReason.trim()) {
-        showModal({
-          title: "Error",
-          message: "A restriction reason is required.",
-        });
-        return;
-      }
-      try {
-        const { error } = await supabase
-          .from("venues")
-          .update({
-            is_approved: false,
-            rejection_reason: rejectionReason.trim(),
-          })
-          .eq("venue_id", venueId);
-        if (error) throw error;
-        fetchAllVenues();
-      } catch (err) {
-        showModal({
-          title: "Error",
-          message: `An unexpected error occurred: ${err.message}`,
-        });
-      }
+  // --- ⬆⬆⬆ END OF LOGIC FIX ⬆⬆⬆ ---
+
+  // --- No changes to handleDecline or handleConfirmDecline ---
+  const handleDecline = (venue) => {
+    setVenueToReject(venue); // Opens the modal
+  };
+
+  const handleConfirmDecline = async (reason) => {
+    if (!venueToReject) return;
+
+    const loadingToast = toast.loading("Restricting venue...");
+    try {
+      const { error } = await supabase
+        .from("venues")
+        .update({
+          is_approved: false,
+          rejection_reason: reason.trim(),
+        })
+        .eq("venue_id", venueToReject.venue_id);
+      if (error) throw error;
+
+      await supabase.from("notifications").insert({
+        user_id: venueToReject.owner_id,
+        title: "Your venue submission was restricted.",
+        message: `Your venue "${venueToReject.name}" was restricted. Reason: "${reason}"`,
+        type: "error",
+      });
+
+      toast.success("Venue restricted and owner notified.", {
+        id: loadingToast,
+      });
+      fetchAllVenues(); // Refresh list
+    } catch (err) {
+      toast.error(`Error: ${err.message}`, { id: loadingToast });
+      showModal({
+        title: "Error",
+        message: `An unexpected error occurred: ${err.message}`,
+      });
+    } finally {
+      setVenueToReject(null); // Close modal
     }
   };
+
+  // --- No changes below this line ---
 
   const handleView = (venue) => {
     setSelectedVenue(venue);
@@ -347,25 +394,29 @@ function AdminVenueManagementPage() {
     setSelectedVenue(null);
   };
 
-  const filterVenues = (venueList) => {
-    if (!searchTerm) return venueList;
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    return venueList.filter((v) =>
-      `${v.name} ${v.city} ${v.address} ${v.owner_id?.username || ""} ${
-        v.owner_id?.email || ""
-      }`
-        .toLowerCase()
-        .includes(lowerCaseSearchTerm)
-    );
-  };
+  const { pendingVenues, approvedVenues, rejectedVenues } = useMemo(() => {
+    const filterVenues = (venueList) => {
+      if (!searchTerm) return venueList;
+      const lowerCaseSearchTerm = searchTerm.toLowerCase();
+      return venueList.filter((v) =>
+        `${v.name} ${v.city} ${v.address} ${v.users?.username || ""} ${
+          v.users?.email || ""
+        }`
+          .toLowerCase()
+          .includes(lowerCaseSearchTerm)
+      );
+    };
 
-  const pendingVenues = filterVenues(
-    venues.filter((v) => !v.is_approved && !v.rejection_reason)
-  );
-  const approvedVenues = filterVenues(venues.filter((v) => v.is_approved));
-  const rejectedVenues = filterVenues(
-    venues.filter((v) => !v.is_approved && v.rejection_reason)
-  );
+    return {
+      pendingVenues: filterVenues(
+        venues.filter((v) => !v.is_approved && !v.rejection_reason)
+      ),
+      approvedVenues: filterVenues(venues.filter((v) => v.is_approved)),
+      rejectedVenues: filterVenues(
+        venues.filter((v) => !v.is_approved && v.rejection_reason)
+      ),
+    };
+  }, [venues, searchTerm]);
 
   const currentVenues =
     {
@@ -402,7 +453,7 @@ function AdminVenueManagementPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-green mx-auto mb-4"></div>
+          <FaSpinner className="animate-spin text-4xl text-primary-green mx-auto mb-4" />
           <p className="text-medium-text text-lg">Loading venues...</p>
         </div>
       </div>
@@ -489,6 +540,15 @@ function AdminVenueManagementPage() {
       </div>
       {selectedVenue && (
         <VenueDetailsModal venue={selectedVenue} onClose={handleCloseModal} />
+      )}
+
+      {venueToReject && (
+        <RejectVenueModal
+          venue={venueToReject}
+          isOpen={!!venueToReject}
+          onClose={() => setVenueToReject(null)}
+          onSubmit={handleConfirmDecline}
+        />
       )}
     </div>
   );

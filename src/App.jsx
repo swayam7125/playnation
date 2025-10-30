@@ -35,6 +35,7 @@ import BookingPage from "./pages/player/BookingPage";
 import OwnerDashboardPage from "./pages/owner/OwnerDashboardPage";
 import MyVenuesPage from "./pages/owner/MyVenuesPage";
 import AddVenuePage from "./pages/owner/AddVenuePage";
+import AddFacilitiesPage from "./pages/owner/AddFacilitiesPage";
 import EditVenuePage from "./pages/owner/EditVenuePage";
 import ManageSlotsPage from "./pages/owner/ManageSlotsPage";
 import ManageOffersPage from "./pages/owner/ManageOffersPage";
@@ -143,6 +144,7 @@ function App() {
               <Route path="my-venues" element={<MyVenuesPage />} />
               <Route path="add-venue" element={<AddVenuePage />} />
               <Route path="edit-venue/:venueId" element={<EditVenuePage />} />
+              <Route path="add-facilities" element={<AddFacilitiesPage />} />
               <Route
                 path="manage-slots"
                 element={<ManageSlotsPage />}
