@@ -40,6 +40,7 @@ import EditVenuePage from "./pages/owner/EditVenuePage";
 import ManageSlotsPage from "./pages/owner/ManageSlotsPage";
 import ManageOffersPage from "./pages/owner/ManageOffersPage";
 import BookingCalendarPage from "./pages/owner/BookingCalendarPage";
+import ReportsPage from './pages/owner/ReportsPage'; // Adjust path as necessary
 
 // Admin Pages
 import AdminUserManagementPage from "./pages/admin/AdminUserManagementPage";
@@ -145,6 +146,7 @@ function App() {
               <Route path="add-venue" element={<AddVenuePage />} />
               <Route path="edit-venue/:venueId" element={<EditVenuePage />} />
               <Route path="add-facilities" element={<AddFacilitiesPage />} />
+              <Route path="/owner/reports" element={<ReportsPage />} />
               <Route
                 path="manage-slots"
                 element={<ManageSlotsPage />}
