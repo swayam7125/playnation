@@ -2,12 +2,15 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
+import { useModal } from "../../ModalContext";
+import { useNavigate } from "react-router-dom";
 import ChangePasswordForm from "../../components/auth/ChangePasswordForm";
 import { FaSave } from "react-icons/fa";
 
 const ProfilePage = () => {
-  // Destructure 'loading' from useAuth to check initial profile load
-  const { user, profile, setProfile, loading: authLoading } = useAuth();
+  const { user, profile, setProfile, logout, loading: authLoading } = useAuth();
+  const { showModal } = useModal();
+  const navigate = useNavigate();
 
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
@@ -29,7 +32,7 @@ const ProfilePage = () => {
 
   useEffect(() => {
     if (success) {
-      const timer = setTimeout(() => setSuccess(""), 3000); // Automatically clear success message
+      const timer = setTimeout(() => setSuccess(""), 3000);
       return () => clearTimeout(timer);
     }
   }, [success]);
@@ -58,7 +61,6 @@ const ProfilePage = () => {
           .from("avatars")
           .getPublicUrl(filePath);
 
-        // Add a unique timestamp to bust the browser cache and ensure the new image loads
         newAvatarUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
         setUploading(false);
       }
@@ -115,6 +117,20 @@ const ProfilePage = () => {
       setError(`Failed to remove avatar: ${err.message}`);
       setAvatarUrl(profile.avatar_url);
     }
+  };
+
+  const handleLogout = () => {
+    showModal({
+      title: "Confirm Logout",
+      message: "Are you sure you want to log out?",
+      confirmText: "Logout",
+      confirmStyle: "danger",
+      showCancel: true,
+      onConfirm: () => {
+        logout();
+        navigate("/");
+      },
+    });
   };
 
   if (authLoading) {
@@ -254,8 +270,28 @@ const ProfilePage = () => {
             </form>
           </div>
 
-          <div>
+          <div className="space-y-6">
+            {/* Change Password Section */}
             <ChangePasswordForm />
+
+            {/* Logout Section */}
+            <div className="bg-card-bg border border-border-color rounded-2xl p-8 shadow-sm">
+              <h2 className="text-xl font-bold text-dark-text mb-4">
+                Account Actions
+              </h2>
+              <p className="text-sm text-medium-text mb-6">
+                Sign out of your account on this device
+              </p>
+              <button
+                onClick={handleLogout}
+                className="w-full py-3 px-6 rounded-lg font-semibold text-sm bg-red-600 text-white shadow-sm hover:bg-red-700 transition-all duration-300 flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </div>
