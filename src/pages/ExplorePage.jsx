@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import VenueCard from "../components/venues/VenueCard";
-import useVenues from "../hooks/useVenues";
+import useVenues from "../hooks/useVenues"; // Make sure this is imported
 
 function ExplorePage() {
   const [sports, setSports] = useState([]);
@@ -11,11 +11,13 @@ function ExplorePage() {
   const [sortBy, setSortBy] = useState("name");
   const [viewMode, setViewMode] = useState("grid");
 
+  // --- START FIX 1: Destructure the hook's return value ---
   const { venues, loading, error } = useVenues({
     selectedSport: selectedSport,
     searchTerm: searchTerm,
     sortBy: sortBy,
   });
+  // --- END FIX 1 ---
 
   useEffect(() => {
     const fetchSports = async () => {
@@ -34,7 +36,9 @@ function ExplorePage() {
     fetchSports();
   }, []);
 
-  const filteredAndSortedVenues = venues;
+  // Note: Your useVenues hook now handles all filtering and sorting
+  // so this line is correct.
+  const filteredAndSortedVenues = venues; 
 
   const clearFilters = () => {
     setSelectedSport("all");
@@ -49,7 +53,7 @@ function ExplorePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Compact Hero Section */}
+      {/* ... Hero Section (no changes) ... */}
       <div className="bg-gradient-to-br from-primary-green to-primary-green-dark text-white py-6 px-4">
         <div className="container mx-auto text-center">
           <h1 className="text-2xl md:text-3xl font-bold mb-2">
@@ -58,8 +62,6 @@ function ExplorePage() {
           <p className="text-sm text-green-200 mb-4 max-w-2xl mx-auto">
             Discover the perfect sports venues in your area
           </p>
-
-          {/* Compact Search Bar */}
           <div className="max-w-xl mx-auto relative">
             <input
               type="text"
@@ -88,7 +90,7 @@ function ExplorePage() {
       </div>
 
       <div className="container mx-auto px-4 py-4">
-        {/* Compact Filters and Controls */}
+        {/* ... Filters and Controls (no changes) ... */}
         <div className="bg-card-bg rounded-xl shadow-md p-4 mb-4 border border-border-color-light">
           <div className="flex flex-col lg:flex-row lg:items-center gap-4">
             {/* Sport Filter */}
@@ -222,7 +224,10 @@ function ExplorePage() {
           )}
         </div>
 
-        {/* Results */}
+
+        {/* --- START FIX 2: Use the variables for conditional rendering --- */}
+
+        {/* Use 'loading' (a boolean) */}
         {loading && (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-primary-green mb-3"></div>
@@ -230,6 +235,7 @@ function ExplorePage() {
           </div>
         )}
 
+        {/* Use 'error' (a string) */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
             <svg
@@ -248,10 +254,12 @@ function ExplorePage() {
             <p className="text-red-800 text-base font-semibold mb-1">
               Oops! Something went wrong
             </p>
+            {/* 'error' is a string (e.g., error.message), so it's safe to render */}
             <p className="text-red-600 text-sm">{error}</p>
           </div>
         )}
 
+        {/* Use 'venues' (an array) */}
         {!loading && !error && filteredAndSortedVenues.length === 0 && (
           <div className="text-center py-12">
             <svg
@@ -286,6 +294,7 @@ function ExplorePage() {
           </div>
         )}
 
+        {/* Use 'venues' (an array) */}
         {!loading && !error && filteredAndSortedVenues.length > 0 && (
           <div
             className={
@@ -294,9 +303,10 @@ function ExplorePage() {
                 : "flex flex-col gap-4 max-w-4xl mx-auto"
             }
           >
+            {/* Map over the 'venues' array */}
             {filteredAndSortedVenues.map((venue) => (
               <div
-                key={venue.id}
+                key={venue.venue_id} // <-- BUGFIX: Use venue.venue_id
                 className={
                   viewMode === "list"
                     ? "transform hover:scale-[1.01] transition-transform duration-200"
@@ -308,6 +318,8 @@ function ExplorePage() {
             ))}
           </div>
         )}
+        {/* --- END FIX 2 --- */}
+
       </div>
     </div>
   );

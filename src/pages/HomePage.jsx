@@ -7,6 +7,11 @@ import CategoryCard from "../components/home/CategoryCard/CategoryCard";
 import VenueCard from "../components/venues/VenueCard";
 import HeroOfferCarousel from "../components/offers/HeroOfferCarousel";
 import { categories } from "../constants/categories";
+
+// --- START FIX 1: Import useVenues ---
+import useVenues from "../hooks/useVenues";
+// --- END FIX 1 ---
+
 import { 
   FaSearch, 
   FaCalendarAlt, 
@@ -26,14 +31,30 @@ import {
 export default function HomePage() {
   const { profile, user } = useAuth();
   const navigate = useNavigate();
-  const [topVenues, setTopVenues] = useState([]);
+
+  // --- START FIX 2: Remove old state for venues/loading ---
+  // const [topVenues, setTopVenues] = useState([]); // This will be provided by useVenues
   const [heroOffers, setHeroOffers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // const [loading, setLoading] = useState(true); // This will be provided by useVenues
+  // --- END FIX 2 ---
   
   // --- STATE FOR PLAYER PERSONALIZATION ---
   const [nextBooking, setNextBooking] = useState(null);
-  const [favoriteVenues, setFavoriteVenues] = useState([]); // Array now holds favorited venues
+  const [favoriteVenues, setFavoriteVenues] = useState([]); 
   const [loadingPersonalData, setLoadingPersonalData] = useState(false);
+
+  // --- START FIX 3: Call and DESTRUCTURE the useVenues hook ---
+  // This is the key fix for the crash and the rating bug.
+  const { 
+    venues: topVenues, // Alias 'venues' to 'topVenues'
+    loading,           // Use 'loading' from the hook
+    error: venuesError // Use 'error' from the hook
+  } = useVenues({ 
+    limit: 4, 
+    sortBy: 'rating' // Fetches top-rated venues
+  });
+  // --- END FIX 3 ---
+
 
   // --- START REDIRECTION LOGIC ---
   useEffect(() => {
@@ -50,20 +71,19 @@ export default function HomePage() {
   }, [user, profile, navigate]);
   // --- END REDIRECTION LOGIC ---
 
-  // RENDER GUARD: If redirection is imminent, return null instantly for a cleaner switch.
+  // RENDER GUARD
   const isRedirecting = profile?.role === "venue_owner" || profile?.role === "admin";
   if (isRedirecting) {
       return null;
   }
 
-  // --- NEW: FETCH PLAYER PERSONALIZED DATA ---
+  // --- FETCH PLAYER PERSONALIZED DATA ---
   useEffect(() => {
     const fetchPersonalData = async () => {
       if (!user || profile?.role !== "player") return;
       
       setLoadingPersonalData(true);
       const today = new Date();
-      // Use toISOString() on the current date for the GTE filter to work correctly
       const todayISO = today.toISOString(); 
 
       try {
@@ -106,22 +126,13 @@ export default function HomePage() {
     fetchPersonalData();
   }, [user, profile]);
 
-  // --- EXISTING: FETCH GENERAL TOP VENUES AND OFFERS ---
+  // --- START FIX 4: Modify useEffect to ONLY fetch offers ---
+  // The 'topVenues' and 'loading' state are now handled by the useVenues hook.
   useEffect(() => {
     const fetchGeneralData = async () => {
-      setLoading(true);
+      // setLoading(true); // REMOVED
       try {
-        // Fetch top 4 general approved venues
-        const { data: venuesData, error: venuesError } = await supabase
-          .from("venues")
-          .select(
-            `*, image_url, facilities (sports (name), facility_amenities ( amenities (name) ) )`
-          )
-          .eq("is_approved", true)
-          .order("created_at", { ascending: false })
-          .limit(4);
-        if (venuesError) throw venuesError;
-        setTopVenues(venuesData);
+        // --- VENUES FETCH REMOVED FROM HERE ---
         
         // Fetch global offers
         const today = new Date().toISOString();
@@ -140,9 +151,10 @@ export default function HomePage() {
         
       } catch (error) {
         console.error("Error fetching general data:", error);
-      } finally {
-        setLoading(false);
-      }
+      } 
+      // finally { // REMOVED
+      //   setLoading(false);
+      // }
     };
 
     // Fetch data only if the user is a 'player' or anonymous
@@ -150,6 +162,7 @@ export default function HomePage() {
       fetchGeneralData();
     }
   }, [user, profile]);
+  // --- END FIX 4 ---
 
 
   const features = [
@@ -202,7 +215,6 @@ export default function HomePage() {
 
   const formatTime = (dateString) => new Date(dateString).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   
-  // --- NEW HELPER FUNCTIONS FOR DATE AND DAY ---
   const formatDay = (dateString) => {
       const date = new Date(dateString);
       const today = new Date();
@@ -219,12 +231,11 @@ export default function HomePage() {
       const date = new Date(dateString);
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
-  // --- END NEW HELPER FUNCTIONS ---
 
 
   return (
     <div className="bg-background">
-      {/* --- 1. PERSONALIZED DASHBOARD SECTION (FOR LOGGED-IN PLAYERS) --- */}
+      {/* --- 1. PERSONALIZED DASHBOARD SECTION --- */}
       {isPlayer && (
         <section className="bg-gradient-to-br from-white via-blue-50 to-emerald-50 py-12 border-b border-border-color-light">
           <div className="container mx-auto px-6">
@@ -241,7 +252,6 @@ export default function HomePage() {
                   <div className="h-24 animate-pulse bg-gray-100 rounded-lg"></div>
                 ) : nextBooking ? (
                   <>
-                    {/* ENHANCED DATE DISPLAY */}
                     <h3 className="text-sm font-extrabold text-blue-600 flex items-center gap-2 mb-3">
                       <FaCalendarAlt className="text-xl" /> 
                       {formatDay(nextBooking.start_time)} | {formatDate(nextBooking.start_time)}
@@ -253,7 +263,6 @@ export default function HomePage() {
                     <p className="text-medium-text mt-1 text-sm truncate">
                       {nextBooking.facilities.venues.name}, {nextBooking.facilities.venues.city}
                     </p>
-                    {/* ENHANCED TIME BADGE */}
                     <div className="mt-4">
                         <span className="text-lg font-bold text-white bg-primary-green px-4 py-2 rounded-full w-fit 
                                        inline-flex items-center gap-2 shadow-lg shadow-primary-green/50 group-hover:bg-primary-green-dark transition-colors">
@@ -291,7 +300,6 @@ export default function HomePage() {
                           <Link 
                           key={venue.venue_id}
                           to={`/venues/${venue.venue_id}`}
-                          // Enhanced hover and styling for individual links
                           className="flex items-center justify-between p-3 rounded-xl hover:bg-light-green-bg transition-colors no-underline group-inner"
                           >
                           <div className="flex items-center gap-3">
@@ -301,7 +309,6 @@ export default function HomePage() {
                               </span>
                           </div>
                           
-                          {/* Display Booking Count as a Badge */}
                           <span className="text-xs font-bold text-white bg-blue-500 px-3 py-1 rounded-full flex-shrink-0 shadow-sm">
                               {venue.booking_count} bookings
                           </span>
@@ -319,7 +326,6 @@ export default function HomePage() {
               <div className="bg-gradient-to-tr from-cyan-50 to-indigo-50 rounded-2xl p-6 shadow-xl border border-indigo-200 flex flex-col justify-between
                            group transform transition duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer">
                   
-                  {/* ICON ENHANCEMENT */}
                   <div className="relative">
                       <span className="p-3 bg-yellow-300/50 rounded-full inline-block mb-3 transition-all duration-300 group-hover:scale-110">
                           <FaTag className="text-3xl text-yellow-700" /> 
@@ -335,7 +341,6 @@ export default function HomePage() {
                       </p>
                   </div>
                   
-                  {/* Link Button */}
                   <Link 
                       to="/explore" 
                       className="text-blue-600 font-bold flex items-center gap-2 hover:gap-3 transition-all text-sm w-fit mt-3"
@@ -472,7 +477,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Top Venues Section */}
+        {/* --- Top Venues Section --- */}
+        {/* This section now correctly uses the variables from useVenues */}
         <section className="py-20">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-16">
             <div>
@@ -492,6 +498,7 @@ export default function HomePage() {
             </Link>
           </div>
           
+          {/* 'loading' now comes from useVenues */}
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {[...Array(4)].map((_, i) => (
@@ -504,9 +511,19 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {topVenues.length > 0 ? (
+              
+              {/* Also check for venuesError from the hook */}
+              {venuesError ? (
+                <div className="col-span-full text-center py-16">
+                  <p className="text-xl text-red-500">Could not load venues.</p>
+                  {/* Render the error message for debugging */}
+                  <p className="text-sm text-medium-text">{venuesError.message || venuesError.toString()}</p>
+                </div>
+              ) : topVenues.length > 0 ? (
                 topVenues.map((venue) => (
                   <div key={venue.venue_id} className="transform hover:scale-105 transition-transform duration-300">
+                    {/* This VenueCard will now receive the venue with
+                        correct avg_rating and review_count */}
                     <VenueCard venue={venue} />
                   </div>
                 ))

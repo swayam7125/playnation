@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { FaMapMarkerAlt, FaStar } from "react-icons/fa"; // Import FaStar
+import { FaMapMarkerAlt, FaStar } from "react-icons/fa"; 
 
 // Import Swiper React components and modules
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -12,6 +12,7 @@ const placeholderImage =
 function VenueCard({ venue, viewMode = "grid" }) {
   const [isHovered, setIsHovered] = useState(false);
 
+  // This logic is safe because 'facilities' comes from the RPC function
   const availableSports = [
     ...new Set(
       (venue.facilities ?? []).map((f) => f.sports?.name).filter(Boolean)
@@ -125,18 +126,27 @@ function VenueCard({ venue, viewMode = "grid" }) {
               </span>
             </p>
 
-            {/* --- START FIX: Use 'avg_rating' and 'review_count' --- */}
+            {/* --- RATING DISPLAY (NOW CORRECT) --- */}
+            {/* This uses the avg_rating and review_count from the hook/RPC */}
             <div className="flex items-center gap-1 mt-1.5">
-              <FaStar className={`text-sm ${venue.avg_rating > 0 ? 'text-yellow-400' : 'text-gray-300'}`} size={12} />
+              <FaStar
+                className={`text-sm ${
+                  venue.review_count > 0 // Use review_count
+                    ? "text-yellow-400"
+                    : "text-gray-300"
+                }`}
+                size={12}
+              />
               <span className="text-xs font-bold text-dark-text">
-                {Number(venue.avg_rating)}
+                {/* Safely handle the number to prevent NaN */}
+                {(Number(venue.avg_rating) || 0).toFixed(1)}
               </span>
               <span className="text-xs text-medium-text">
-                ({venue.review_count})
+                ({venue.review_count || 0}) {/* Use review_count */}
               </span>
             </div>
-            {/* --- END FIX --- */}
-            
+            {/* --- END RATING DISPLAY --- */}
+
           </div>
 
           {/* Sports Tags */}
