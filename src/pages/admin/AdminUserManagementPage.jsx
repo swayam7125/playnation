@@ -261,53 +261,47 @@ function AdminUserManagementPage() {
       confirmText: `Yes, ${action}`,
       confirmStyle: newStatus === "suspended" ? "danger" : "primary",
       onConfirm: async () => {
-        const originalUsers = users;
-        const updatedUser = { ...userToUpdate, status: newStatus };
-        setUsers((currentUsers) =>
-          currentUsers.map((u) =>
-            u.user_id === userToUpdate.user_id ? updatedUser : u
-          )
-        );
-
         const toastId = toast.loading(`Updating user status...`);
         try {
-          console.log("Attempting to update public.users table...");
-          const { data: updateData, error: updateError } = await supabase
-            .from("users")
-            .update({ status: newStatus })
-            .eq("user_id", userToUpdate.user_id)
-            .select(); // <-- Add .select() to get the updated data back
-
-          console.log("Update response from public.users:", { updateData, updateError });
-
-          if (updateError) {
-            console.error("Error updating public.users:", updateError);
-            throw updateError;
-          }
-
-          if (!updateData || updateData.length === 0) {
-            console.error("Update on public.users did not return data. RLS policy might be preventing the update.");
-            throw new Error("RLS policy might be preventing the update on the users table.");
-          }
-
-          console.log("Successfully updated public.users. Now invoking edge function...");
+          // First, invoke the edge function to update the user's auth status
           const { error: functionError } = await supabase.functions.invoke('update-user-status', {
             body: { user_id: userToUpdate.user_id, status: newStatus },
           });
 
           if (functionError) {
-            console.error("Error invoking edge function:", functionError);
-            throw functionError;
+            throw new Error(`Authentication update failed: ${functionError.message}`);
           }
 
-          console.log("Edge function invoked successfully.");
+          // If the auth update is successful, then update the public.users table
+          const { data: updateData, error: updateError } = await supabase
+            .from("users")
+            .update({ status: newStatus })
+            .eq("user_id", userToUpdate.user_id)
+            .select();
+
+          if (updateError) {
+            throw new Error(`Database update failed: ${updateError.message}`);
+          }
+          
+          if (!updateData || updateData.length === 0) {
+            throw new Error("User not found or RLS policy prevented update.");
+          }
+
+          // If both are successful, update the local state
+          setUsers((currentUsers) =>
+            currentUsers.map((u) =>
+              u.user_id === userToUpdate.user_id ? { ...u, status: newStatus } : u
+            )
+          );
+
           toast.dismiss(toastId);
           toast.success(`User successfully ${action.toLowerCase()}ed.`);
+          
         } catch (err) {
-          setUsers(originalUsers);
           toast.dismiss(toastId);
           toast.error(`Failed to update user status: ${err.message}`);
           setError(err.message);
+          // No need to manually revert state as we now update it only on full success
         }
       },
     });
