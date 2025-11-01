@@ -215,8 +215,6 @@ const ManageSlotsPage = () => {
   }, [fetchSlots]);
 
   const handleAddSlots = async (params) => {
-    // Logic remains mostly the same, assuming AddSlotsModal uses this
-    // I'm omitting the full function body for brevity, but it should be correct from previous versions
     const {
       isBulk,
       date,
@@ -226,12 +224,12 @@ const ManageSlotsPage = () => {
       endTime,
       slotDuration,
     } = params;
+
+    const toastId = toast.loading("Generating new slots...");
+
     const newSlots = [];
     const dateRange = isBulk
-      ? eachDayOfInterval({
-          start: new Date(startDate),
-          end: new Date(endDate),
-        })
+      ? eachDayOfInterval({ start: new Date(startDate), end: new Date(endDate) })
       : [new Date(date)];
 
     for (const day of dateRange) {
@@ -241,26 +239,44 @@ const ManageSlotsPage = () => {
         const slotEnd = addMinutes(current, slotDuration);
         newSlots.push({
           facility_id: selectedFacility.facility_id,
-          start_time: current,
-          end_time: slotEnd,
+          start_time: current.toISOString(),
+          end_time: slotEnd.toISOString(),
           is_available: true,
         });
         current = slotEnd;
       }
     }
 
-    if (newSlots.length > 0) {
-      const { error } = await supabase
-        .from("time_slots")
-        .upsert(newSlots, { onConflict: "facility_id, start_time, end_time" });
+    if (newSlots.length === 0) {
+      toast.dismiss(toastId);
+      toast.error("No slots were generated. Check your time range.");
+      return;
+    }
+
+    try {
+      // Use 'insert' instead of 'upsert' to avoid silent conflicts.
+      const { error } = await supabase.from("time_slots").insert(newSlots);
+
       if (error) {
-        alert("Error adding slots: " + error.message);
-      } else {
-        setIsModalOpen(false);
-        fetchSlots();
+        // Check for the specific unique constraint violation error
+        if (error.code === '23505') { // PostgreSQL unique violation code
+          throw new Error("Some slots already exist in this time range. Please adjust your selection.");
+        } else {
+          throw error;
+        }
       }
-    } else {
+
+      toast.dismiss(toastId);
+      toast.success(`${newSlots.length} slots added successfully!`);
       setIsModalOpen(false);
+      fetchSlots(); // Refresh the view
+
+    } catch (err) {
+      toast.dismiss(toastId);
+      showModal({
+        title: "Error Adding Slots",
+        message: err.message || "An unexpected error occurred.",
+      });
     }
   };
 
