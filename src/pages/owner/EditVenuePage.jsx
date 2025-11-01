@@ -199,44 +199,49 @@ const EditVenuePage = () => {
         }
 
         const deleteImage = async () => {
+            const toastId = toast.loading("Deleting image...");
             try {
                 // Extract the file path from the public URL
-                const urlParts = imageUrl.split('/venue-images/');
-                if (urlParts.length < 2) throw new Error("Invalid image URL format for deletion.");
-                const filePath = `venue-images/${urlParts[1]}`;
+                const url = new URL(imageUrl);
+                const filePath = decodeURIComponent(url.pathname.split('/venue-images/').pop());
 
-                console.log(`Attempting to remove storage object at path: ${filePath}`); // Log removal path
-
-                const { error: storageError } = await supabase.storage
-                    .from('venue-images')
-                    .remove([filePath]); // Use the extracted path
-
-                if (storageError) {
-                    console.error("Storage removal error:", storageError);
-                    // Provide more context if possible
-                    if (storageError.message.includes("Object not found")) {
-                        console.warn("Attempted to delete an image that might already be removed or path is incorrect:", filePath);
-                        // Optionally proceed to update DB if file not found in storage
-                    } else {
-                        throw storageError; // Re-throw other storage errors
-                    }
-                } else {
-                    console.log("Image successfully removed from storage:", filePath);
+                if (!filePath) {
+                    throw new Error("Could not determine file path from URL.");
                 }
 
+                // 1. Remove the image from Supabase Storage
+                const { error: storageError } = await supabase.storage
+                    .from('venue-images')
+                    .remove([filePath]);
 
+                if (storageError && storageError.message !== 'The object was not found') {
+                    // If the error is anything other than "not found", throw it.
+                    throw new Error(`Storage error: ${storageError.message}`);
+                }
+
+                // 2. Update the venues table
                 const updatedImageArray = existingImages.filter(url => url !== imageUrl);
                 const { error: updateError } = await supabase
                     .from('venues')
                     .update({ image_url: updatedImageArray })
                     .eq('venue_id', venueId);
-                if (updateError) throw updateError;
 
-                toast.success("Image deleted successfully!");
+                if (updateError) {
+                    throw new Error(`Database update error: ${updateError.message}`);
+                }
+
+                // 3. If both succeed, update the local state
                 setExistingImages(updatedImageArray);
+                toast.dismiss(toastId);
+                toast.success("Image deleted successfully!");
+
             } catch (err) {
+                toast.dismiss(toastId);
                 console.error("Deletion process failed:", err);
-                showModal({ title: "Deletion Failed", message: `Deletion failed: ${err.message || 'Unknown error'}` });
+                showModal({ 
+                    title: "Deletion Failed", 
+                    message: `Failed to delete image: ${err.message}` 
+                });
             }
         };
 
