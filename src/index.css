@@ -130,3 +130,34 @@ html {
 body {
   -ms-overflow-style: none;
 }
+
+/* Add these styles to your src/index.css */
+
+/* Ensure Leaflet map tiles render correctly */
+.leaflet-container {
+    height: 100%;
+    width: 100%;
+    z-index: 0; /* Ensure it doesn't overlap modals/navbars unnecessarily */
+}
+
+/* You might need to adjust z-index for map controls if they conflict with other UI */
+.leaflet-control-zoom {
+    z-index: 500 !important; /* Use !important if needed to override Leaflet defaults */
+}
+.leaflet-control-attribution {
+   z-index: 500 !important;
+}
+
+/* Ensure popups are visible */
+.leaflet-popup {
+    z-index: 600 !important;
+}
+
+/* Style marker icons if needed */
+.leaflet-marker-icon {
+    /* Custom marker styles here if you replace the default */
+}
+
+.leaflet-marker-shadow {
+    /* Custom shadow styles */
+}

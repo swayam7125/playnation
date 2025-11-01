@@ -1,21 +1,43 @@
 // src/components/auth/LoginForm.test.jsx
-import React from "react";
-import { render, screen } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
-import { AuthProvider } from "../../AuthContext"; // AuthContext is needed as LoginForm uses useAuth
-import LoginForm from "./LoginForm";
-import { describe, it, expect } from "vitest";
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { BrowserRouter } from 'react-router-dom';
+import { vi } from 'vitest';
+import { AuthProvider } from '../../AuthContext';
+import { supabase } from '../../supabaseClient';
+import LoginForm from './LoginForm';
 
-// Mock the ModalContext as it's not relevant for this test
-vi.mock("../../ModalContext", () => ({
-  useModal: () => ({
-    showModal: vi.fn(),
-  }),
+vi.mock('../../supabaseClient', () => ({
+  supabase: {
+    auth: {
+      signInWithPassword: vi.fn(),
+      onAuthStateChange: vi.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      }),
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    },
+    // 👇 **ADD THIS MOCK FOR THE RPC CALL** 👇
+    rpc: vi.fn().mockResolvedValue({ data: 'player', error: null }),
+  },
 }));
 
-describe("LoginForm Component", () => {
-  it("should render all input fields and the submit button", () => {
-    // Arrange: Render the component within necessary providers
+// ... (the rest of your test file remains the same)
+describe('LoginForm Component', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should allow a user to log in successfully', async () => {
+    const user = userEvent.setup();
+    const mockLoginData = {
+      data: {
+        user: { id: '123', email: 'test@example.com' },
+        session: { access_token: 'fake-token' },
+      },
+      error: null,
+    };
+    supabase.auth.signInWithPassword.mockResolvedValue(mockLoginData);
+
     render(
       <BrowserRouter>
         <AuthProvider>
@@ -24,9 +46,16 @@ describe("LoginForm Component", () => {
       </BrowserRouter>
     );
 
-    // Act & Assert: Check if the key elements are on the screen
-    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /login/i })).toBeInTheDocument();
+    const emailInput = await screen.findByPlaceholderText('you@example.com');
+    const passwordInput = screen.getByPlaceholderText('Enter your password');
+
+    await user.type(emailInput, 'test@example.com');
+    await user.type(passwordInput, 'password123');
+    await user.click(screen.getByRole('button', { name: /Sign In/i }));
+
+    expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: 'test@example.com',
+      password: 'password123',
+    });
   });
 });

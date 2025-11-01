@@ -6,7 +6,7 @@ const AuthContext = createContext();
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Initial state is TRUE
 
   const updateUser = async () => {
     try {
@@ -24,7 +24,9 @@ export function AuthProvider({ children }) {
         if (error) throw error;
 
         setProfile(userProfile);
-        return userProfile; // <-- Important: Return the profile
+        return userProfile;
+      } else {
+        setProfile(null);
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
@@ -34,16 +36,19 @@ export function AuthProvider({ children }) {
 
 
   useEffect(() => {
+    // Initial Load: Check session and user profile immediately.
     updateUser().finally(() => setLoading(false));
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === 'SIGNED_IN') {
           setUser(session.user);
-          updateUser();
+          setLoading(true); 
+          updateUser().finally(() => setLoading(false));
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           setProfile(null);
+          setLoading(false); // Authentication check is complete
         }
       }
     );
@@ -57,7 +62,7 @@ export function AuthProvider({ children }) {
     user,
     profile,
     loading,
-    updateUser, // <-- Add the updateUser function to the context value
+    updateUser,
     logout: async () => {
       await supabase.auth.signOut();
       setUser(null);
@@ -67,7 +72,15 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {/* GLOBAL RENDER GUARD: Block rendering of the entire app until loading is false. */}
+      {loading ? (
+          <div className="flex justify-center items-center h-screen w-screen bg-background">
+             {/* Render a simple, global loading indicator */}
+             <div className="w-12 h-12 border-4 border-primary-green border-t-transparent rounded-full animate-spin"></div>
+          </div>
+      ) : (
+          children
+      )}
     </AuthContext.Provider>
   );
 }

@@ -1,4 +1,3 @@
-// src/pages/HomePage.jsx
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
@@ -8,6 +7,11 @@ import CategoryCard from "../components/home/CategoryCard/CategoryCard";
 import VenueCard from "../components/venues/VenueCard";
 import HeroOfferCarousel from "../components/offers/HeroOfferCarousel";
 import { categories } from "../constants/categories";
+
+// --- START FIX 1: Import useVenues ---
+import useVenues from "../hooks/useVenues";
+// --- END FIX 1 ---
+
 import { 
   FaSearch, 
   FaCalendarAlt, 
@@ -19,37 +23,118 @@ import {
   FaShieldAlt,
   FaClock,
   FaCheckCircle,
-  FaQuoteLeft
+  FaQuoteLeft,
+  FaAngleRight,
+  FaTag
 } from "react-icons/fa";
 
 export default function HomePage() {
   const { profile, user } = useAuth();
   const navigate = useNavigate();
-  const [topVenues, setTopVenues] = useState([]);
-  const [heroOffers, setHeroOffers] = useState([]);
-  const [loading, setLoading] = useState(true);
 
+  // --- START FIX 2: Remove old state for venues/loading ---
+  // const [topVenues, setTopVenues] = useState([]); // This will be provided by useVenues
+  const [heroOffers, setHeroOffers] = useState([]);
+  // const [loading, setLoading] = useState(true); // This will be provided by useVenues
+  // --- END FIX 2 ---
+  
+  // --- STATE FOR PLAYER PERSONALIZATION ---
+  const [nextBooking, setNextBooking] = useState(null);
+  const [favoriteVenues, setFavoriteVenues] = useState([]); 
+  const [loadingPersonalData, setLoadingPersonalData] = useState(false);
+
+  // --- START FIX 3: Call and DESTRUCTURE the useVenues hook ---
+  // This is the key fix for the crash and the rating bug.
+  const { 
+    venues: topVenues, // Alias 'venues' to 'topVenues'
+    loading,           // Use 'loading' from the hook
+    error: venuesError // Use 'error' from the hook
+  } = useVenues({ 
+    limit: 4, 
+    sortBy: 'rating' // Fetches top-rated venues
+  });
+  // --- END FIX 3 ---
+
+
+  // --- START REDIRECTION LOGIC ---
   useEffect(() => {
-    if (user && profile?.role === "venue_owner") {
-      navigate("/owner/dashboard");
+    if (user && profile) {
+      if (profile.role === "venue_owner") {
+        navigate("/owner/dashboard", { replace: true });
+        return;
+      }
+      if (profile.role === "admin") {
+        navigate("/admin", { replace: true });
+        return;
+      }
     }
   }, [user, profile, navigate]);
+  // --- END REDIRECTION LOGIC ---
 
+  // RENDER GUARD
+  const isRedirecting = profile?.role === "venue_owner" || profile?.role === "admin";
+  if (isRedirecting) {
+      return null;
+  }
+
+  // --- FETCH PLAYER PERSONALIZED DATA ---
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const { data: venuesData, error: venuesError } = await supabase
-          .from("venues")
-          .select(
-            `*, image_url,facilities (sports (name), facility_amenities ( amenities (name) ) )`
-          )
-          .eq("is_approved", true)
-          .order("created_at", { ascending: false })
-          .limit(4);
-        if (venuesError) throw venuesError;
-        setTopVenues(venuesData);
+    const fetchPersonalData = async () => {
+      if (!user || profile?.role !== "player") return;
+      
+      setLoadingPersonalData(true);
+      const today = new Date();
+      const todayISO = today.toISOString(); 
 
+      try {
+        // 1. Fetch Next Upcoming Booking
+        const { data: bookingData, error: bookingError } = await supabase
+          .from('bookings')
+          .select(`
+            booking_id, start_time, 
+            facilities(
+              venue_id, name, 
+              venues(name, address, city, state)
+            )
+          `)
+          .eq('user_id', user.id)
+          .gte('start_time', todayISO)
+          .eq('status', 'confirmed')
+          .order('start_time', { ascending: true })
+          .limit(1);
+
+        if (bookingError) console.error("Booking fetch error:", bookingError);
+        setNextBooking(bookingData?.[0] || null);
+
+        // 2. Fetch Top 3 Favorite Venues using the RPC function
+        const { data: favoriteData, error: favoriteError } = await supabase.rpc('get_favorite_venues', { p_user_id: user.id });
+
+        if (favoriteError) {
+          console.error("RPC 'get_favorite_venues' failed:", favoriteError);
+          setFavoriteVenues([]);
+        } else {
+          setFavoriteVenues(favoriteData || []);
+        }
+
+      } catch (error) {
+        console.error("Error fetching personalized data:", error);
+      } finally {
+        setLoadingPersonalData(false);
+      }
+    };
+
+    fetchPersonalData();
+  }, [user, profile]);
+
+  // --- START FIX 4: Modify useEffect to ONLY fetch offers ---
+  // The 'topVenues' and 'loading' state are now handled by the useVenues hook.
+  useEffect(() => {
+    const fetchGeneralData = async () => {
+      // setLoading(true); // REMOVED
+      try {
+        // --- VENUES FETCH REMOVED FROM HERE ---
+        
+        // Fetch global offers
         const today = new Date().toISOString();
         const { data: heroOffersData, error: heroOffersError } = await supabase
           .from("offers")
@@ -61,32 +146,24 @@ export default function HomePage() {
           .order("created_at", { ascending: false })
           .limit(5);
 
-        if (heroOffersError) {
-          throw heroOffersError;
-        }
+        if (heroOffersError) throw heroOffersError;
         setHeroOffers(heroOffersData || []);
+        
       } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
-      }
+        console.error("Error fetching general data:", error);
+      } 
+      // finally { // REMOVED
+      //   setLoading(false);
+      // }
     };
 
-    if (!profile || profile?.role !== "venue_owner") {
-      fetchData();
+    // Fetch data only if the user is a 'player' or anonymous
+    if (!user || profile?.role === "player") {
+      fetchGeneralData();
     }
-  }, [profile]);
+  }, [user, profile]);
+  // --- END FIX 4 ---
 
-  if (profile?.role === "venue_owner") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary-green border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-medium-text font-medium">Redirecting to your dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   const features = [
     {
@@ -134,85 +211,227 @@ export default function HomePage() {
     }
   ];
 
+  const isPlayer = user && profile?.role === 'player';
+
+  const formatTime = (dateString) => new Date(dateString).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  
+  const formatDay = (dateString) => {
+      const date = new Date(dateString);
+      const today = new Date();
+      const tomorrow = new Date();
+      tomorrow.setDate(today.getDate() + 1);
+
+      if (date.toDateString() === today.toDateString()) return 'TODAY';
+      if (date.toDateString() === tomorrow.toDateString()) return 'TOMORROW';
+      
+      return date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+  };
+  
+  const formatDate = (dateString) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+
   return (
     <div className="bg-background">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary-green/5 to-primary-green-light/10"></div>
-        
-        <div className="container mx-auto px-6 relative">
-          <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-16 min-h-[600px] py-16">
-            {/* Left Content */}
-            <div className="space-y-8">
-              <div className="space-y-6">
-                <div className="inline-flex items-center gap-2 bg-light-green-bg px-4 py-2 rounded-full text-primary-green font-medium text-sm">
-                  <FaCheckCircle className="w-4 h-4" />
-                  India's #1 Sports Booking Platform
-                </div>
-                
-                <h1 className="text-5xl lg:text-6xl font-bold leading-tight text-dark-text">
-                  Book Sports Slots in
-                  <span className="text-primary-green block">Seconds</span>
-                </h1>
-                
-                <p className="text-xl text-medium-text leading-relaxed max-w-lg">
-                  Real-time availability across turfs and tables near you. No calls, no waiting, just play.
-                </p>
-              </div>
+      {/* --- 1. PERSONALIZED DASHBOARD SECTION --- */}
+      {isPlayer && (
+        <section className="bg-gradient-to-br from-white via-blue-50 to-emerald-50 py-12 border-b border-border-color-light">
+          <div className="container mx-auto px-6">
+            <h2 className="text-3xl font-bold text-dark-text mb-6">
+              Welcome Back, {profile.username || profile.first_name || 'Player'}!
+            </h2>
 
-              {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Link
-                  to="/explore"
-                  className="group bg-primary-green text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-xl hover:bg-primary-green-dark transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl flex items-center justify-center gap-3"
-                >
-                  Start Playing
-                  <FaArrowRight className="group-hover:translate-x-1 transition-transform duration-300" />
-                </Link>
-                
-                <Link
-                  to="/how-it-works"
-                  className="bg-card-bg text-dark-text px-8 py-4 rounded-xl font-semibold text-lg border-2 border-border-color hover:border-primary-green transition-all duration-300 flex items-center justify-center gap-3 hover:shadow-lg"
-                >
-                  <FaPlay className="text-primary-green" />
-                  How It Works
-                </Link>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Card 1: Your Next Game (Next Booking) */}
+              <div className="md:col-span-1 bg-gradient-to-br from-white to-blue-50 rounded-2xl p-6 shadow-xl border border-blue-300/50 
+                             group transform transition duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer">
+                {loadingPersonalData ? (
+                  <div className="h-24 animate-pulse bg-gray-100 rounded-lg"></div>
+                ) : nextBooking ? (
+                  <>
+                    <h3 className="text-sm font-extrabold text-blue-600 flex items-center gap-2 mb-3">
+                      <FaCalendarAlt className="text-xl" /> 
+                      {formatDay(nextBooking.start_time)} | {formatDate(nextBooking.start_time)}
+                    </h3>
+                    
+                    <p className="text-3xl font-extrabold text-dark-text leading-snug truncate">
+                      {nextBooking.facilities.name} 
+                    </p>
+                    <p className="text-medium-text mt-1 text-sm truncate">
+                      {nextBooking.facilities.venues.name}, {nextBooking.facilities.venues.city}
+                    </p>
+                    <div className="mt-4">
+                        <span className="text-lg font-bold text-white bg-primary-green px-4 py-2 rounded-full w-fit 
+                                       inline-flex items-center gap-2 shadow-lg shadow-primary-green/50 group-hover:bg-primary-green-dark transition-colors">
+                          <FaClock className="text-sm" /> 
+                          {formatTime(nextBooking.start_time)}
+                        </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-lg font-semibold text-dark-text mb-2">
+                      No Upcoming Bookings
+                    </h3>
+                    <p className="text-medium-text mb-4">
+                      It's time to hit the courts!
+                    </p>
+                    <Link to="/explore" className="text-primary-green font-medium flex items-center gap-1 hover:gap-2 transition-all text-sm">
+                      Browse Venues <FaAngleRight className="w-3 h-3" />
+                    </Link>
+                  </>
+                )}
               </div>
-
-              {/* Quick Stats */}
-              <div className="flex flex-wrap gap-8 pt-8">
-                {stats.slice(0, 2).map((stat, index) => (
-                  <div key={index} className="text-center">
-                    <div className="text-2xl font-bold text-primary-green">{stat.number}</div>
-                    <div className="text-medium-text text-sm">{stat.label}</div>
+              
+              {/* Card 2: Favorites Suggestion (Enhanced List Items) */}
+              <div className="bg-card-bg rounded-2xl p-6 shadow-xl border border-border-color-light 
+                             group transform transition duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer"> 
+                  <h3 className="text-xl font-bold text-dark-text mb-4 border-b border-border-color-light pb-3">
+                    Book Your Favorites Again:
+                  </h3>
+                  {loadingPersonalData ? (
+                      <div className="h-20 animate-pulse bg-gray-100 rounded-lg"></div>
+                  ) : favoriteVenues.length > 0 ? (
+                      <div className="space-y-3 pt-2">
+                      {favoriteVenues.map((venue) => (
+                          <Link 
+                          key={venue.venue_id}
+                          to={`/venues/${venue.venue_id}`}
+                          className="flex items-center justify-between p-3 rounded-xl hover:bg-light-green-bg transition-colors no-underline group-inner"
+                          >
+                          <div className="flex items-center gap-3">
+                              <FaStar className="text-yellow-500 text-base" />
+                              <span className="font-medium text-dark-text group-inner-hover:text-primary-green transition-colors">
+                                  {venue.name}
+                              </span>
+                          </div>
+                          
+                          <span className="text-xs font-bold text-white bg-blue-500 px-3 py-1 rounded-full flex-shrink-0 shadow-sm">
+                              {venue.booking_count} bookings
+                          </span>
+                          
+                          <FaArrowRight className="text-primary-green w-3 h-3 transition-transform group-inner-hover:translate-x-1" />
+                          </Link>
+                      ))}
+                      </div>
+                  ) : (
+                      <p className="text-medium-text text-sm">Book more venues to see your favorites here!</p>
+                  )}
+              </div>
+              
+              {/* Card 3: New Offers Available (Soft Gradient + Icon Pop) */}
+              <div className="bg-gradient-to-tr from-cyan-50 to-indigo-50 rounded-2xl p-6 shadow-xl border border-indigo-200 flex flex-col justify-between
+                           group transform transition duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer">
+                  
+                  <div className="relative">
+                      <span className="p-3 bg-yellow-300/50 rounded-full inline-block mb-3 transition-all duration-300 group-hover:scale-110">
+                          <FaTag className="text-3xl text-yellow-700" /> 
+                      </span>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Right Content - Hero Image */}
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-primary-green/20 to-primary-green-light/20 rounded-3xl blur-3xl transform -rotate-6 scale-110"></div>
-              <div className="relative bg-card-bg rounded-3xl shadow-2xl overflow-hidden">
-                <img
-                  src={heroImage}
-                  alt="Sports venues and activities"
-                  className="w-full h-auto object-cover"
-                />
+                  
+                  <div>
+                      <h3 className="text-xl font-bold text-dark-text mb-2">
+                          New Offers Available!
+                      </h3>
+                      <p className="text-medium-text mb-4">
+                          Don't miss out on special discounts! Find deals on courts and fields near you.
+                      </p>
+                  </div>
+                  
+                  <Link 
+                      to="/explore" 
+                      className="text-blue-600 font-bold flex items-center gap-2 hover:gap-3 transition-all text-sm w-fit mt-3"
+                  >
+                      See Latest Deals 
+                      <FaAngleRight className="w-4 h-4" />
+                  </Link>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
+      
+      {/* --- 2. HERO/MARKETING SECTION (FOR GUESTS/FALLBACK) --- */}
+      {(!isPlayer || loadingPersonalData) && ( // Show this if not a player, or while player data is loading
+        <section className="relative overflow-hidden">
+          {/* Background Pattern */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-green/5 to-primary-green-light/10"></div>
+          
+          <div className="container mx-auto px-6 relative">
+            <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-16 min-h-[600px] py-16">
+              {/* Left Content */}
+              <div className="space-y-8">
+                <div className="space-y-6">
+                  <div className="inline-flex items-center gap-2 bg-light-green-bg px-4 py-2 rounded-full text-primary-green font-medium text-sm">
+                    <FaCheckCircle className="w-4 h-4" />
+                    India's #1 Sports Booking Platform
+                  </div>
+                  
+                  <h1 className="text-5xl lg:text-6xl font-bold leading-tight text-dark-text">
+                    Book Sports Slots in
+                    <span className="text-primary-green block">Seconds</span>
+                  </h1>
+                  
+                  <p className="text-xl text-medium-text leading-relaxed max-w-lg">
+                    Real-time availability across turfs and tables near you. No calls, no waiting, just play.
+                  </p>
+                </div>
+
+                {/* CTA Buttons */}
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Link
+                    to="/explore"
+                    className="group bg-primary-green text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-xl hover:bg-primary-green-dark transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl flex items-center justify-center gap-3"
+                  >
+                    Start Playing
+                    <FaArrowRight className="group-hover:translate-x-1 transition-transform duration-300" />
+                  </Link>
+                  
+                  <Link
+                    to="/how-it-works"
+                    className="bg-card-bg text-dark-text px-8 py-4 rounded-xl font-semibold text-lg border-2 border-border-color hover:border-primary-green transition-all duration-300 flex items-center justify-center gap-3 hover:shadow-lg"
+                  >
+                    <FaPlay className="text-primary-green" />
+                    How It Works
+                  </Link>
+                </div>
+
+                {/* Quick Stats */}
+                <div className="flex flex-wrap gap-8 pt-8">
+                  {stats.slice(0, 2).map((stat, index) => (
+                    <div key={index} className="text-center">
+                      <div className="text-2xl font-bold text-primary-green">{stat.number}</div>
+                      <div className="text-medium-text text-sm">{stat.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right Content - Hero Image */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary-green/20 to-primary-green-light/20 rounded-3xl blur-3xl transform -rotate-6 scale-110"></div>
+                <div className="relative bg-card-bg rounded-3xl shadow-2xl overflow-hidden">
+                  <img
+                    src={heroImage}
+                    alt="Sports venues and activities"
+                    className="w-full h-auto object-cover"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
 
       <div className="container mx-auto px-6">
         {/* Dynamic Hero Offer Carousel */}
-        {!loading && heroOffers.length > 0 && (
-          <section className="py-16">
-            <HeroOfferCarousel offers={heroOffers} />
-          </section>
-        )}
+        <section className="py-16">
+          <HeroOfferCarousel />
+        </section>
 
         {/* Features Section */}
         <section className="py-20">
@@ -258,7 +477,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Top Venues Section */}
+        {/* --- Top Venues Section --- */}
+        {/* This section now correctly uses the variables from useVenues */}
         <section className="py-20">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-16">
             <div>
@@ -278,6 +498,7 @@ export default function HomePage() {
             </Link>
           </div>
           
+          {/* 'loading' now comes from useVenues */}
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {[...Array(4)].map((_, i) => (
@@ -290,9 +511,19 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {topVenues.length > 0 ? (
+              
+              {/* Also check for venuesError from the hook */}
+              {venuesError ? (
+                <div className="col-span-full text-center py-16">
+                  <p className="text-xl text-red-500">Could not load venues.</p>
+                  {/* Render the error message for debugging */}
+                  <p className="text-sm text-medium-text">{venuesError.message || venuesError.toString()}</p>
+                </div>
+              ) : topVenues.length > 0 ? (
                 topVenues.map((venue) => (
                   <div key={venue.venue_id} className="transform hover:scale-105 transition-transform duration-300">
+                    {/* This VenueCard will now receive the venue with
+                        correct avg_rating and review_count */}
                     <VenueCard venue={venue} />
                   </div>
                 ))
@@ -357,27 +588,6 @@ export default function HomePage() {
             ))}
           </div>
         </section>
-
-        {/* Stats Section */}
-        {/* <section className="py-20">
-          <div className="bg-gradient-to-r from-primary-green to-primary-green-dark rounded-3xl p-12 text-center text-white">
-            <h2 className="text-4xl font-bold mb-4">
-              Join Thousands of Happy Players
-            </h2>
-            <p className="text-xl opacity-90 mb-12">
-              Be part of India's largest sports community
-            </p>
-            
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-              {stats.map((stat, index) => (
-                <div key={index} className="text-center">
-                  <div className="text-4xl lg:text-5xl font-bold mb-2">{stat.number}</div>
-                  <div className="text-lg opacity-80">{stat.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section> */}
 
         {/* Testimonials Section */}
         <section className="py-20">

@@ -78,3 +78,18 @@ export const calculateDurationHours = (startTime, endTime) => {
     const diffInHours = (end - start) / (1000 * 60 * 60);
     return `${diffInHours.toFixed(1)}h`;
 };
+
+/**
+ * Formats a number into a currency string (Indian Rupees).
+ * @param {number} amount
+ * @returns {string}
+ */
+export const formatCurrency = (amount) => {
+  if (typeof amount !== 'number') {
+    return 'N/A';
+  }
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+  }).format(amount);
+};

@@ -9,6 +9,7 @@ import {
   FaEnvelope,
   FaTrash,
 } from "react-icons/fa";
+import LocationPickerMap from '../../components/maps/LocationPickerMap'; // Import the map component
 
 function AddVenuePage() {
   const { showModal } = useModal();
@@ -27,11 +28,18 @@ function AddVenuePage() {
       contact_phone: "",
       opening_time: "06:00",
       closing_time: "23:00",
+      google_maps_url: "", // Optional Google Maps URL field
+      // Latitude and Longitude will be handled by the map component state now
+      cancellation_cutoff_hours: 24, // Default 24 hours
+      // cancellation_fee_percentage: 0, // We'll just use the cutoff for now
     }
   );
 
   const [venueImageFiles, setVenueImageFiles] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
+
+  // State for map coordinates
+  const [selectedLocation, setSelectedLocation] = useState(null);
 
   // Cleanup object URLs on component unmount
   useEffect(() => {
@@ -55,7 +63,7 @@ function AddVenuePage() {
     const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file));
     setImagePreviews(prevPreviews => [...prevPreviews, ...newPreviewUrls]);
   };
-  
+
   const clearImages = () => {
       imagePreviews.forEach(url => URL.revokeObjectURL(url));
       setImagePreviews([]);
@@ -71,10 +79,25 @@ function AddVenuePage() {
       });
       return;
     }
-    
+
+    if (!selectedLocation) { // Check if location is selected
+      showModal({ title: "Location Required", message: "Please select the venue location on the map." });
+      return;
+    }
+
+    // Combine venue details and location for the next step
+    const completeVenueDetails = {
+      ...venueDetails,
+      latitude: selectedLocation.lat,
+      longitude: selectedLocation.lng,
+    };
+
     navigate('/owner/add-facilities', {
       state: {
-        venueDetails,
+        venueDetails: completeVenueDetails, // Pass combined details
+        // Note: Passing actual File objects in navigation state can be problematic.
+        // It's often better to handle uploads here or pass minimal info.
+        // For simplicity, we'll pass them, but be aware of potential size limits.
         venueImageFiles,
       },
     });
@@ -117,7 +140,7 @@ function AddVenuePage() {
                         </button>
                     )}
                 </div>
-                
+
                 {imagePreviews.length > 0 && (
                   <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mb-2">
                     {imagePreviews.map((preview, index) => (
@@ -132,7 +155,7 @@ function AddVenuePage() {
                   <FaImages className="mx-auto text-2xl text-slate-400 mb-1" />
                   <p className="text-sm text-slate-600">Add More Images</p>
                   <p className="text-xs text-slate-500 mt-1">(Re-select if you go back)</p>
-                  <input type="file" onChange={handleImageChange} multiple className="absolute inset-0 w-full h-full opacity-0" />
+                  <input type="file" onChange={handleImageChange} multiple className="absolute inset-0 w-full h-full opacity-0" accept="image/*" />
                 </div>
               </div>
 
@@ -141,12 +164,44 @@ function AddVenuePage() {
                 <input name="address" type="text" value={venueDetails.address} onChange={handleVenueChange} required className="w-full py-2 px-3 bg-white/50 border rounded-lg text-sm" placeholder="Full Address *" />
                 <input name="city" type="text" value={venueDetails.city} onChange={handleVenueChange} required className="w-full py-2 px-3 bg-white/50 border rounded-lg text-sm" placeholder="City *" />
                 <input name="state" type="text" value={venueDetails.state} onChange={handleVenueChange} required className="w-full py-2 px-3 bg-white/50 border rounded-lg text-sm" placeholder="State *" />
+                 <input name="zip_code" type="text" value={venueDetails.zip_code} onChange={handleVenueChange} className="w-full py-2 px-3 bg-white/50 border rounded-lg text-sm" placeholder="ZIP Code" />
+                <input name="google_maps_url" type="url" value={venueDetails.google_maps_url} onChange={handleVenueChange} className="w-full py-2 px-3 bg-white/50 border rounded-lg text-sm" placeholder="Google Maps Share Link (Optional)" />
                 <div className="relative"><FaEnvelope className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-green text-xs" /><input name="contact_email" type="email" value={venueDetails.contact_email} onChange={handleVenueChange} className="w-full py-2 pl-8 pr-3 bg-white/50 border rounded-lg text-sm" placeholder="Contact Email" /></div>
                 <div className="relative"><FaPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-green text-xs" /><input name="contact_phone" type="tel" value={venueDetails.contact_phone} onChange={handleVenueChange} className="w-full py-2 pl-8 pr-3 bg-white/50 border rounded-lg text-sm" placeholder="Phone Number" /></div>
-                <div className="relative"><FaClock className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-green text-xs" /><input name="opening_time" type="time" value={venueDetails.opening_time} onChange={handleVenueChange} required className="w-full py-2 pl-8 pr-3 bg-white/50 border rounded-lg text-sm" /></div>
-                <div className="relative"><FaClock className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-green text-xs" /><input name="closing_time" type="time" value={venueDetails.closing_time} onChange={handleVenueChange} required className="w-full py-2 pl-8 pr-3 bg-white/50 border rounded-lg text-sm" /></div>
+                <div className="relative"><FaClock className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-green text-xs" /><label className="sr-only" htmlFor="opening_time">Opening Time</label><input id="opening_time" name="opening_time" type="time" value={venueDetails.opening_time} onChange={handleVenueChange} required className="w-full py-2 pl-8 pr-3 bg-white/50 border rounded-lg text-sm" /></div>
+                <div className="relative"><FaClock className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-green text-xs" /><label className="sr-only" htmlFor="closing_time">Closing Time</label><input id="closing_time" name="closing_time" type="time" value={venueDetails.closing_time} onChange={handleVenueChange} required className="w-full py-2 pl-8 pr-3 bg-white/50 border rounded-lg text-sm" /></div>
                 <div className="md:col-span-2"><textarea name="description" rows="2" value={venueDetails.description} onChange={handleVenueChange} className="w-full py-2 px-3 bg-white/50 border rounded-lg resize-none text-sm" placeholder="Describe your venue..."></textarea></div>
+                <div className="pt-4 border-t border-gray-200">
+                 <h3 className="text-md font-semibold text-slate-800 mb-2">Cancellation Policy</h3>
+                 <div>
+                    <label 
+                      htmlFor="cancellation_cutoff_hours" 
+                      className="block text-xs font-semibold text-slate-700 mb-1.5"
+                    >
+                      Cancellation Cutoff (in hours)
+                    </label>
+                    <input 
+                      id="cancellation_cutoff_hours"
+                      name="cancellation_cutoff_hours" 
+                      type="number" 
+                      value={venueDetails.cancellation_cutoff_hours} 
+                      onChange={handleVenueChange} 
+                      required 
+                      min="0"
+                      className="w-full py-2 px-3 bg-white/50 border rounded-lg text-sm" 
+                      placeholder="e.g., 24" 
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Time in hours before a booking that a player can cancel (e.g., 24).
+                    </p>
+                 </div>
               </div>
+              </div>
+
+               {/* Add the Location Picker Map */}
+               <div className="md:col-span-2">
+                 <LocationPickerMap onLocationSelect={setSelectedLocation} />
+               </div>
 
               <button type="submit" className="w-full bg-primary-green hover:bg-primary-green-dark text-white py-2.5 rounded-lg font-semibold transition-colors">
                 Continue to Add Facilities

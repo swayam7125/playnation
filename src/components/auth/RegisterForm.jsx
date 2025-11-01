@@ -1,9 +1,8 @@
-// src/components/auth/RegisterForm.jsx
-
 import React, { useState } from "react";
 import { supabase } from "../../supabaseClient";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
+import toast from "react-hot-toast";
 
 function RegisterForm() {
   const navigate = useNavigate();
@@ -20,7 +19,6 @@ function RegisterForm() {
     role: "player",
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
   const from = location.state?.from || null;
 
@@ -30,22 +28,24 @@ function RegisterForm() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    setError(null);
 
+    // Client-side validation using toasts
     if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters long.");
+      toast.error("Password must be at least 6 characters long.");
       return;
     }
     if (formData.password !== formData.confirm_password) {
-      setError("Passwords do not match.");
+      toast.error("Passwords do not match.");
       return;
     }
 
     setLoading(true);
+    const loadingToast = toast.loading("Creating your account...");
 
     try {
-      // ... (rest of the logic is the same)
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // The signUp function passes all profile data in options.data.
+      // Your SQL trigger will use this to create the profile automatically.
+      const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
@@ -59,38 +59,41 @@ function RegisterForm() {
         },
       });
 
-      if (authError) throw authError;
-      if (!authData.user)
-        throw new Error("Registration failed, please try again.");
+      if (error) {
+        throw error; // Let the catch block handle the error toast
+      }
 
-      const userProfile = await updateUser();
+      toast.dismiss(loadingToast);
 
-      if (userProfile && userProfile.role === "venue_owner") {
-        navigate("/owner/dashboard");
-      } else if (from) {
-        navigate(from.pathname, { state: from.state, replace: true });
-      } else {
-        navigate("/");
+      if (data.user) {
+        toast.success("Account created! Please check your email for verification.");
+        updateUser(data.user); // Update auth context
+
+        // --- MODIFIED: Role-based redirection logic ---
+        if (from) {
+          navigate(from, { replace: true });
+        } else {
+          if (formData.role === 'venue_owner') {
+            navigate("/owner/dashboard");
+          } else {
+            navigate("/");
+          }
+        }
       }
     } catch (error) {
-      setError(error.message);
+      toast.dismiss(loadingToast);
+      toast.error(error.message || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   };
 
-  const inputStyles =
-    "w-full py-2 px-3 bg-background border-2 border-border-color rounded-lg text-sm text-dark-text transition duration-300 focus:outline-none focus:border-primary-green focus:ring-2 focus:ring-primary-green/20"; // Smaller padding
-  const labelStyles = "font-semibold text-xs text-dark-text mb-1 block"; // Smaller font and margin
+  const inputStyles = "w-full p-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-primary-green focus:border-primary-green transition-all";
+  const labelStyles = "block mb-0.5 text-xs font-medium text-gray-700";
 
   return (
-    <form onSubmit={handleRegister} className="space-y-3"> {/* Reduced spacing */}
-      {error && (
-        <p className="bg-red-100 text-red-700 p-2 rounded-md text-center text-xs border border-red-200 col-span-2"> {/* Smaller padding */}
-          {error}
-        </p>
-      )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2"> {/* Reduced gaps */}
+    <form onSubmit={handleRegister}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-1.5">
         <div>
           <label htmlFor="first_name" className={labelStyles}>
             First Name
@@ -133,12 +136,12 @@ function RegisterForm() {
             onChange={handleChange}
             required
             className={inputStyles}
-            placeholder="johndoe"
+            placeholder="johndoe123"
           />
         </div>
         <div className="md:col-span-2">
           <label htmlFor="email" className={labelStyles}>
-            Email Address
+            Email
           </label>
           <input
             id="email"
@@ -149,6 +152,21 @@ function RegisterForm() {
             required
             className={inputStyles}
             placeholder="you@example.com"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label htmlFor="phone_number" className={labelStyles}>
+            Phone Number
+          </label>
+          <input
+            id="phone_number"
+            name="phone_number"
+            type="tel"
+            value={formData.phone_number}
+            onChange={handleChange}
+            required
+            className={inputStyles}
+            placeholder="123-456-7890"
           />
         </div>
         <div>
@@ -164,7 +182,7 @@ function RegisterForm() {
             onChange={handleChange}
             required
             className={inputStyles}
-            placeholder="Min. 6 characters"
+            placeholder="••••••••"
           />
         </div>
         <div>
@@ -183,7 +201,7 @@ function RegisterForm() {
             placeholder="Re-enter password"
           />
         </div>
-         <div className="md:col-span-2">
+        <div className="md:col-span-2">
           <label htmlFor="role" className={labelStyles}>
             I am a...
           </label>
@@ -201,7 +219,7 @@ function RegisterForm() {
       </div>
       <button
         type="submit"
-        className="w-full bg-primary-green text-white py-2.5 rounded-lg text-sm font-bold transition duration-300 hover:bg-primary-green-dark hover:-translate-y-0.5 transform disabled:opacity-50 disabled:transform-none shadow-md hover:shadow-primary-green/30 !mt-4" // Smaller padding and specific margin
+        className="w-full bg-primary-green text-white py-1.5 rounded text-xs font-semibold transition-all duration-300 hover:bg-primary-green-dark disabled:opacity-50 shadow-md hover:shadow-lg mt-2"
         disabled={loading}
       >
         {loading ? "Creating Account..." : "Create Account"}

@@ -1,111 +1,136 @@
-import React, { useState } from 'react';
-import { supabase } from '../../supabaseClient';
-import { useAuth } from '../../AuthContext';
-import { FaStar } from 'react-icons/fa';
+// src/components/reviews/ReviewForm.jsx
 
-function ReviewForm({ booking, onClose, onReviewSubmitted }) {
-    const { user } = useAuth();
-    const [rating, setRating] = useState(0);
-    const [hover, setHover] = useState(0);
-    const [comment, setComment] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
+import React, { useState } from "react";
+import { useAuth } from "../../AuthContext";
+import { supabase } from "../../supabaseClient";
+import toast from "react-hot-toast";
+import { Star } from "lucide-react";
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (rating === 0) {
-            setError('Please select a star rating.');
-            return;
-        }
-        setLoading(true);
-        setError('');
+// --- Star Rating Component ---
+const StarRating = ({ rating, setRating }) => {
+  return (
+    <div className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Star
+          key={star}
+          className={`h-7 w-7 cursor-pointer transition-all ${
+            star <= rating
+              ? "fill-yellow-400 text-yellow-400"
+              : "text-gray-300 hover:text-gray-400"
+          }`}
+          onClick={() => setRating(star)}
+        />
+      ))}
+    </div>
+  );
+};
 
-        try {
-            const { error: insertError } = await supabase
-                .from('reviews')
-                .insert({
-                    user_id: user.id,
-                    venue_id: booking.facilities.venues.venue_id,
-                    booking_id: booking.booking_id,
-                    rating: rating,
-                    comment: comment,
-                });
+// --- Review Form Component ---
+const ReviewForm = ({ booking, onSuccess, onCancel }) => {
+  const { user } = useAuth();
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [loading, setLoading] = useState(false);
 
-            if (insertError) {
-                // This handles the case where the database rejects the review because one already exists for this booking
-                if (insertError.code === '23505') { 
-                    throw new Error('You have already submitted a review for this booking.');
-                }
-                throw insertError;
-            }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!user || rating === 0) {
+      toast.error("Please select a rating to submit your review.");
+      return;
+    }
 
-            // After successfully inserting, mark the booking as reviewed
-            const { error: updateError } = await supabase
-                .from('bookings')
-                .update({ has_been_reviewed: true })
-                .eq('booking_id', booking.booking_id);
-            
-            if (updateError) throw updateError;
-            
-            onReviewSubmitted();
-            onClose();
+    setLoading(true);
+    const loadingToast = toast.loading("Submitting your review...");
 
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
+    try {
+      // 1. Insert the review
+      const { data: reviewData, error: reviewError } = await supabase
+        .from("reviews")
+        .insert({
+          user_id: user.id,
+          venue_id: booking.facilities.venues.venue_id,
+          facility_id: booking.facilities.facility_id,
+          booking_id: booking.booking_id,
+          rating: rating,
+          comment: comment,
+        })
+        .select()
+        .single();
 
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-card-bg rounded-xl shadow-lg w-full max-w-md p-8">
-                <h2 className="text-2xl font-bold text-dark-text mb-4">Leave a Review for {booking.facilities.venues.name}</h2>
-                <form onSubmit={handleSubmit}>
-                    <div className="mb-6">
-                        <label className="block text-sm font-medium text-medium-text mb-2">Your Rating</label>
-                        <div className="flex items-center gap-2">
-                            {[...Array(5)].map((_, index) => {
-                                const ratingValue = index + 1;
-                                return (
-                                    <label key={ratingValue}>
-                                        <input type="radio" name="rating" value={ratingValue} onClick={() => setRating(ratingValue)} className="hidden" />
-                                        <FaStar
-                                            className="cursor-pointer transition-colors"
-                                            color={ratingValue <= (hover || rating) ? '#ffc107' : '#e4e5e9'}
-                                            size={30}
-                                            onMouseEnter={() => setHover(ratingValue)}
-                                            onMouseLeave={() => setHover(0)}
-                                        />
-                                    </label>
-                                );
-                            })}
-                        </div>
-                    </div>
-                    <div className="mb-6">
-                        <label htmlFor="comment" className="block text-sm font-medium text-medium-text mb-2">Your Comments</label>
-                        <textarea
-                            id="comment"
-                            rows="4"
-                            value={comment}
-                            onChange={(e) => setComment(e.target.value)}
-                            className="w-full px-4 py-3 bg-hover-bg border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green"
-                            placeholder="Tell us about your experience..."
-                        ></textarea>
-                    </div>
-                    {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
-                    <div className="flex justify-end gap-4">
-                        <button type="button" onClick={onClose} className="py-2 px-5 rounded-lg font-semibold text-sm bg-border-color-light hover:bg-border-color text-medium-text">
-                            Cancel
-                        </button>
-                        <button type="submit" disabled={loading} className="py-2 px-5 rounded-lg font-semibold text-sm bg-primary-green text-white shadow-sm hover:bg-primary-green-dark disabled:bg-gray-400">
-                            {loading ? 'Submitting...' : 'Submit Review'}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-}
+      if (reviewError) throw reviewError;
+
+      // 2. Mark the booking as reviewed
+      const { error: bookingError } = await supabase
+        .from("bookings")
+        .update({ has_been_reviewed: true })
+        .eq("booking_id", booking.booking_id);
+
+      if (bookingError) throw bookingError;
+
+      // 3. (Optional but recommended) Recalculate average rating
+      // You should have a Supabase Function to do this automatically
+      // For now, we'll just show success
+      await supabase.rpc("calculate_venue_avg_rating", {
+        p_venue_id: booking.facilities.venues.venue_id,
+      });
+
+      toast.success("Thank you for your review!", { id: loadingToast });
+      onSuccess(); // Close modal and refresh list
+    } catch (error) {
+      console.error("Error submitting review:", error);
+      toast.error(error.message || "Failed to submit review.", {
+        id: loadingToast,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div>
+        <label className="mb-2 block text-sm font-semibold text-dark-text">
+          Your Rating
+        </label>
+        <StarRating rating={rating} setRating={setRating} />
+      </div>
+
+      <div>
+        <label
+          htmlFor="comment"
+          className="mb-2 block text-sm font-semibold text-dark-text"
+        >
+          Your Review (Optional)
+        </label>
+        <textarea
+          id="comment"
+          rows="4"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder="What did you like or dislike?"
+          className="w-full rounded-lg border border-border-color bg-background p-3 text-sm text-dark-text focus:border-primary-green focus:ring-1 focus:ring-primary-green"
+        />
+      </div>
+
+      <div className="flex justify-end gap-3 pt-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={loading}
+          className="rounded-lg border-2 border-border-color px-5 py-2.5 text-sm font-semibold text-medium-text transition hover:bg-hover-bg"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={loading || rating === 0}
+          className="rounded-lg bg-primary-green px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-green-dark disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? "Submitting..." : "Submit Review"}
+        </button>
+      </div>
+    </form>
+  );
+};
 
 export default ReviewForm;

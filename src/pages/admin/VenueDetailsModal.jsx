@@ -23,7 +23,8 @@ const VenueDetailRow = ({ icon: Icon, label, value }) => (
 const VenueDetailsModal = ({ venue, onClose }) => {
   if (!venue) return null;
 
-  const owner = venue.owner_id;
+  // --- LOGIC FIX: Access the 'users' object fetched from the parent page ---
+  const owner = venue.users;
   const isApproved = venue.is_approved;
   const isDeclined = !isApproved && venue.rejection_reason;
 
@@ -98,7 +99,8 @@ const VenueDetailsModal = ({ venue, onClose }) => {
             <VenueDetailRow
               icon={FaUser}
               label="Owner"
-              value={owner?.username || owner?.email}
+              // --- LOGIC FIX: Use the 'owner' object and provide a fallback ---
+              value={owner?.username || owner?.email || "Owner not specified"}
             />
             <VenueDetailRow
               icon={FaClock}

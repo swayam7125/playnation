@@ -6,67 +6,81 @@ const useVenues = (options = {}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Destructure filtering and sorting options
-  const { limit, selectedSport, searchTerm, sortBy } = options; 
+  const { limit, selectedSport, searchTerm, sortBy } = options;
 
-  // Include filters in dependency array to re-fetch when they change
   useEffect(() => {
     const fetchVenues = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        let query = supabase
-          .from("venues")
-          .select(
-            `
-            *,
-            facilities (
-              *,
-              sports (sport_id, name),
-              facility_amenities (
-                amenities (name)
-              )
-            )
-          `
-          )
-          .eq("is_approved", true);
+        // --- Call the RPC function ---
+        // The data comes back as a single JSON array
+        let { data, error: fetchError } = await supabase
+          .rpc('get_explore_page_venues');
+        
+        if (fetchError) throw fetchError;
 
-        // --- SERVER-SIDE FILTERING LOGIC ---
+        // The 'data' is the JSON array from the function
+        let processedVenues = data || [];
 
+        // Apply search filter (client-side)
         if (searchTerm) {
-          const searchPattern = `%${searchTerm.toLowerCase()}%`;
-          // Apply search filter across name, address, and description fields
-          query = query.or(`name.ilike.${searchPattern},address.ilike.${searchPattern},description.ilike.${searchPattern}`);
+          const searchPattern = searchTerm.toLowerCase();
+          processedVenues = processedVenues.filter(venue =>
+            venue.name?.toLowerCase().includes(searchPattern) ||
+            venue.address?.toLowerCase().includes(searchPattern) ||
+            venue.description?.toLowerCase().includes(searchPattern)
+          );
         }
-
+        
+        // Client-side filtering by sport
         if (selectedSport && selectedSport !== 'all') {
-          // Filter by sport ID in the nested 'facilities' table
-          query = query.eq('facilities.sport_id', selectedSport);
+          processedVenues = processedVenues.filter(venue => {
+            return venue.facilities && venue.facilities.some(
+              facility => facility.sport_id === selectedSport
+            );
+          });
         }
 
-        // Apply sorting directly in the query
-        switch (sortBy) {
-          case 'name':
-            query = query.order('name', { ascending: true });
-            break;
-          case 'created_at': // Default fallback
-          default:
-            query = query.order('created_at', { ascending: false });
-            break;
+        // Client-side sorting
+        if (sortBy === 'name') {
+          processedVenues.sort((a, b) => {
+            const nameA = (a.name || '').toLowerCase();
+            const nameB = (b.name || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+        } else if (sortBy === 'rating') {
+          // Sort by the 'avg_rating' property from the function
+          processedVenues.sort((a, b) => {
+            const ratingA = a.avg_rating || 0;
+            const ratingB = b.avg_rating || 0;
+            return ratingB - ratingA; // Descending
+          });
+        } else if (sortBy === 'price') {
+          processedVenues.sort((a, b) => {
+            const minPriceA = a.facilities?.length 
+              ? Math.min(...a.facilities.map(f => f.hourly_rate || Infinity))
+              : Infinity;
+            const minPriceB = b.facilities?.length 
+              ? Math.min(...b.facilities.map(f => f.hourly_rate || Infinity))
+              : Infinity;
+            return minPriceA - minPriceB;
+          });
+        } else {
+          processedVenues.sort((a, b) => {
+            const dateA = new Date(a.created_at || 0);
+            const dateB = new Date(b.created_at || 0);
+            return dateB - dateA; // Descending
+          });
         }
 
+        // Apply limit (client-side)
         if (limit) {
-          query = query.limit(limit);
+          processedVenues = processedVenues.slice(0, limit);
         }
 
-        const { data, error: fetchError } = await query;
-
-        if (fetchError) {
-          throw fetchError;
-        }
-
-        setVenues(data || []);
+        setVenues(processedVenues);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -77,6 +91,7 @@ const useVenues = (options = {}) => {
     fetchVenues();
   }, [limit, selectedSport, searchTerm, sortBy]);
 
+  // This return value is what's causing the error in your component
   return { venues, loading, error };
 };
 

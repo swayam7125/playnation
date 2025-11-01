@@ -1,97 +1,186 @@
-import React from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
-import Navbar from './components/layout/Navbar.jsx';
-import OwnerProtectedRoute from './components/auth/OwnerProtectedRoute.jsx';
-import AdminProtectedRoute from './components/auth/AdminProtectedRoute.jsx';
-import Footer from './components/layout/Footer.jsx';
+import {
+  Routes,
+  Route,
+  Outlet,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+import React, { useEffect } from "react"; // 👈 Import React and useEffect
 
-// Public Pages
-import HomePage from './pages/HomePage.jsx';
-import AuthPage from './pages/AuthPage.jsx';
-import ExplorePage from './pages/ExplorePage.jsx';
-import VenuePage from './pages/VenuePage.jsx';
-import AboutUsPage from './pages/AboutUsPage.jsx';
-import ContactUsPage from './pages/ContactUsPage.jsx'; 
+// Auth & Context
+import { AuthProvider, useAuth } from "./AuthContext";
+import { ModalProvider } from "./ModalContext";
+import AdminProtectedRoute from "./components/auth/AdminProtectedRoute";
+import OwnerProtectedRoute from "./components/auth/OwnerProtectedRoute";
+
+// Layout
+import Navbar from "./components/layout/Navbar";
+import Footer from "./components/layout/Footer";
+
+// General Pages
+import HomePage from "./pages/HomePage";
+import ExplorePage from "./pages/ExplorePage";
+import VenuePage from "./pages/VenuePage";
+import AuthPage from "./pages/AuthPage";
+import AboutUsPage from "./pages/AboutUsPage";
+import ContactUsPage from "./pages/ContactUsPage";
 
 // Player Pages
-import MyBookingsPage from './pages/player/MyBookingsPage.jsx';
-import BookingPage from './pages/player/BookingPage.jsx';
-import ProfilePage from './pages/player/ProfilePage.jsx';
+import MyBookingsPage from "./pages/player/MyBookingsPage";
+import ProfilePage from "./pages/player/ProfilePage";
+import BookingPage from "./pages/player/BookingPage";
 
 // Owner Pages
-import OwnerDashboardPage from './pages/owner/OwnerDashboardPage.jsx';
-import AddVenuePage from './pages/owner/AddVenuePage.jsx';
-import AddFacilitiesPage from './pages/owner/AddFacilitiesPage.jsx'; 
-import EditVenuePage from './pages/owner/EditVenuePage.jsx';
-import MyVenuesPage from './pages/owner/MyVenuesPage.jsx';
-import BookingCalendarPage from './pages/owner/BookingCalendarPage.jsx';
-import ManageSlotsPage from './pages/owner/ManageSlotsPage.jsx';
-import ManageOffersPage from './pages/owner/ManageOffersPage.jsx';
+import OwnerDashboardPage from "./pages/owner/OwnerDashboardPage";
+import MyVenuesPage from "./pages/owner/MyVenuesPage";
+import AddVenuePage from "./pages/owner/AddVenuePage";
+import AddFacilitiesPage from "./pages/owner/AddFacilitiesPage";
+import EditVenuePage from "./pages/owner/EditVenuePage";
+import ManageSlotsPage from "./pages/owner/ManageSlotsPage";
+import ManageOffersPage from "./pages/owner/ManageOffersPage";
+import BookingCalendarPage from "./pages/owner/BookingCalendarPage";
+import ReportsPage from './pages/owner/ReportsPage'; // Adjust path as necessary
 
 // Admin Pages
-import AdminVenueManagementPage from './pages/admin/AdminVenueManagementPage.jsx';
-import AdminBookingsPage from './pages/admin/AdminBookingsPage.jsx';
-import AdminUserManagementPage from './pages/admin/AdminUserManagementPage.jsx';
-import AdminNotifyPage from './pages/admin/AdminNotifyPage.jsx';
-import AdminManageOffersPage from './pages/admin/AdminManageOffersPage.jsx';
+import AdminUserManagementPage from "./pages/admin/AdminUserManagementPage";
+import AdminVenueManagementPage from "./pages/admin/AdminVenueManagementPage";
+import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
+import AdminManageOffersPage from "./pages/admin/AdminManageOffersPage";
+import AdminNotifyPage from "./pages/admin/AdminNotifyPage";
 
-function App() {
+// --- NEW COMPONENT: Resets scroll position on route change ---
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    // Scrolls to the top-left corner of the page on every route change
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+};
+// -------------------------------------------------------------
+
+// Layout Component to conditionally render footer
+const AppLayout = () => {
   const location = useLocation();
-  const hideFooter =
-    location.pathname === "/login" || location.pathname === "/signup";
+  const { pathname } = location;
+
+  // Define the paths where the footer should be displayed
+  const showFooterOnPaths = ["/", "/about", "/contact"];
+
+  // Check for exact paths or if it's a dynamic venue page
+  const shouldShowFooter =
+    showFooterOnPaths.includes(pathname);
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-background font-sans">
       <Navbar />
       <main className="flex-grow">
+        <Outlet />
+      </main>
+      {shouldShowFooter && <Footer />}
+    </div>
+  );
+};
+
+// --- The App component with the previous flicker fix integrated ---
+// You MUST ensure your HomePage.jsx file is clean of the redundant redirection logic 
+// from previous steps for the AuthContext delay fix to work correctly.
+
+function App() {
+  return (
+    <AuthProvider>
+      <ModalProvider>
+        <Toaster
+          position="top-center"
+          reverseOrder={false}
+          toastOptions={{
+            success: {
+              duration: 3000,
+            },
+            error: {
+              duration: 5000,
+            },
+            style: {
+              fontSize: "16px",
+              maxWidth: "500px",
+              padding: "16px 24px",
+            },
+          }}
+        />
         <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<HomePage />} />
-          <Route path="/explore" element={<ExplorePage />} />
-          <Route path="/about" element={<AboutUsPage />} />
-          <Route path="/contact" element={<ContactUsPage />} />
-          <Route path="/login" element={<AuthPage />} />
-          <Route path="/signup" element={<AuthPage />} />
-          <Route path="/venues/:venueId" element={<VenuePage />} />
+          <Route path="/" element={<> <ScrollToTop /> <AppLayout /> </>}> {/* 👈 WRAPPING LAYOUT WITH SCROLLTOTOP */}
+            
+            {/* Index route element restored to HomePage (The delay is in AuthContext) */}
+            <Route index element={<HomePage />} />
+            
+            <Route path="explore" element={<ExplorePage />} />
+            <Route path="venues/:venueId" element={<VenuePage />} />
+            <Route path="about" element={<AboutUsPage />} />
+            <Route path="contact" element={<ContactUsPage />} />
 
-          {/* Player-specific routes */}
-          <Route path="/my-bookings" element={<MyBookingsPage />} />
-          <Route path="/booking" element={<BookingPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
+            {/* Auth Routes */}
+            <Route path="auth" element={<AuthPage />} />
+            <Route path="login" element={<AuthPage />} />
+            <Route path="signup" element={<AuthPage />} />
 
-          {/* Owner Protected Routes */}
-          <Route element={<OwnerProtectedRoute />}>
-            <Route path="/owner/dashboard" element={<OwnerDashboardPage />} />
-            <Route path="/owner/add-venue" element={<AddVenuePage />} />
-            <Route path="/owner/add-facilities" element={<AddFacilitiesPage />} />
-            <Route
-              path="/owner/edit-venue/:venueId"
-              element={<EditVenuePage />}
-            />
-            <Route path="/owner/my-venues" element={<MyVenuesPage />} />
-            <Route path="/owner/manage-offers" element={<ManageOffersPage />} />
-            <Route path="/owner/calendar" element={<BookingCalendarPage />} />
-            <Route path="/owner/manage-slots" element={<ManageSlotsPage />} />
-          </Route>
+            {/* Player Routes */}
+            <Route path="my-bookings" element={<MyBookingsPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="booking/:facilityId" element={<BookingPage />} />
 
-          {/* Admin Protected Routes */}
-          <Route element={<AdminProtectedRoute />}>
+            {/* Owner Routes (Path is fixed, protected) */}
             <Route
-              path="/admin/venues"
-              element={<AdminVenueManagementPage />}
-            />
-            <Route path="/admin/bookings" element={<AdminBookingsPage />} />
-            <Route path="/admin/users" element={<AdminUserManagementPage />} />
+              path="owner"
+              element={
+                <OwnerProtectedRoute>
+                  <Outlet />
+                </OwnerProtectedRoute>
+              }
+            >
+              <Route index element={<OwnerDashboardPage />} />
+              <Route path="dashboard" element={<OwnerDashboardPage />} />
+              <Route path="my-venues" element={<MyVenuesPage />} />
+              <Route path="add-venue" element={<AddVenuePage />} />
+              <Route path="edit-venue/:venueId" element={<EditVenuePage />} />
+              <Route path="add-facilities" element={<AddFacilitiesPage />} />
+              <Route path="/owner/reports" element={<ReportsPage />} />
+              <Route
+                path="manage-slots"
+                element={<ManageSlotsPage />}
+              />
+              <Route
+                path="manage-offers"
+                element={<ManageOffersPage />}
+              />
+              <Route
+                path="calendar"
+                element={<BookingCalendarPage />}
+              />
+            </Route>
+
+            {/* Admin Routes */}
             <Route
-              path="/admin/manage-offers"
-              element={<AdminManageOffersPage />}
-            />
-            <Route path="/admin/notify" element={<AdminNotifyPage />} />
+              path="admin"
+              element={
+                <AdminProtectedRoute>
+                  <Outlet />
+                </AdminProtectedRoute>
+              }
+            >
+              <Route index element={<AdminUserManagementPage />} />
+              <Route path="users" element={<AdminUserManagementPage />} />
+              <Route path="venues" element={<AdminVenueManagementPage />} />
+              <Route path="bookings" element={<AdminBookingsPage />} />
+              <Route path="manage-offers" element={<AdminManageOffersPage />} />
+              <Route path="notify" element={<AdminNotifyPage />} />
+            </Route>
           </Route>
         </Routes>
-      </main>
-      {!hideFooter && <Footer />}
-    </div>
+      </ModalProvider>
+    </AuthProvider>
   );
 }
 
