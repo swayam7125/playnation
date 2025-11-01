@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../supabaseClient";
 import { useModal } from "../../ModalContext";
+import toast from 'react-hot-toast';
 import {
   FaUserCircle,
   FaUsers,
@@ -252,43 +253,64 @@ function AdminUserManagementPage() {
     fetchCurrentUser();
   }, [fetchUsers]);
 
-  const handleToggleStatus = async (userToUpdate, newStatus) => {
+  const handleToggleStatus = (userToUpdate, newStatus) => {
     const action = newStatus === "suspended" ? "Suspend" : "Activate";
-    const confirmed = await showModal({
+    showModal({
       title: `${action} User`,
       message: `Are you sure you want to ${action.toLowerCase()} this user?`,
       confirmText: `Yes, ${action}`,
       confirmStyle: newStatus === "suspended" ? "danger" : "primary",
+      onConfirm: async () => {
+        const originalUsers = users;
+        const updatedUser = { ...userToUpdate, status: newStatus };
+        setUsers((currentUsers) =>
+          currentUsers.map((u) =>
+            u.user_id === userToUpdate.user_id ? updatedUser : u
+          )
+        );
+
+        const toastId = toast.loading(`Updating user status...`);
+        try {
+          console.log("Attempting to update public.users table...");
+          const { data: updateData, error: updateError } = await supabase
+            .from("users")
+            .update({ status: newStatus })
+            .eq("user_id", userToUpdate.user_id)
+            .select(); // <-- Add .select() to get the updated data back
+
+          console.log("Update response from public.users:", { updateData, updateError });
+
+          if (updateError) {
+            console.error("Error updating public.users:", updateError);
+            throw updateError;
+          }
+
+          if (!updateData || updateData.length === 0) {
+            console.error("Update on public.users did not return data. RLS policy might be preventing the update.");
+            throw new Error("RLS policy might be preventing the update on the users table.");
+          }
+
+          console.log("Successfully updated public.users. Now invoking edge function...");
+          const { error: functionError } = await supabase.functions.invoke('update-user-status', {
+            body: { user_id: userToUpdate.user_id, status: newStatus },
+          });
+
+          if (functionError) {
+            console.error("Error invoking edge function:", functionError);
+            throw functionError;
+          }
+
+          console.log("Edge function invoked successfully.");
+          toast.dismiss(toastId);
+          toast.success(`User successfully ${action.toLowerCase()}ed.`);
+        } catch (err) {
+          setUsers(originalUsers);
+          toast.dismiss(toastId);
+          toast.error(`Failed to update user status: ${err.message}`);
+          setError(err.message);
+        }
+      },
     });
-
-    if (!confirmed) return;
-
-    // Optimistic UI update for instant feedback
-    const originalUsers = users;
-    const updatedUser = { ...userToUpdate, status: newStatus };
-    setUsers((currentUsers) =>
-      currentUsers.map((u) =>
-        u.user_id === userToUpdate.user_id ? updatedUser : u
-      )
-    );
-
-    try {
-      const { error } = await supabase
-        .from("users")
-        .update({ status: newStatus })
-        .eq("user_id", userToUpdate.user_id);
-
-      if (error) {
-        // If there's an error, revert the UI change and show an error modal
-        setUsers(originalUsers);
-        throw error;
-      }
-    } catch (err) {
-      showModal({
-        title: "Update Failed",
-        message: `Could not update the user's status. Please check your network connection and Supabase Row Level Security (RLS) policies for the 'users' table. Error: ${err.message}`,
-      });
-    }
   };
 
   const handleViewDetails = (user) => {
@@ -483,4 +505,4 @@ function AdminUserManagementPage() {
   );
 }
 
-export default AdminUserManagementPage;
+export { AdminUserManagementPage as default };

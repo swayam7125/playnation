@@ -22,14 +22,15 @@ export const ModalProvider = ({ children }) => {
       {children}
       {modalProps && (
         <Modal
-          {...modalProps} // 👈 *** THIS IS THE FIX ***
+          {...modalProps}
           onClose={() => {
-            // Ensure onClose logic from props is also called if it exists
             if (modalProps.onClose) {
               modalProps.onClose();
             }
-            hideModal(); // Always hide the modal
+            hideModal();
           }}
+          onConfirm={modalProps.onConfirm}
+          onCancel={modalProps.onCancel}
         />
       )}
     </ModalContext.Provider>

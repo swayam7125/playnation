@@ -9,6 +9,7 @@ import {
   FaClock, FaPhone, FaEnvelope, FaUpload, FaEye, FaUsers,
   FaRupeeSign, FaStar, FaShieldAlt // 👈 Import new icon
 } from 'react-icons/fa';
+import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid'; // Import uuid for unique filenames
 import LocationPickerMap from '../../components/maps/LocationPickerMap'; // Import map picker
 
@@ -59,7 +60,7 @@ const uploadVenueImage = async (file, userId) => {
      return urlData.publicUrl;
 };
 
-function EditVenuePage() {
+const EditVenuePage = () => {
     const { venueId } = useParams();
     const { user } = useAuth();
     const { showModal } = useModal();
@@ -192,25 +193,17 @@ function EditVenuePage() {
     };
 
     const handleRemoveExistingImage = async (imageUrl) => {
-         // Prevent deletion if it's the last image
         if (existingImages.length <= 1 && newImageFiles.length === 0) {
-            await showModal({ title: "Cannot Delete", message: "You must have at least one image for the venue." });
+            showModal({ title: "Cannot Delete", message: "You must have at least one image for the venue." });
             return;
         }
 
-        const isConfirmed = await showModal({
-            title: "Confirm Deletion",
-            message: "Are you sure you want to delete this image? This action cannot be undone.",
-            confirmText: "Delete",
-            confirmStyle: "danger"
-        });
-
-        if (isConfirmed) {
+        const deleteImage = async () => {
             try {
                 // Extract the file path from the public URL
-                 const urlParts = imageUrl.split('/venue-images/');
-                 if (urlParts.length < 2) throw new Error("Invalid image URL format for deletion.");
-                 const filePath = `venue-images/${urlParts[1]}`;
+                const urlParts = imageUrl.split('/venue-images/');
+                if (urlParts.length < 2) throw new Error("Invalid image URL format for deletion.");
+                const filePath = `venue-images/${urlParts[1]}`;
 
                 console.log(`Attempting to remove storage object at path: ${filePath}`); // Log removal path
 
@@ -219,17 +212,17 @@ function EditVenuePage() {
                     .remove([filePath]); // Use the extracted path
 
                 if (storageError) {
-                     console.error("Storage removal error:", storageError);
-                     // Provide more context if possible
-                     if (storageError.message.includes("Object not found")) {
+                    console.error("Storage removal error:", storageError);
+                    // Provide more context if possible
+                    if (storageError.message.includes("Object not found")) {
                         console.warn("Attempted to delete an image that might already be removed or path is incorrect:", filePath);
-                         // Optionally proceed to update DB if file not found in storage
-                     } else {
+                        // Optionally proceed to update DB if file not found in storage
+                    } else {
                         throw storageError; // Re-throw other storage errors
                     }
-                 } else {
-                     console.log("Image successfully removed from storage:", filePath);
-                 }
+                } else {
+                    console.log("Image successfully removed from storage:", filePath);
+                }
 
 
                 const updatedImageArray = existingImages.filter(url => url !== imageUrl);
@@ -239,13 +232,22 @@ function EditVenuePage() {
                     .eq('venue_id', venueId);
                 if (updateError) throw updateError;
 
-                await showModal({ title: "Success", message: "Image deleted successfully!" });
+                toast.success("Image deleted successfully!");
                 setExistingImages(updatedImageArray);
             } catch (err) {
-                 console.error("Deletion process failed:", err);
-                 await showModal({ title: "Deletion Failed", message: `Deletion failed: ${err.message || 'Unknown error'}` });
+                console.error("Deletion process failed:", err);
+                showModal({ title: "Deletion Failed", message: `Deletion failed: ${err.message || 'Unknown error'}` });
             }
-        }
+        };
+
+        showModal({
+            title: "Confirm Deletion",
+            message: "Are you sure you want to delete this image? This action cannot be undone.",
+            confirmText: "Delete",
+            confirmStyle: "danger",
+            showCancel: true,
+            onConfirm: deleteImage,
+        });
     };
 
     const handleDetailsUpdate = async (e) => {
@@ -302,7 +304,8 @@ function EditVenuePage() {
                 .eq('venue_id', venueId);
             if (updateError) throw updateError;
 
-            await showModal({ title: "Success", message: "Venue details updated successfully!" });
+            toast.success("Venue details updated successfully!");
+            navigate(`/venues/${venueId}`);
             // Manually update local state to reflect changes immediately
             setExistingImages(updatedImageArray);
             if(updatedLocation) setInitialMapPosition(updatedLocation); // Update map position state
@@ -331,7 +334,7 @@ function EditVenuePage() {
         try {
             const { error } = await supabase.from('facilities').insert([{ venue_id: venueId, ...newFacility }]);
             if (error) throw error;
-            await showModal({ title: "Success", message: "Facility added successfully!" });
+            toast.success("Facility added successfully!");
             setShowAddFacilityForm(false);
             setNewFacility({ name: '', sport_id: '', capacity: '', hourly_rate: '', description: '' }); // Reset form
             fetchVenueData(); // Refresh list
@@ -341,22 +344,25 @@ function EditVenuePage() {
     };
 
     const handleDeleteFacility = async (facilityId, facilityName) => {
-        const isConfirmed = await showModal({
-            title: "Confirm Deletion",
-            message: `Are you sure you want to delete "${facilityName}"? This action cannot be undone.`,
-            confirmText: "Delete",
-            confirmStyle: "danger"
-        });
-        if (isConfirmed) {
+        const deleteFacility = async () => {
             try {
                 const { error } = await supabase.from('facilities').delete().eq('facility_id', facilityId);
                 if (error) throw error;
-                await showModal({ title: "Success", message: "Facility deleted!" });
+                toast.success("Facility deleted!");
                 fetchVenueData(); // Refresh list
             } catch (error) {
-                await showModal({ title: "Error", message: `Error deleting facility: ${error.message}` });
+                showModal({ title: "Error", message: `Error deleting facility: ${error.message}` });
             }
-        }
+        };
+
+        showModal({
+            title: "Confirm Deletion",
+            message: `Are you sure you want to delete "${facilityName}"? This action cannot be undone.`,
+            confirmText: "Delete",
+            confirmStyle: "danger",
+            showCancel: true,
+            onConfirm: deleteFacility,
+        });
     };
 
     if (loading && !venue) { // Show initial loading only if venue is not yet loaded

@@ -25,14 +25,14 @@ const OwnerOfferCard = ({ offer, onEdit, onDelete, onToggle }) => {
           <h3 className="font-bold text-md text-dark-text pr-2">{title}</h3>
           <div className="flex items-center gap-2">
             <button
-              onClick={onEdit}
+              onClick={() => onEdit(offer)}
               className="text-gray-400 hover:text-blue-500 transition-colors p-1"
               title="Edit Offer"
             >
               <FaEdit />
             </button>
             <button
-              onClick={onDelete}
+              onClick={() => onDelete(offer.offer_id)}
               className="text-gray-400 hover:text-red-500 transition-colors p-1"
               title="Delete Offer"
             >
@@ -66,7 +66,7 @@ const OwnerOfferCard = ({ offer, onEdit, onDelete, onToggle }) => {
           {statusText}
         </span>
         <button
-          onClick={onToggle}
+          onClick={() => onToggle(offer)}
           className={`text-xl ${statusColor} hover:opacity-70 transition-opacity`}
           title={is_active ? "Deactivate Offer" : "Activate Offer"}
         >

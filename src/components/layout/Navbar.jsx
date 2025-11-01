@@ -1,15 +1,29 @@
-// src/components/layout/Navbar.jsx
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 import { useModal } from "../../ModalContext";
+import { FaUserCircle, FaSignOutAlt } from "react-icons/fa"; // Import new icons
 
 function Navbar() {
-  const { user, profile } = useAuth();
+  const { user, profile, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { showModal } = useModal();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsProfileDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownRef]);
 
   const handleLogout = () => {
     showModal({
@@ -22,6 +36,7 @@ function Navbar() {
         logout();
         navigate("/");
         setIsMobileMenuOpen(false);
+        setIsProfileDropdownOpen(false);
       },
     });
   };
@@ -29,6 +44,7 @@ function Navbar() {
   const handleProfileClick = () => {
     navigate("/profile");
     setIsMobileMenuOpen(false);
+    setIsProfileDropdownOpen(false);
   };
 
   const navLinkClasses =
@@ -116,11 +132,11 @@ function Navbar() {
 
           {/* Auth Section */}
           <div className="flex items-center gap-4">
-            {/* Desktop Auth - Profile Button Only (No Logout) */}
-            <div className="hidden lg:flex items-center gap-4">
+            {/* Desktop Auth - Profile Button with Dropdown */}
+            <div className="hidden lg:flex items-center gap-4 relative" ref={dropdownRef}>
               {user ? (
                 <button
-                  onClick={handleProfileClick}
+                  onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                   aria-label={
                     profile?.username
                       ? `Open profile for ${profile.username}`
@@ -128,14 +144,12 @@ function Navbar() {
                   }
                   className="w-10 h-10 p-0 rounded-full overflow-hidden transition-all duration-200 hover:scale-105 focus:outline-none"
                 >
-                  {/* If an avatar URL exists, render it full-bleed; otherwise render the gradient initial */}
                   {profile?.avatar_url ? (
                     <img
                       src={profile.avatar_url}
                       alt={(profile?.username || "User") + " avatar"}
                       className="w-full h-full object-cover block"
                       onError={(e) => {
-                        // hide broken image so fallback initial below (if any) will show
                         e.currentTarget.style.display = "none";
                       }}
                     />
@@ -162,6 +176,33 @@ function Navbar() {
                     Sign up
                   </Link>
                 </>
+              )}
+
+              {/* Profile Dropdown Menu */}
+              {user && isProfileDropdownOpen && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-200 transition-all duration-300 ease-in-out transform opacity-100 scale-100">
+                  <div className="px-4 py-3 border-b border-gray-200">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{profile?.username || "User"}</p>
+                    <p className="text-xs text-gray-500 truncate">{profile?.email || ""}</p>
+                  </div>
+                  <div className="py-1">
+                    <Link
+                      to="/profile"
+                      onClick={handleProfileClick}
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary-green"
+                    >
+                      <FaUserCircle />
+                      <span>Profile</span>
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700"
+                    >
+                      <FaSignOutAlt />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 

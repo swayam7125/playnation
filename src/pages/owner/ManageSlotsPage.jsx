@@ -34,7 +34,7 @@ import {
   subMonths,
   addMonths,
 } from "date-fns";
-// import AddSlotsModal from "../../components/bookings/AddSlotsModal"; // Assuming this is imported if needed
+import AddSlotsModal from "../../components/bookings/AddSlotsModal";
 
 const getTodayString = () => new Date().toISOString().split("T")[0];
 
@@ -200,8 +200,7 @@ const ManageSlotsPage = () => {
 
     const { data: slotData, error } = await supabase
       .from("time_slots")
-      // FIX: Select the correct column name 'price_override'
-      .select(`*, bookings(booking_id)`) 
+      .select(`*, price_override, bookings(booking_id)`) 
       .eq("facility_id", selectedFacility.facility_id)
       .gte("start_time", dayStart.toISOString())
       .lt("start_time", dayEnd.toISOString())
@@ -329,7 +328,6 @@ const ManageSlotsPage = () => {
         // Save the new price override
         const { error: updateError } = await supabase
             .from('time_slots')
-            // FIX: Use the correct column name 'price_override'
             .update({ price_override: price }) 
             .eq('slot_id', slotId);
         
@@ -370,7 +368,6 @@ const ManageSlotsPage = () => {
     const isBooked = slot.bookings && slot.bookings.length > 0;
     const isAvailable = slot.is_available && !isBooked; // Slot is truly available
     const baseRate = selectedFacility?.hourly_rate ?? 0;
-    // FIX: Use the correct column name for current price
     const currentPrice = slot.price_override || baseRate; 
     const isOverridden = !!slot.price_override;
     
@@ -645,14 +642,13 @@ const ManageSlotsPage = () => {
         </div>
       </div>
 
-      {/* Assuming AddSlotsModal is correctly imported */}
-      {/* {isModalOpen && (
+      {isModalOpen && (
         <AddSlotsModal
           facility={selectedFacility}
           onSave={handleAddSlots}
           onCancel={() => setIsModalOpen(false)}
         />
-      )} */}
+      )}
     </div>
   );
 };

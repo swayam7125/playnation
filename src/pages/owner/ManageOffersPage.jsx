@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
 import { useModal } from "../../ModalContext";
+import toast from 'react-hot-toast';
 import { FaPlus, FaTicketAlt } from "react-icons/fa";
 import OwnerOfferCard from "../../components/offers/OwnerOfferCard";
 import OfferForm from "../../components/offers/OfferForm";
@@ -13,8 +14,7 @@ function ManageOffersPage() {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingOffer, setEditingOffer] = useState(null);
+  const [formState, setFormState] = useState({ isOpen: false, offer: null });
 
   const fetchOffers = useCallback(async () => {
     // ... fetch logic remains the same
@@ -51,37 +51,57 @@ function ManageOffersPage() {
     fetchOffers();
   }, [fetchOffers]);
 
-  // All handlers remain the same
   const handleAddNew = () => {
-    setEditingOffer(null);
-    setIsFormOpen(true);
+    setFormState({ isOpen: true, offer: null });
   };
   const handleEdit = (offer) => {
-    setEditingOffer(offer);
-    setIsFormOpen(true);
+    setFormState({ isOpen: true, offer: offer });
   };
   const handleSave = () => {
     fetchOffers();
-    setIsFormOpen(false);
-    setEditingOffer(null);
+    setFormState({ isOpen: false, offer: null });
   };
-  const handleDelete = async (offerId) => {
-    const isConfirmed = await showModal({
+  const handleDelete = (offerId) => {
+    showModal({
       title: "Confirm Deletion",
-      message: "Are you sure you want to delete this offer?",
+      message: "Are you sure you want to delete this offer? This action cannot be undone.",
       confirmText: "Delete",
       confirmStyle: "danger",
+      onConfirm: async () => {
+        const toastId = toast.loading('Deleting offer...');
+        const { error } = await supabase
+          .from("offers")
+          .delete()
+          .eq("offer_id", offerId);
+
+        if (error) {
+          toast.dismiss(toastId);
+          toast.error(`Failed to delete offer: ${error.message}`);
+          setError(error.message);
+        } else {
+          toast.dismiss(toastId);
+          toast.success("Offer deleted successfully.");
+          setOffers((prevOffers) => prevOffers.filter((o) => o.offer_id !== offerId));
+        }
+      },
     });
-    if (isConfirmed) {
-      const { error } = await supabase
-        .from("offers")
-        .delete()
-        .eq("offer_id", offerId);
-      if (error) {
-        setError(error.message);
-      } else {
-        fetchOffers();
-      }
+  };
+
+  const handleToggle = async (offer) => {
+    const updatedStatus = !offer.is_active;
+    const { error } = await supabase
+      .from("offers")
+      .update({ is_active: updatedStatus })
+      .eq("offer_id", offer.offer_id);
+
+    if (error) {
+      setError(error.message);
+    } else {
+      setOffers((prevOffers) =>
+        prevOffers.map((o) =>
+          o.offer_id === offer.offer_id ? { ...o, is_active: updatedStatus } : o
+        )
+      );
     }
   };
 
@@ -132,7 +152,8 @@ function ManageOffersPage() {
                 offer={offer}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                profile={profile} // <-- PASS THE PROFILE DOWN
+                onToggle={handleToggle} // <-- PASS THE TOGGLE HANDLER
+                profile={profile}
               />
             ))}
           </div>
@@ -153,11 +174,11 @@ function ManageOffersPage() {
         )}
       </div>
 
-      {isFormOpen && (
+      {formState.isOpen && (
         <OfferForm
-          offer={editingOffer}
+          offer={formState.offer}
           onSave={handleSave}
-          onCancel={() => setIsFormOpen(false)}
+          onCancel={() => setFormState({ isOpen: false, offer: null })}
         />
       )}
     </div>
