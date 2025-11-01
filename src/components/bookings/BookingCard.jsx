@@ -96,7 +96,11 @@ function BookingCard({
   }, [isHighlighted]);
 
   if (!booking || !booking.facilities || !booking.facilities.venues) {
-    return null; // Don't render if data is incomplete
+    return (
+      <div className="text-center p-4 bg-gray-100 rounded-lg">
+        <p className="text-gray-500">Booking information is currently unavailable.</p>
+      </div>
+    );
   }
 
   const {

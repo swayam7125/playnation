@@ -12,21 +12,22 @@ vi.mock('../../utils/formatters', () => ({
 
 describe('BookingCard Component', () => {
   const mockBooking = {
-    id: 1,
-    venues: {
-      id: 101,
-      name: 'Grand Sports Arena',
-      images: ['path/to/image.jpg'],
-      address: '123 Sports Lane, Sportsville',
-    },
-    facilities: {
-      name: 'Main Football Turf',
-      category: 'Football',
-    },
+    booking_id: 1,
     start_time: '2023-10-27T10:00:00Z',
     end_time: '2023-10-27T11:00:00Z',
     total_amount: 1500,
     status: 'confirmed',
+    facilities: {
+      name: 'Main Football Turf',
+      sports: { name: 'Football' },
+      venues: {
+        venue_id: 101,
+        name: 'Grand Sports Arena',
+        address: '123 Sports Lane, Sportsville',
+        cancellation_cutoff_hours: 24,
+      },
+    },
+    reviews: [],
   };
 
   it('should render all booking details correctly when a valid booking is provided', () => {
