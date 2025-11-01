@@ -89,14 +89,21 @@ function ManageOffersPage() {
 
   const handleToggle = async (offer) => {
     const updatedStatus = !offer.is_active;
+    const action = updatedStatus ? "Activating" : "Deactivating";
+    const toastId = toast.loading(`${action} offer...`);
+
     const { error } = await supabase
       .from("offers")
       .update({ is_active: updatedStatus })
       .eq("offer_id", offer.offer_id);
 
     if (error) {
+      toast.dismiss(toastId);
+      toast.error(`Failed to ${action.toLowerCase()} offer: ${error.message}`);
       setError(error.message);
     } else {
+      toast.dismiss(toastId);
+      toast.success(`Offer successfully ${updatedStatus ? "activated" : "deactivated"}.`);
       setOffers((prevOffers) =>
         prevOffers.map((o) =>
           o.offer_id === offer.offer_id ? { ...o, is_active: updatedStatus } : o
