@@ -1,6 +1,7 @@
 import React, { Suspense, useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import useVenues from "../hooks/useVenues";
+import Loader from "../components/common/Loader";
 
 const Hero = React.lazy(() => import("../components/home/Hero"));
 const HowItWorks = React.lazy(() => import("../components/home/HowItWorks"));
@@ -8,8 +9,6 @@ const FeaturedVenues = React.lazy(() => import("../components/home/FeaturedVenue
 const WhyChooseUs = React.lazy(() => import("../components/home/WhyChooseUs"));
 const Testimonials = React.lazy(() => import("../components/home/Testimonials"));
 const Categories = React.lazy(() => import("../components/home/Categories"));
-
-const Loading = () => <div className="h-96 bg-gray-200 animate-pulse"></div>;
 
 export default function HomePage() {
   const { venues: topVenues, loading, error } = useVenues({
@@ -36,22 +35,22 @@ export default function HomePage() {
 
   return (
     <div className="bg-background">
-      <Suspense fallback={<Loading />}>
+      <Suspense fallback={<Loader />}>
         <Hero />
       </Suspense>
-      <Suspense fallback={<Loading />}>
+      <Suspense fallback={<Loader />}>
         <Categories categories={sports} />
       </Suspense>
-      <Suspense fallback={<Loading />}>
+      <Suspense fallback={<Loader />}>
         <HowItWorks />
       </Suspense>
-      <Suspense fallback={<Loading />}>
+      <Suspense fallback={<Loader />}>
         <FeaturedVenues venues={topVenues} loading={loading} error={error} />
       </Suspense>
-      <Suspense fallback={<Loading />}>
+      <Suspense fallback={<Loader />}>
         <WhyChooseUs />
       </Suspense>
-      <Suspense fallback={<Loading />}>
+      <Suspense fallback={<Loader />}>
         <Testimonials />
       </Suspense>
     </div>

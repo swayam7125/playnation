@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import VenueCard from "../components/venues/VenueCard";
 import useVenues from "../hooks/useVenues"; // Make sure this is imported
+import Loader from "../components/common/Loader";
 
 function ExplorePage() {
   const [sports, setSports] = useState([]);
@@ -237,12 +238,7 @@ function ExplorePage() {
         {/* --- START FIX 2: Use the variables for conditional rendering --- */}
 
         {/* Use 'loading' (a boolean) */}
-        {loading && (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-primary-green mb-3"></div>
-            <p className="text-medium-text text-sm">Loading venues...</p>
-          </div>
-        )}
+        {loading && <Loader />}
 
         {/* Use 'error' (a string) */}
         {error && (

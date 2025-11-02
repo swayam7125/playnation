@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import VenueCard from "../venues/VenueCard";
 import { FaArrowRight } from "react-icons/fa";
+import Loader from "../common/Loader";
 
 const FeaturedVenues = ({ venues, loading, error }) => {
   return (
@@ -26,15 +27,7 @@ const FeaturedVenues = ({ venues, loading, error }) => {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-card-bg rounded-2xl p-6 shadow-lg animate-pulse">
-                <div className="h-48 bg-border-color-light rounded-xl mb-4"></div>
-                <div className="h-6 bg-border-color-light rounded mb-2"></div>
-                <div className="h-4 bg-border-color-light rounded w-2/3"></div>
-              </div>
-            ))}
-          </div>
+          <Loader />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {error ? (
