@@ -45,8 +45,8 @@ describe('ExplorePage Component', () => {
 
   it('should display a list of venues when fetching is successful', () => {
     const mockVenuesData = [
-      { id: 1, name: 'Main Cricket Ground', address: '123 Sport Rd' },
-      { id: 2, name: 'City Football Arena', address: '456 Goal Ave' },
+      { venue_id: 1, name: 'Main Cricket Ground', address: '123 Sport Rd' },
+      { venue_id: 2, name: 'City Football Arena', address: '456 Goal Ave' },
     ];
     useVenues.mockReturnValue({
       venues: mockVenuesData,

@@ -15,7 +15,7 @@ const HeroOfferCarousel = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchGlobalOffers = async () => {
+    const fetchActiveOffers = async () => {
       setLoading(true);
       setError(null);
 
@@ -23,14 +23,12 @@ const HeroOfferCarousel = () => {
       const today = new Date().toISOString();
 
       // This query fetches offers that are:
-      // 1. Marked as global
-      // 2. Marked as active
-      // 3. Have already started
-      // 4. Have not yet expired (or have no expiration date)
+      // 1. Marked as active
+      // 2. Have already started
+      // 3. Have not yet expired (or have no expiration date)
       const { data, error: fetchError } = await supabase
         .from("offers")
         .select("*")
-        .eq("is_global", true)
         .eq("is_active", true)
         .lte("valid_from", today)
         .or(`valid_until.is.null,valid_until.gte.${today}`);
@@ -40,7 +38,7 @@ const HeroOfferCarousel = () => {
         console.error("Supabase fetch error:", fetchError);
         setError("Failed to fetch offers from the database.");
       } else if (!data) {
-        console.warn("No global offers found or data is null.");
+        console.warn("No active offers found or data is null.");
         setOffers([]);
       } else {
         setOffers(data);
@@ -49,7 +47,7 @@ const HeroOfferCarousel = () => {
       setLoading(false);
     };
 
-    fetchGlobalOffers();
+    fetchActiveOffers();
   }, []);
 
   // Display a loading skeleton for better UX
@@ -70,7 +68,7 @@ const HeroOfferCarousel = () => {
     );
   }
 
-  // If there are no valid global offers to display, don't render the component
+  // If there are no valid active offers to display, don't render the component
   if (offers.length === 0) {
     return null;
   }
