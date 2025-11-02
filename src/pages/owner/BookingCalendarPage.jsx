@@ -32,7 +32,8 @@ function BookingCalendarPage() {
         if (facilityIds.length > 0) {
           const { data: bookingsData, error: bookingsError } = await supabase
             .from('bookings')
-            .select('*, users:users!bookings_user_id_fkey (username, first_name, last_name, email)')
+            // FIX 1: Explicitly select 'total_amount' for consistency
+            .select('booking_id, user_id, facility_id, slot_id, start_time, end_time, total_amount, status, payment_status, customer_name, customer_phone, created_at, has_been_reviewed, cancelled_at, cancelled_by, cancellation_reason, offer_id, discount_amount, users:users!bookings_user_id_fkey (username, first_name, last_name, email)')
             .in('facility_id', facilityIds);
             
           if (bookingsError) throw bookingsError;
@@ -317,6 +318,10 @@ function BookingCalendarPage() {
                                 )}
                                 <div className="inline-block px-3 py-1 bg-white/20 rounded-full text-xs font-medium capitalize">
                                   {booking.status}
+                                </div>
+                                {/* FIX 2: Display the correct booking amount property */}
+                                <div className="text-sm font-semibold mt-1">
+                                  ₹{booking.total_amount ? booking.total_amount.toLocaleString("en-IN") : 'N/A'}
                                 </div>
                               </div>
                             </div>
