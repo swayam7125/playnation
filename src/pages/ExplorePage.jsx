@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import VenueCard from "../components/venues/VenueCard";
 import useVenues from "../hooks/useVenues"; // Make sure this is imported
@@ -10,6 +11,14 @@ function ExplorePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("name");
   const [viewMode, setViewMode] = useState("grid");
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const sportId = searchParams.get("sportId");
+    if (sportId) {
+      setSelectedSport(sportId);
+    }
+  }, [searchParams]);
 
   // --- START FIX 1: Destructure the hook's return value ---
   const { venues, loading, error } = useVenues({
@@ -38,7 +47,7 @@ function ExplorePage() {
 
   // Note: Your useVenues hook now handles all filtering and sorting
   // so this line is correct.
-  const filteredAndSortedVenues = venues; 
+  const filteredAndSortedVenues = venues;
 
   const clearFilters = () => {
     setSelectedSport("all");
@@ -113,9 +122,9 @@ function ExplorePage() {
                   sports.map((sport) => (
                     <button
                       key={sport.sport_id}
-                      onClick={() => setSelectedSport(sport.sport_id)}
+                      onClick={() => setSelectedSport(String(sport.sport_id))}
                       className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                        selectedSport === sport.sport_id
+                        selectedSport === String(sport.sport_id)
                           ? "bg-primary-green text-white shadow-sm"
                           : "bg-light-green-bg text-primary-green border border-primary-green/20 hover:bg-primary-green hover:text-white"
                       }`}

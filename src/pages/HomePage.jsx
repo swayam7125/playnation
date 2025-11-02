@@ -1,5 +1,5 @@
-import React, { Suspense } from "react";
-import { categories } from "../constants/categories";
+import React, { Suspense, useState, useEffect } from "react";
+import { supabase } from "../supabaseClient";
 import useVenues from "../hooks/useVenues";
 
 const Hero = React.lazy(() => import("../components/home/Hero"));
@@ -17,13 +17,30 @@ export default function HomePage() {
     sortBy: "rating",
   });
 
+  const [sports, setSports] = useState([]);
+
+  useEffect(() => {
+    const fetchSports = async () => {
+      try {
+        const { data: sportsData, error: sportsError } = await supabase
+          .from("sports")
+          .select("*");
+        if (sportsError) throw sportsError;
+        setSports(sportsData || []);
+      } catch (err) {
+        console.error("Error fetching sports:", err.message);
+      }
+    };
+    fetchSports();
+  }, []);
+
   return (
     <div className="bg-background">
       <Suspense fallback={<Loading />}>
         <Hero />
       </Suspense>
       <Suspense fallback={<Loading />}>
-        <Categories categories={categories} />
+        <Categories categories={sports} />
       </Suspense>
       <Suspense fallback={<Loading />}>
         <HowItWorks />
