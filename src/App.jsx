@@ -5,8 +5,6 @@ import React, { useEffect } from "react"; // 👈 Import React and useEffect
 // Auth & Context
 import { AuthProvider, useAuth } from "./AuthContext";
 import { ModalProvider } from "./ModalContext";
-import AdminProtectedRoute from "./components/auth/AdminProtectedRoute";
-import OwnerProtectedRoute from "./components/auth/OwnerProtectedRoute";
 
 // Layout
 import Navbar from "./components/layout/Navbar";
@@ -42,6 +40,7 @@ import AdminVenueManagementPage from "./pages/admin/AdminVenueManagementPage";
 import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
 import AdminManageOffersPage from "./pages/admin/AdminManageOffersPage";
 import AdminNotifyPage from "./pages/admin/AdminNotifyPage";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 
 // --- NEW COMPONENT: Resets scroll position on route change ---
 const ScrollToTop = () => {
@@ -106,8 +105,7 @@ const AuthRouter = ({ children }) => {
         case "venue_owner":
           return <Navigate to="/owner/dashboard" replace />;
         case "admin":
-          return <Navigate to="/admin/venues" replace />;
-        case "player":
+          return <Navigate to="/admin/dashboard" replace />;
           if (location.pathname === "/") {
             return <Navigate to="/explore" replace />;
           }
@@ -168,7 +166,7 @@ const RequireAuth = ({ children, allowedRoles = [] }) => {
     // Redirect to appropriate dashboard based on role
     switch (profile.role) {
       case "admin":
-        return <Navigate to="/admin/venues" replace />;
+        return <Navigate to="/admin/dashboard" replace />;
       case "venue_owner":
         return <Navigate to="/owner/dashboard" replace />;
       case "player":
@@ -283,7 +281,8 @@ function App() {
                   </RequireAuth>
                 }
               >
-                <Route index element={<AdminUserManagementPage />} />
+                <Route index element={<AdminDashboardPage />} />
+                <Route path="dashboard" element={<AdminDashboardPage />} />
                 <Route path="users" element={<AdminUserManagementPage />} />
                 <Route path="venues" element={<AdminVenueManagementPage />} />
                 <Route path="bookings" element={<AdminBookingsPage />} />

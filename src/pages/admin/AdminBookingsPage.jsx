@@ -1,5 +1,6 @@
 // src/pages/admin/AdminBookingsPage.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import toast from "react-hot-toast";
 import { supabase } from "../../supabaseClient";
 import {
   FaSearch,
@@ -108,50 +109,56 @@ function AdminBookingsPage() {
     []
   );
 
-  const handleRefundAction = async (bookingId, newPaymentStatus) => {
-    const action =
-      newPaymentStatus === "refunded" ? "Approve Refund" : "Revert Refund";
-    const isConfirmed = await showModal({
-      title: `Confirm ${action}`,
-      message: `Are you sure you want to ${action.toLowerCase()} for booking ID: ${bookingId}?`,
-      confirmText: `Yes, ${action}`,
-      confirmStyle: newPaymentStatus === "refunded" ? "success" : "warning",
-    });
+  const handleRefundAction = (bookingId, action) => {
+    const isApprove = action === "refunded";
+    const modalTitle = isApprove ? "Confirm Refund Approval" : "Confirm Refund Revert";
+    const modalMessage = `Are you sure you want to ${isApprove ? "approve the refund" : "revert the refund"} for booking ID: ${bookingId}?`;
+    const confirmText = isApprove ? "Yes, Approve" : "Yes, Revert";
 
-    if (isConfirmed) {
-      try {
-        const { error } = await supabase
-          .from("bookings")
-          .update({
-            payment_status: newPaymentStatus,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("booking_id", bookingId);
-
-        if (error) throw error;
-        await showModal({
-          title: "Success",
-          message: `Action completed successfully.`,
-        });
-        fetchBookings(searchTerm, filters);
-        if (selectedBooking && selectedBooking.booking_id === bookingId) {
-          const updatedBooking = bookings.find(
-            (b) => b.booking_id === bookingId
-          );
-          if (updatedBooking) {
-            setSelectedBooking({
-              ...updatedBooking,
-              payment_status: newPaymentStatus,
+    showModal({
+      title: modalTitle,
+      message: modalMessage,
+      confirmText,
+      confirmStyle: isApprove ? "success" : "warning",
+      onConfirm: async () => {
+        try {
+          let result;
+          if (isApprove) {
+            // Call the serverless function to process the refund
+            const { data, error } = await supabase.functions.invoke("create-refund", {
+              body: { booking_id: bookingId },
             });
+
+            if (error) throw new Error(`Function error: ${error.message}`);
+            result = data;
+
+          } else {
+            // Directly update the status for reverting a refund
+            const { error } = await supabase
+              .from("bookings")
+              .update({ payment_status: "paid", updated_at: new Date().toISOString() })
+              .eq("booking_id", bookingId);
+
+            if (error) throw error;
           }
+
+          toast.success(isApprove ? "Refund approved successfully!" : "Refund reverted successfully!");
+
+          // Refresh data and update UI
+          fetchBookings(searchTerm, filters);
+          if (selectedBooking?.booking_id === bookingId) {
+            const updatedBooking = { ...selectedBooking, payment_status: isApprove ? "refunded" : "paid" };
+            setSelectedBooking(updatedBooking);
+          }
+
+        } catch (err) {
+          showModal({
+            title: "Error",
+            message: `Failed to perform action: ${err.message}`,
+          });
         }
-      } catch (err) {
-        await showModal({
-          title: "Error",
-          message: `Failed to update booking: ${err.message}`,
-        });
-      }
-    }
+      },
+    });
   };
 
   useEffect(() => {

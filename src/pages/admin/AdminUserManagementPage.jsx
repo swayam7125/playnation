@@ -22,94 +22,78 @@ import StatsCard from "../../components/common/StatsCard";
 import UserDetailsModal from "./UserDetailsModal";
 
 // --- NEW: User List Row Component ---
-const UserListRow = ({ user, currentUser, onToggleStatus, onViewDetails }) => {
+const UserTableRow = ({ user, currentUser, onToggleStatus, onViewDetails }) => {
   const getRoleConfig = (role) => {
     switch (role) {
       case "player":
-        return { color: "text-blue-600", text: "Player", icon: FaUserCircle };
+        return { color: "bg-blue-100 text-blue-800 border-blue-200", text: "Player" };
       case "venue_owner":
-        return { color: "text-green-600", text: "Venue Owner", icon: FaUserCog };
+        return { color: "bg-green-100 text-green-800 border-green-200", text: "Venue Owner" };
       case "admin":
-        return { color: "text-purple-600", text: "Admin", icon: FaUserShield };
+        return { color: "bg-purple-100 text-purple-800 border-purple-200", text: "Admin" };
       default:
-        return { color: "text-gray-600", text: "Unknown", icon: FaUserCircle };
+        return { color: "bg-gray-100 text-gray-800 border-gray-200", text: "Unknown" };
     }
   };
 
   const roleConfig = getRoleConfig(user.role);
-  const RoleIcon = roleConfig.icon;
   const isActive = user.status !== "suspended";
   const isProtectedAdmin = user.role === "admin";
   const isSelf = currentUser && currentUser.id === user.user_id;
 
   return (
-    <div className="grid grid-cols-12 items-center bg-white border-b border-gray-100 p-4 hover:bg-gray-50 transition-colors duration-200">
-      {/* 1. User/Email */}
-      <div className="col-span-4 flex items-center gap-3 min-w-0">
-        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-          <FaUserCircle className="text-xl text-green-600" />
+    <tr className="border-b border-border-color-light hover:bg-light-green-bg transition-all duration-200 group">
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-primary-green-light rounded-full flex items-center justify-center">
+            <FaUserCircle className="text-primary-green text-xs" />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-dark-text">
+              {user.username || "N/A"} {isSelf && <span className="text-xs text-gray-500">(You)</span>}
+            </div>
+            <div className="text-xs text-light-text">
+              {user.email}
+            </div>
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-gray-900 truncate">
-            {user.username || "N/A"} {isSelf && <span className="text-xs text-gray-500">(You)</span>}
-          </p>
-          <p className="text-xs text-gray-500 truncate">{user.email}</p>
-        </div>
-      </div>
-
-      {/* 2. Role */}
-      <div className="col-span-2 hidden sm:flex items-center gap-2">
-        <RoleIcon className={`text-xs ${roleConfig.color}`} />
-        <span className={`text-sm font-medium ${roleConfig.color}`}>
+      </td>
+      <td className="px-6 py-4">
+        <span className={`px-3 py-2 inline-flex text-xs leading-5 font-semibold rounded-lg ${roleConfig.color}`}>
           {roleConfig.text}
         </span>
-      </div>
-
-      {/* 3. Status */}
-      <div className="col-span-2 hidden md:flex items-center gap-2">
-        <div
-          className={`w-2 h-2 rounded-full ${
-            isActive ? "bg-green-500" : "bg-red-500"
-          }`}
-        ></div>
-        <span className={`text-sm font-medium ${isActive ? "text-green-700" : "text-red-700"}`}>
+      </td>
+      <td className="px-6 py-4">
+        <span className={`px-3 py-2 inline-flex text-xs leading-5 font-semibold rounded-lg ${isActive ? "bg-green-100 text-green-800 border-green-200" : "bg-red-100 text-red-800 border-red-200"}`}>
           {isActive ? "Active" : "Suspended"}
         </span>
-      </div>
-
-      {/* 4. Joined Date (Truncated for space) */}
-      <div className="col-span-2 hidden lg:block text-sm text-gray-500 truncate">
-        {new Date(user.registration_date).toLocaleDateString()}
-      </div>
-
-      {/* 5. Actions */}
-      <div className="col-span-4 sm:col-span-4 md:col-span-4 lg:col-span-2 flex justify-end gap-2">
-        {!isProtectedAdmin ? (
-          <>
-            <button
-              onClick={() => onViewDetails(user)}
-              className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm rounded-lg transition-colors border border-gray-200"
-              title="View Details"
-            >
-              <FaEye className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onToggleStatus(user, isActive ? "suspended" : "active")}
-              className={`p-2 text-sm rounded-lg transition-colors border ${
-                isActive
-                  ? "bg-red-500 hover:bg-red-600 text-white border-red-500"
-                  : "bg-green-500 hover:bg-green-600 text-white border-green-500"
-              }`}
-              title={isActive ? "Suspend User" : "Activate User"}
-            >
-              {isActive ? <FaBan className="w-4 h-4" /> : <FaCheck className="w-4 h-4" />}
-            </button>
-          </>
-        ) : (
-          <span className="text-xs text-gray-500 italic px-2 py-1">Protected</span>
-        )}
-      </div>
-    </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="text-sm text-dark-text">{new Date(user.registration_date).toLocaleDateString()}</div>
+      </td>
+      <td className="px-6 py-4 text-right">
+          <div className="flex items-center gap-2 justify-end transition-opacity duration-200">
+            {!isProtectedAdmin ? (
+              <>
+                <button
+                  onClick={() => onViewDetails(user)}
+                  className="p-2 text-primary-green hover:bg-primary-green hover:text-white rounded-lg transition-all duration-200"
+                  title="View Details"
+                >
+                  <FaEye />
+                </button>
+                <button
+                  onClick={() => onToggleStatus(user, isActive ? "suspended" : "active")}
+                  className={`p-2 text-white rounded-lg transition-all duration-200 ${isActive ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"}`}>
+                  {isActive ? <FaBan /> : <FaCheck />}
+                </button>
+              </>
+            ) : (
+              <span className="text-xs text-gray-500 italic px-2 py-1">Protected</span>
+            )}
+          </div>
+      </td>
+    </tr>
   );
 };
 // --- END: User List Row Component ---
@@ -316,7 +300,7 @@ function AdminUserManagementPage() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isUserDetailsModalOpen, setIsUserDetailsModalOpen] = useState(false);
   // --- NEW STATE: View Mode ---
-  const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState("list"); // 'grid' or 'list'
   // -------------------------
   const { showModal } = useModal();
 
@@ -621,25 +605,31 @@ function AdminUserManagementPage() {
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-              {/* List Header */}
-              <div className="grid grid-cols-12 items-center bg-gray-100 p-4 font-semibold text-xs text-gray-600 uppercase tracking-wider border-b border-gray-200">
-                <div className="col-span-4">User Details</div>
-                <div className="col-span-2 hidden sm:block">Role</div>
-                <div className="col-span-2 hidden md:block">Status</div>
-                <div className="col-span-2 hidden lg:block">Joined</div>
-                <div className="col-span-4 sm:col-span-4 md:col-span-4 lg:col-span-2 text-right">Actions</div>
+            <div className="bg-card-bg rounded-2xl shadow-lg border border-border-color-light overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-border-color-light">
+                  <thead className="bg-gradient-to-r from-hover-bg to-light-green-bg">
+                    <tr>
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider">User</th>
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider">Role</th>
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider">Status</th>
+                      <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-dark-text uppercase tracking-wider">Joined</th>
+                      <th scope="col" className="relative px-6 py-4"><span className="sr-only">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-card-bg divide-y divide-border-color-light">
+                    {filteredUsers.map((user) => (
+                      <UserTableRow
+                        key={user.user_id}
+                        user={user}
+                        currentUser={currentUser}
+                        onToggleStatus={handleToggleStatus}
+                        onViewDetails={handleViewDetails}
+                      />
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              {/* List Body */}
-              {filteredUsers.map((user) => (
-                <UserListRow
-                  key={user.user_id}
-                  user={user}
-                  currentUser={currentUser}
-                  onToggleStatus={handleToggleStatus}
-                  onViewDetails={handleViewDetails}
-                />
-              ))}
             </div>
           )
         ) : (
