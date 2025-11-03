@@ -15,9 +15,105 @@ import {
   FaCheck,
   FaExclamationTriangle,
   FaEye,
+  FaThLarge, // Grid Icon
+  FaList,      // List Icon
 } from "react-icons/fa";
 import StatsCard from "../../components/common/StatsCard";
 import UserDetailsModal from "./UserDetailsModal";
+
+// --- NEW: User List Row Component ---
+const UserListRow = ({ user, currentUser, onToggleStatus, onViewDetails }) => {
+  const getRoleConfig = (role) => {
+    switch (role) {
+      case "player":
+        return { color: "text-blue-600", text: "Player", icon: FaUserCircle };
+      case "venue_owner":
+        return { color: "text-green-600", text: "Venue Owner", icon: FaUserCog };
+      case "admin":
+        return { color: "text-purple-600", text: "Admin", icon: FaUserShield };
+      default:
+        return { color: "text-gray-600", text: "Unknown", icon: FaUserCircle };
+    }
+  };
+
+  const roleConfig = getRoleConfig(user.role);
+  const RoleIcon = roleConfig.icon;
+  const isActive = user.status !== "suspended";
+  const isProtectedAdmin = user.role === "admin";
+  const isSelf = currentUser && currentUser.id === user.user_id;
+
+  return (
+    <div className="grid grid-cols-12 items-center bg-white border-b border-gray-100 p-4 hover:bg-gray-50 transition-colors duration-200">
+      {/* 1. User/Email */}
+      <div className="col-span-4 flex items-center gap-3 min-w-0">
+        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+          <FaUserCircle className="text-xl text-green-600" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-gray-900 truncate">
+            {user.username || "N/A"} {isSelf && <span className="text-xs text-gray-500">(You)</span>}
+          </p>
+          <p className="text-xs text-gray-500 truncate">{user.email}</p>
+        </div>
+      </div>
+
+      {/* 2. Role */}
+      <div className="col-span-2 hidden sm:flex items-center gap-2">
+        <RoleIcon className={`text-xs ${roleConfig.color}`} />
+        <span className={`text-sm font-medium ${roleConfig.color}`}>
+          {roleConfig.text}
+        </span>
+      </div>
+
+      {/* 3. Status */}
+      <div className="col-span-2 hidden md:flex items-center gap-2">
+        <div
+          className={`w-2 h-2 rounded-full ${
+            isActive ? "bg-green-500" : "bg-red-500"
+          }`}
+        ></div>
+        <span className={`text-sm font-medium ${isActive ? "text-green-700" : "text-red-700"}`}>
+          {isActive ? "Active" : "Suspended"}
+        </span>
+      </div>
+
+      {/* 4. Joined Date (Truncated for space) */}
+      <div className="col-span-2 hidden lg:block text-sm text-gray-500 truncate">
+        {new Date(user.registration_date).toLocaleDateString()}
+      </div>
+
+      {/* 5. Actions */}
+      <div className="col-span-4 sm:col-span-4 md:col-span-4 lg:col-span-2 flex justify-end gap-2">
+        {!isProtectedAdmin ? (
+          <>
+            <button
+              onClick={() => onViewDetails(user)}
+              className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm rounded-lg transition-colors border border-gray-200"
+              title="View Details"
+            >
+              <FaEye className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => onToggleStatus(user, isActive ? "suspended" : "active")}
+              className={`p-2 text-sm rounded-lg transition-colors border ${
+                isActive
+                  ? "bg-red-500 hover:bg-red-600 text-white border-red-500"
+                  : "bg-green-500 hover:bg-green-600 text-white border-green-500"
+              }`}
+              title={isActive ? "Suspend User" : "Activate User"}
+            >
+              {isActive ? <FaBan className="w-4 h-4" /> : <FaCheck className="w-4 h-4" />}
+            </button>
+          </>
+        ) : (
+          <span className="text-xs text-gray-500 italic px-2 py-1">Protected</span>
+        )}
+      </div>
+    </div>
+  );
+};
+// --- END: User List Row Component ---
+
 
 const UserCard = ({ user, currentUser, onToggleStatus, onViewDetails }) => {
   const getRoleConfig = (role) => {
@@ -219,6 +315,9 @@ function AdminUserManagementPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isUserDetailsModalOpen, setIsUserDetailsModalOpen] = useState(false);
+  // --- NEW STATE: View Mode ---
+  const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
+  // -------------------------
   const { showModal } = useModal();
 
   const fetchUsers = useCallback(async () => {
@@ -429,17 +528,20 @@ function AdminUserManagementPage() {
             Manage all users and their roles on your platform
           </p>
         </div>
-
+        
+        {/* --- Stats Cards --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {statsData.map((stat) => (
             <StatsCard key={stat.title} {...stat} />
           ))}
         </div>
-
+        
+        {/* --- Controls Panel (Search, Count, View Mode) --- */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
           <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <div className="relative flex-1 max-w-md">
-              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1-2 text-gray-400 text-sm" />
+            {/* Search Bar */}
+            <div className="relative flex-1 max-w-lg w-full">
+              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm" />
               <input
                 type="text"
                 placeholder="Search users by name or email..."
@@ -448,13 +550,44 @@ function AdminUserManagementPage() {
                 className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 placeholder-gray-500"
               />
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <FaFilter />
-              <span>Showing {filteredUsers.length} users</span>
+            
+            <div className="flex items-center gap-4">
+              {/* Filter Count */}
+              <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600">
+                <FaFilter />
+                <span>Showing {filteredUsers.length} user(s)</span>
+              </div>
+
+              {/* View Mode Toggle */}
+              <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-lg transition-colors duration-200 ${
+                    viewMode === 'grid'
+                      ? 'bg-white shadow-sm text-green-600'
+                      : 'text-gray-500 hover:text-green-600'
+                  }`}
+                  title="Grid View"
+                >
+                  <FaThLarge className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-lg transition-colors duration-200 ${
+                    viewMode === 'list'
+                      ? 'bg-white shadow-sm text-green-600'
+                      : 'text-gray-500 hover:text-green-600'
+                  }`}
+                  title="List View"
+                >
+                  <FaList className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
+        {/* --- Role Tabs --- */}
         <div className="mb-8">
           <div className="flex space-x-1 bg-white p-1 rounded-2xl border border-gray-200 shadow-sm overflow-x-auto">
             {tabData.map((tab) => (
@@ -473,21 +606,45 @@ function AdminUserManagementPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredUsers.length > 0 ? (
-            filteredUsers.map((user) => (
-              <UserCard
-                key={user.user_id}
-                user={user}
-                currentUser={currentUser}
-                onToggleStatus={handleToggleStatus}
-                onViewDetails={handleViewDetails}
-              />
-            ))
+        {/* --- User Display Area (Conditional Rendering) --- */}
+        {filteredUsers.length > 0 ? (
+          viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              {filteredUsers.map((user) => (
+                <UserCard
+                  key={user.user_id}
+                  user={user}
+                  currentUser={currentUser}
+                  onToggleStatus={handleToggleStatus}
+                  onViewDetails={handleViewDetails}
+                />
+              ))}
+            </div>
           ) : (
-            <EmptyState activeTab={activeTab} />
-          )}
-        </div>
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+              {/* List Header */}
+              <div className="grid grid-cols-12 items-center bg-gray-100 p-4 font-semibold text-xs text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                <div className="col-span-4">User Details</div>
+                <div className="col-span-2 hidden sm:block">Role</div>
+                <div className="col-span-2 hidden md:block">Status</div>
+                <div className="col-span-2 hidden lg:block">Joined</div>
+                <div className="col-span-4 sm:col-span-4 md:col-span-4 lg:col-span-2 text-right">Actions</div>
+              </div>
+              {/* List Body */}
+              {filteredUsers.map((user) => (
+                <UserListRow
+                  key={user.user_id}
+                  user={user}
+                  currentUser={currentUser}
+                  onToggleStatus={handleToggleStatus}
+                  onViewDetails={handleViewDetails}
+                />
+              ))}
+            </div>
+          )
+        ) : (
+          <EmptyState activeTab={activeTab} />
+        )}
       </div>
       {isUserDetailsModalOpen && (
         <UserDetailsModal
