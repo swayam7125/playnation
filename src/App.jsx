@@ -22,6 +22,7 @@ import ContactUsPage from "./pages/ContactUsPage";
 import MyBookingsPage from "./pages/player/MyBookingsPage";
 import ProfilePage from "./pages/player/ProfilePage";
 import BookingPage from "./pages/player/BookingPage";
+import PlayerDashboardPage from "./pages/player/PlayerDashboardPage";
 
 // Owner Pages
 import OwnerDashboardPage from "./pages/owner/OwnerDashboardPage";
@@ -101,15 +102,18 @@ const AuthRouter = ({ children }) => {
 
     // Redirect based on role when on public routes
     if (isOnPublicRoute) {
+      // Allow players to access the explore page even when logged in
+      if (location.pathname === '/explore' && profile.role === 'player') {
+        return children;
+      }
+      
       switch (profile.role) {
         case "venue_owner":
           return <Navigate to="/owner/dashboard" replace />;
         case "admin":
           return <Navigate to="/admin/dashboard" replace />;
-          if (location.pathname === "/") {
-            return <Navigate to="/explore" replace />;
-          }
-          break;
+        case "player":
+          return <Navigate to="/dashboard" replace />;
         default:
           break;
       }
@@ -170,7 +174,7 @@ const RequireAuth = ({ children, allowedRoles = [] }) => {
       case "venue_owner":
         return <Navigate to="/owner/dashboard" replace />;
       case "player":
-        return <Navigate to="/explore" replace />;
+        return <Navigate to="/dashboard" replace />;
       default:
         return <Navigate to="/" replace />;
     }
@@ -220,6 +224,14 @@ function App() {
               <Route path="signup" element={<AuthPage />} />
               {/* Player Routes - Also accessible by non-logged in users */}
               <Route path="explore" element={<ExplorePage />} />
+              <Route
+                path="dashboard"
+                element={
+                  <RequireAuth allowedRoles={["player"]}>
+                    <PlayerDashboardPage />
+                  </RequireAuth>
+                }
+              />
               <Route
                 path="venues/:venueId"
                 element={

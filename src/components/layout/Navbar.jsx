@@ -58,15 +58,19 @@ function Navbar() {
 
   const getNavLinks = () => {
     if (profile?.role !== "venue_owner" && profile?.role !== "admin") {
-      const links = [{ to: "/explore", label: "Explore" }];
-      if (!user) {
-        links.push(
-          { to: "/about", label: "About Us" },
-          { to: "/contact", label: "Contact Us" }
-        );
-      }
+      let links = [];
       if (user) {
-        links.push({ to: "/my-bookings", label: "My Bookings" });
+        links = [
+          { to: "/dashboard", label: "Dashboard" },
+          { to: "/explore", label: "Explore" },
+          { to: "/my-bookings", label: "My Bookings" },
+        ];
+      } else {
+        links = [
+          { to: "/explore", label: "Explore" },
+          { to: "/about", label: "About Us" },
+          { to: "/contact", label: "Contact Us" },
+        ];
       }
       return links;
     }

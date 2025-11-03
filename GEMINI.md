@@ -1,7 +1,6 @@
-
 # Project Overview
 
-This is a React web application built with Vite. It uses Tailwind CSS for styling and Supabase for the backend. The application is a platform for booking sports venues.
+This is a React web application built with Vite. It's a platform for booking sports venues, featuring distinct user roles like players, venue owners, and administrators.
 
 # Building and Running
 
@@ -37,7 +36,7 @@ The project uses Tailwind CSS for styling. Please adhere to the Tailwind CSS uti
 
 ## Backend
 
-The project uses Supabase for the backend. The Supabase configuration is located in `supabase/config.toml`.
+The project uses Supabase for the backend. The Supabase client is used throughout the application for data fetching and management.
 
 ## Linting
 
