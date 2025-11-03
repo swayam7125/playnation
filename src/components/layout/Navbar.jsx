@@ -81,6 +81,7 @@ function Navbar() {
     }
     if (profile?.role === "admin") {
       return [
+        { to: "/admin/dashboard", label: "Dashboard" },
         { to: "/admin/venues", label: "Manage Venues" },
         { to: "/admin/users", label: "Manage Users" },
         { to: "/admin/bookings", label: "Manage Bookings" },
