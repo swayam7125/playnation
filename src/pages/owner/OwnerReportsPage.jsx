@@ -13,6 +13,9 @@ function OwnerReportsPage() {
   const [revenueTrendData, setRevenueTrendData] = useState([]);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [totalRevenue, setTotalRevenue] = useState(0);
+  const [venues, setVenues] = useState([]);
+  const [selectedVenue, setSelectedVenue] = useState("all");
+  const [allRevenueData, setAllRevenueData] = useState([]);
 
   const fetchRevenueTrend = useCallback(async (timeframe) => {
     if (!user) return;
@@ -39,6 +42,15 @@ function OwnerReportsPage() {
     setLoading(true);
     setError(null);
     try {
+      const { data: venuesData, error: venuesError } = await supabase
+        .from('venues')
+        .select('venue_id, name')
+        .eq('owner_id', user.id)
+        .eq('is_approved', true);
+
+      if (venuesError) throw venuesError;
+      setVenues(venuesData || []);
+
       // Use the existing PostgreSQL function to fetch metrics for the period
       const { data: statsData, error: statsError } = await supabase
         .rpc('get_owner_dashboard_statistics', { days_to_track: daysToTrack });
@@ -52,14 +64,9 @@ function OwnerReportsPage() {
           name: formatLabel(item.date),
           Revenue: item.revenue // Key for Recharts
         }));
-        
-        // Calculate total revenue for the displayed period
-        const periodTotal = trend.reduce((sum, item) => sum + item.Revenue, 0);
-        setTotalRevenue(periodTotal);
-        setRevenueTrendData(trend);
+        setAllRevenueData(trend);
       } else {
-        setRevenueTrendData([]);
-        setTotalRevenue(0);
+        setAllRevenueData([]);
       }
 
     } catch (e) {
@@ -73,6 +80,19 @@ function OwnerReportsPage() {
   useEffect(() => {
     fetchRevenueTrend(reportTimeframe);
   }, [reportTimeframe, fetchRevenueTrend]);
+
+  useEffect(() => {
+    if (selectedVenue === "all") {
+      setRevenueTrendData(allRevenueData);
+      const periodTotal = allRevenueData.reduce((sum, item) => sum + item.Revenue, 0);
+      setTotalRevenue(periodTotal);
+    } else {
+      const filteredData = allRevenueData.filter(item => item.venue_id === selectedVenue);
+      setRevenueTrendData(filteredData);
+      const periodTotal = filteredData.reduce((sum, item) => sum + item.Revenue, 0);
+      setTotalRevenue(periodTotal);
+    }
+  }, [selectedVenue, allRevenueData]);
 
   const getChartTitle = useMemo(() => {
     return reportTimeframe === 'weekly' 
@@ -142,33 +162,51 @@ function OwnerReportsPage() {
                 </p>
              </div>
              
-             {/* Timeframe Selector */}
-             <div className="relative">
-                <button 
-                  onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-white rounded-xl border border-border-color text-sm font-semibold text-dark-text hover:bg-hover-bg transition-colors"
-                >
-                  <FaRegCalendar className="w-4 h-4 text-primary-green" />
-                  <span>{reportTimeframe.charAt(0).toUpperCase() + reportTimeframe.slice(1)} Report</span>
-                  <FaChevronDown className={`w-3 h-3 text-medium-text transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : 'rotate-0'}`} />
-                </button>
-                {isMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white border border-border-color rounded-lg shadow-xl z-10">
-                    {/* Daily/Hourly removed as this page is for long-term reports */}
-                    <button 
-                      onClick={() => { setReportTimeframe('weekly'); setIsMenuOpen(false); }}
-                      className={`block w-full text-left px-4 py-2 text-sm ${reportTimeframe === 'weekly' ? 'bg-primary-green text-white' : 'text-dark-text hover:bg-hover-bg'}`}
-                    >
-                      Weekly (Last 7 Days)
-                    </button>
-                    <button 
-                      onClick={() => { setReportTimeframe('monthly'); setIsMenuOpen(false); }}
-                      className={`block w-full text-left px-4 py-2 text-sm ${reportTimeframe === 'monthly' ? 'bg-primary-green text-white' : 'text-dark-text hover:bg-hover-bg'}`}
-                    >
-                      Monthly (Last 30 Days)
-                    </button>
-                  </div>
-                )}
+             <div className="flex items-center">
+               {/* Timeframe Selector */}
+               <div className="relative">
+                  <button 
+                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-white rounded-xl border border-border-color text-sm font-semibold text-dark-text hover:bg-hover-bg transition-colors"
+                  >
+                    <FaRegCalendar className="w-4 h-4 text-primary-green" />
+                    <span>{reportTimeframe.charAt(0).toUpperCase() + reportTimeframe.slice(1)} Report</span>
+                    <FaChevronDown className={`w-3 h-3 text-medium-text transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : 'rotate-0'}`} />
+                  </button>
+                  {isMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white border border-border-color rounded-lg shadow-xl z-10">
+                      {/* Daily/Hourly removed as this page is for long-term reports */}
+                      <button 
+                        onClick={() => { setReportTimeframe('weekly'); setIsMenuOpen(false); }}
+                        className={`block w-full text-left px-4 py-2 text-sm ${reportTimeframe === 'weekly' ? 'bg-primary-green text-white' : 'text-dark-text hover:bg-hover-bg'}`}
+                      >
+                        Weekly (Last 7 Days)
+                      </button>
+                      <button 
+                        onClick={() => { setReportTimeframe('monthly'); setIsMenuOpen(false); }}
+                        className={`block w-full text-left px-4 py-2 text-sm ${reportTimeframe === 'monthly' ? 'bg-primary-green text-white' : 'text-dark-text hover:bg-hover-bg'}`}
+                      >
+                        Monthly (Last 30 Days)
+                      </button>
+                    </div>
+                  )}
+               </div>
+
+               {/* Venue Selector */}
+               <div className="relative ml-4">
+                  <select
+                    value={selectedVenue}
+                    onChange={(e) => setSelectedVenue(e.target.value)}
+                    className="appearance-none w-full md:w-auto flex items-center space-x-2 px-4 py-2 bg-white rounded-xl border border-border-color text-sm font-semibold text-dark-text hover:bg-hover-bg transition-colors focus:outline-none focus:ring-2 focus:ring-primary-green"
+                  >
+                    <option value="all">All Venues</option>
+                    {venues.map((venue) => (
+                      <option key={venue.venue_id} value={venue.venue_id}>
+                        {venue.name}
+                      </option>
+                    ))}
+                  </select>
+               </div>
              </div>
         </div>
 

@@ -4,7 +4,7 @@ import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
 import {
   FaRupeeSign, FaCalendarCheck, FaChartLine, FaFutbol, FaClock,
-  FaTrophy, FaCalendarAlt, FaEye, FaList, FaChartBar
+  FaTrophy, FaCalendarAlt, FaEye, FaList, FaChartBar, FaChevronDown
 } from "react-icons/fa";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -55,6 +55,8 @@ function OwnerDashboardPage() {
   const [todaysBookings, setTodaysBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [venues, setVenues] = useState([]);
+  const [selectedVenue, setSelectedVenue] = useState("all");
 
   const fetchDashboardData = useCallback(async () => {
     if (!user) {
@@ -74,6 +76,7 @@ function OwnerDashboardPage() {
         .eq('is_approved', true);
 
       if (venuesError) throw venuesError;
+      setVenues(venuesData || []);
 
       if (!venuesData || venuesData.length === 0) {
         setStats({
@@ -92,7 +95,10 @@ function OwnerDashboardPage() {
         return;
       }
 
-      const venueIds = venuesData.map(v => v.venue_id);
+      const venueIds =
+        selectedVenue === "all"
+          ? venuesData.map((v) => v.venue_id)
+          : [selectedVenue];
 
       // 2. Fetch facilities for these venues
       const { data: facilitiesData, error: facilitiesError } = await supabase
@@ -238,7 +244,7 @@ function OwnerDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, selectedVenue]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -342,8 +348,30 @@ function OwnerDashboardPage() {
           </div>
         </div>
 
-        {/* KPI Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+        {/* Venue Filter Dropdown - NOW STYLED */}
+        <div className="mb-6 flex justify-end">
+          <div className="relative w-64">
+            <select
+              value={selectedVenue}
+              onChange={(e) => setSelectedVenue(e.target.value)}
+              className="appearance-none w-full px-4 py-2.5 pr-10 bg-white border border-border-color rounded-xl shadow-sm text-sm font-medium text-dark-text focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-primary-green cursor-pointer"
+            >
+              <option value="all">All Venues</option>
+              {venues.map((venue) => (
+                <option key={venue.venue_id} value={venue.venue_id}>
+                  {venue.name}
+                </option>
+              ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+              <FaChevronDown className="w-4 h-4 text-gray-400" />
+            </div>
+          </div>
+        </div>
+
+
+        {/* KPI Cards Grid - UPDATED FOR 2x3 LAYOUT */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <KpiCard 
             icon={<FaRupeeSign />} 
             title="Today's Revenue" 
