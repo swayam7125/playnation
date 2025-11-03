@@ -74,9 +74,9 @@ function Navbar() {
       return [
         { to: "/owner/dashboard", label: "Dashboard" },
         { to: "/owner/my-venues", label: "My Venues" },
-        { to: "/owner/manage-offers", label: "Manage Offers" },
         { to: "/owner/calendar", label: "Bookings" },
         { to: "/owner/manage-slots", label: "Manage Slots" },
+        { to: "/owner/manage-offers", label: "Manage Offers" },
       ];
     }
     if (profile?.role === "admin") {
