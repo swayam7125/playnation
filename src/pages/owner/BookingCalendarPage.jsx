@@ -253,268 +253,278 @@ function BookingCalendarPage() {
         onCancel={() => setBookingToRefund(null)}
       />
       
-      {/* 🌟 Header Section 🌟 */}
-      <div className="bg-gradient-to-r from-primary-green to-primary-green-light shadow-2xl">
-        <div className="container mx-auto px-6 py-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-white/30 rounded-xl">
-                <FaCalendarAlt className="text-white text-2xl" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-extrabold text-white tracking-tight">Schedule Dashboard</h1>
-                <p className="text-white/80 text-lg">Real-time management for all your facility bookings</p>
-              </div>
-            </div>
-            {/* Today Button - Conditional styling for clear visual feedback */}
-            <button 
-                onClick={() => setCurrentDate(new Date())} 
-                className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 shadow-md ${
-                    isToday 
-                        ? 'bg-white text-primary-green' 
-                        : 'bg-white/10 text-white hover:bg-white/20'
-                }`}
-            >
-                {isToday ? 'Viewing Today' : 'Go To Today'}
-            </button>
-          </div>
+      {/* 🌟 Outer container for alignment 🌟 */}
+      <div className="container mx-auto px-6 py-8 max-w-7xl">
+
+        {/* 🌟 Header Section (Green Stripe) 🌟 */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-primary-green via-primary-green-dark to-primary-green rounded-2xl shadow-2xl">
+          <div className="absolute inset-0 bg-gradient-to-r from-black/5 to-black/10"></div>
           
-          {/* Stats Cards - Enhanced Design */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-            
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:scale-[1.02] transition-transform duration-200 shadow-md">
-              <p className="text-white/70 text-sm font-medium uppercase tracking-wider">Date View</p>
-              <div className="flex items-center gap-2 mt-1">
-                <FaCalendarAlt className="text-white/80 w-5 h-5" />
-                <p className="text-white font-semibold text-xl">{currentDate.toLocaleDateString()}</p>
+          <div className="relative px-8 py-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 p-3 bg-white/20 rounded-xl flex items-center justify-center">
+                  <FaCalendarAlt className="text-white text-2xl" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-extrabold text-white tracking-tight">Schedule Dashboard</h1>
+                  <p className="text-white/80 text-sm">Real-time management for all your facility bookings</p>
+                </div>
               </div>
+              {/* Today Button - Conditional styling for clear visual feedback */}
+              <button 
+                  onClick={() => setCurrentDate(new Date())} 
+                  className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 shadow-md ${
+                      isToday 
+                          ? 'bg-white text-primary-green' 
+                          : 'bg-white/10 text-white hover:bg-white/20'
+                  }`}
+              >
+                  {isToday ? 'Viewing Today' : 'Go To Today'}
+              </button>
             </div>
             
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:scale-[1.02] transition-transform duration-200 shadow-md">
-              <p className="text-white/70 text-sm font-medium uppercase tracking-wider">Confirmed Bookings</p>
-              <div className="flex items-center gap-2 mt-1">
-                <FaCheckCircle className="text-light-green-bg w-5 h-5" />
-                <p className="text-white font-semibold text-2xl">{todaysBookingsCount}</p>
+            {/* Stats Cards - Aligned below the header text */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+              
+              {/* Card 1: Date View */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:scale-[1.02] transition-transform duration-200 shadow-md">
+                <p className="text-white/70 text-sm font-medium uppercase tracking-wider">Date View</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <FaCalendarAlt className="text-white/80 w-5 h-5" />
+                  <p className="text-white font-semibold text-xl">{currentDate.toLocaleDateString()}</p>
+                </div>
               </div>
-            </div>
-            
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:scale-[1.02] transition-transform duration-200 shadow-md">
-              <p className="text-white/70 text-sm font-medium uppercase tracking-wider">Active Facilities</p>
-              <div className="flex items-center gap-2 mt-1">
-                <FaMapMarkerAlt className="text-white/80 w-5 h-5" />
-                <p className="text-white font-semibold text-2xl">{facilitiesToDisplay.length}</p>
+              
+              {/* Card 2: Confirmed Bookings */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:scale-[1.02] transition-transform duration-200 shadow-md">
+                <p className="text-white/70 text-sm font-medium uppercase tracking-wider">Confirmed Bookings</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <FaCheckCircle className="text-light-green-bg w-5 h-5" />
+                  <p className="text-white font-semibold text-2xl">{todaysBookingsCount}</p>
+                </div>
+              </div>
+              
+              {/* Card 3: Active Facilities */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:scale-[1.02] transition-transform duration-200 shadow-md">
+                <p className="text-white/70 text-sm font-medium uppercase tracking-wider">Active Facilities</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <FaMapMarkerAlt className="text-white/80 w-5 h-5" />
+                  <p className="text-white font-semibold text-2xl">{facilitiesToDisplay.length}</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="container mx-auto px-6 py-8">
         
-        {/* 🌟 Control Panel 🌟 */}
-        <div className="bg-white rounded-2xl border border-border-color p-6 shadow-2xl mb-8">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            
-            {/* Date Navigation Block */}
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => changeDate(-1)} 
-                className="p-3 border border-border-color rounded-xl hover:bg-hover-bg hover:border-primary-green transition-all duration-200 group shadow-md"
-                aria-label="Previous Day"
-              >
-                <FaChevronLeft className="text-medium-text group-hover:text-primary-green" />
-              </button>
+        {/* The rest of the content remains within the mx-auto container */}
+        <div className="py-8">
+          
+          {/* 🌟 Control Panel 🌟 */}
+          <div className="bg-white rounded-2xl border border-border-color p-6 shadow-2xl mb-8">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
               
-              {/* DATE INPUT FIX HERE */}
-              <div className="relative flex items-center border border-border-color rounded-xl bg-white focus-within:border-primary-green focus-within:ring-4 focus-within:ring-primary-green/10 transition-all duration-200">
-                <input 
-                  type="date" 
-                  className="px-4 py-3 text-dark-text font-semibold text-center outline-none cursor-pointer w-40 bg-transparent opacity-0 absolute inset-0" 
-                  value={getDateStringForInput(currentDate)} 
-                  onChange={e => setCurrentDate(new Date(e.target.value))} 
-                />
+              {/* Date Navigation Block */}
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => changeDate(-1)} 
+                  className="p-3 border border-border-color rounded-xl hover:bg-hover-bg hover:border-primary-green transition-all duration-200 group shadow-md"
+                  aria-label="Previous Day"
+                >
+                  <FaChevronLeft className="text-medium-text group-hover:text-primary-green" />
+                </button>
                 
-                {/* Visual wrapper for the date text and icon */}
-                <div className="flex items-center justify-center space-x-2 px-4 py-3 w-40 pointer-events-none">
-                    <span className="text-dark-text font-semibold">
-                        {getDateStringForInput(currentDate).split('-').reverse().join('-')}
-                    </span>
-                    <FaCalendarAlt className="text-primary-green w-5 h-5" />
+                {/* DATE INPUT FIX HERE */}
+                <div className="relative flex items-center border border-border-color rounded-xl bg-white focus-within:border-primary-green focus-within:ring-4 focus-within:ring-primary-green/10 transition-all duration-200">
+                  <input 
+                    type="date" 
+                    className="px-4 py-3 text-dark-text font-semibold text-center outline-none cursor-pointer w-40 bg-transparent opacity-0 absolute inset-0" 
+                    value={getDateStringForInput(currentDate)} 
+                    onChange={e => setCurrentDate(new Date(e.target.value))} 
+                  />
+                  
+                  {/* Visual wrapper for the date text and icon */}
+                  <div className="flex items-center justify-center space-x-2 px-4 py-3 w-40 pointer-events-none">
+                      <span className="text-dark-text font-semibold">
+                          {getDateStringForInput(currentDate).split('-').reverse().join('-')}
+                      </span>
+                      <FaCalendarAlt className="text-primary-green w-5 h-5" />
+                  </div>
                 </div>
+                {/* END DATE INPUT FIX */}
+                
+                <button 
+                  onClick={() => changeDate(1)} 
+                  className="p-3 border border-border-color rounded-xl hover:bg-hover-bg hover:border-primary-green transition-all duration-200 group shadow-md"
+                  aria-label="Next Day"
+                >
+                  <FaChevronRight className="text-medium-text group-hover:text-primary-green" />
+                </button>
               </div>
-              {/* END DATE INPUT FIX */}
-              
-              <button 
-                onClick={() => changeDate(1)} 
-                className="p-3 border border-border-color rounded-xl hover:bg-hover-bg hover:border-primary-green transition-all duration-200 group shadow-md"
-                aria-label="Next Day"
-              >
-                <FaChevronRight className="text-medium-text group-hover:text-primary-green" />
-              </button>
-            </div>
 
-            {/* Venue Filter Block */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-dark-text font-semibold">
-                <FaFilter className="text-primary-green" />
-                <span>Filter by Venue:</span>
+              {/* Venue Filter Block */}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 text-dark-text font-semibold">
+                  <FaFilter className="text-primary-green" />
+                  <span>Filter by Venue:</span>
+                </div>
+                <select 
+                  value={selectedVenueId} 
+                  onChange={(e) => setSelectedVenueId(e.target.value)} 
+                  className="px-4 py-3 border border-border-color rounded-xl text-dark-text bg-white focus:outline-none focus:border-primary-green focus:ring-4 focus:ring-primary-green/10 transition-all duration-200 min-w-[200px] shadow-sm"
+                >
+                  <option value="all">All Venues ({venues.length})</option>
+                  {venues.map(venue => (
+                    <option key={venue.venue_id} value={venue.venue_id}>
+                      {venue.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <select 
-                value={selectedVenueId} 
-                onChange={(e) => setSelectedVenueId(e.target.value)} 
-                className="px-4 py-3 border border-border-color rounded-xl text-dark-text bg-white focus:outline-none focus:border-primary-green focus:ring-4 focus:ring-primary-green/10 transition-all duration-200 min-w-[200px] shadow-sm"
-              >
-                <option value="all">All Venues ({venues.length})</option>
-                {venues.map(venue => (
-                  <option key={venue.venue_id} value={venue.venue_id}>
-                    {venue.name}
-                  </option>
-                ))}
-              </select>
+            </div>
+            
+            {/* Selected Date Display */}
+            <div className="mt-6 pt-6 border-t border-border-color text-center">
+              <h3 className="text-xl font-bold text-dark-text">
+                Viewing Schedule for <span className="text-primary-green">{formatDate(currentDate)}</span>
+              </h3>
             </div>
           </div>
           
-          {/* Selected Date Display */}
-          <div className="mt-6 pt-6 border-t border-border-color text-center">
-            <h3 className="text-xl font-bold text-dark-text">
-              Viewing Schedule for <span className="text-primary-green">{formatDate(currentDate)}</span>
-            </h3>
-          </div>
-        </div>
-        
-        {/* Calendar Content */}
-        {facilitiesToDisplay.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-border-color p-16 text-center shadow-2xl">
-            <div className="max-w-md mx-auto">
-              <div className="p-4 bg-light-green-bg rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-                <FaMapMarkerAlt className="text-primary-green text-2xl" />
-              </div>
-              <h3 className="text-xl font-semibold text-dark-text mb-2">No Facilities Found</h3>
-              <p className="text-medium-text">Please add facilities to your venues to view the booking calendar.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl border border-border-color shadow-2xl overflow-hidden">
-            {/* Calendar Header */}
-            <div className="bg-primary-green/10 border-b-2 border-primary-green/30">
-              <div className="grid" style={{ gridTemplateColumns: `120px repeat(${facilitiesToDisplay.length}, minmax(200px, 1fr))` }}>
-                <div className="p-4 flex flex-col items-center justify-center border-r border-border-color bg-primary-green/10">
-                  <FaClock className="text-primary-green text-xl mb-1" />
-                  <span className="font-extrabold text-dark-text text-sm uppercase">Time Slot</span>
+          {/* Calendar Content */}
+          {facilitiesToDisplay.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-border-color p-16 text-center shadow-2xl">
+              <div className="max-w-md mx-auto">
+                <div className="p-4 bg-light-green-bg rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                  <FaMapMarkerAlt className="text-primary-green text-2xl" />
                 </div>
-                {facilitiesToDisplay.map((facility, index) => (
-                  <div key={facility.facility_id} className={`p-4 text-center bg-primary-green/5 ${index < facilitiesToDisplay.length - 1 ? 'border-r border-border-color' : ''}`}>
-                    <div className="space-y-1">
-                      <h4 className="font-bold text-dark-text text-lg">{facility.name}</h4>
-                      <div className="inline-flex items-center px-3 py-0.5 bg-primary-green/20 text-dark-text/80 rounded-full text-xs font-medium">
-                        {facility.sports?.name || 'Sport'}
-                      </div>
-                    </div>
+                <h3 className="text-xl font-semibold text-dark-text mb-2">No Facilities Found</h3>
+                <p className="text-medium-text">Please add facilities to your venues to view the booking calendar.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-border-color shadow-2xl overflow-hidden">
+              {/* Calendar Header */}
+              <div className="bg-primary-green/10 border-b-2 border-primary-green/30">
+                <div className="grid" style={{ gridTemplateColumns: `120px repeat(${facilitiesToDisplay.length}, minmax(200px, 1fr))` }}>
+                  <div className="p-4 flex flex-col items-center justify-center border-r border-border-color bg-primary-green/10">
+                    <FaClock className="text-primary-green text-xl mb-1" />
+                    <span className="font-extrabold text-dark-text text-sm uppercase">Time Slot</span>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Calendar Body */}
-            <div className="overflow-x-auto">
-              <div className="grid" style={{ gridTemplateColumns: `120px repeat(${facilitiesToDisplay.length}, minmax(200px, 1fr))` }}>
-                {hours.map((hour, hourIndex) => (
-                  <React.Fragment key={hour}>
-                    {/* Time Column - Enhanced BG for time tracking */}
-                    <div className={`p-4 flex flex-col items-center justify-center border-r border-border-color ${isToday && hour === new Date().getHours() ? 'bg-yellow-50 font-extrabold border-l-4 border-yellow-500' : 'bg-gray-50'} ${hourIndex < hours.length - 1 ? 'border-b border-border-color' : ''}`}>
-                      <div className="text-center">
-                        <div className={`font-semibold text-dark-text text-md ${isToday && hour === new Date().getHours() ? 'text-yellow-800' : ''}`}>{formatTime(hour)}</div>
-                        <div className="text-xs text-medium-text">{hour}:00 - {hour + 1}:00</div>
+                  {facilitiesToDisplay.map((facility, index) => (
+                    <div key={facility.facility_id} className={`p-4 text-center bg-primary-green/5 ${index < facilitiesToDisplay.length - 1 ? 'border-r border-border-color' : ''}`}>
+                      <div className="space-y-1">
+                        <h4 className="font-bold text-dark-text text-lg">{facility.name}</h4>
+                        <div className="inline-flex items-center px-3 py-0.5 bg-primary-green/20 text-dark-text/80 rounded-full text-xs font-medium">
+                          {facility.sports?.name || 'Sport'}
+                        </div>
                       </div>
                     </div>
-                    
-                    {/* Facility Columns */}
-                    {facilitiesToDisplay.map((facility, facilityIndex) => {
-                      const booking = getBookingForSlot(facility.facility_id, hour);
-                      
-                      const isCancelled = booking && booking.status === 'cancelled';
-                      const isRefunded = booking && booking.payment_status === 'refunded';
-                      const isConfirmed = booking && booking.status === 'confirmed';
-                      const isRefundable = isCancelled && !isRefunded;
+                  ))}
+                </div>
+              </div>
 
-                      let slotBg = 'hover:bg-hover-bg';
-                      let cardStyle = '';
-                      let statusIcon = null;
-                      
-                      if (isConfirmed) {
-                          slotBg = 'bg-primary-green-light/5';
-                          cardStyle = 'bg-gradient-to-br from-primary-green to-primary-green-dark shadow-xl shadow-green-200/50 text-white';
-                          statusIcon = <FaCheckCircle className="text-white/90" />;
-                      } else if (isRefunded) {
-                          slotBg = 'bg-gray-100';
-                          cardStyle = 'bg-gray-500 shadow-lg text-white';
-                          statusIcon = <FaMoneyBillWave className="text-white/90" />;
-                      } else if (isCancelled) {
-                          slotBg = 'bg-red-50'; 
-                          cardStyle = 'bg-red-600 shadow-xl shadow-red-200/50 text-white';
-                          statusIcon = <FaTimesCircle className="text-white/90" />;
-                      }
-
-                      return (
-                        <div 
-                          key={`${facility.facility_id}-${hour}`} 
-                          className={`p-2 min-h-[100px] transition-all duration-200 ${
-                            facilityIndex < facilitiesToDisplay.length - 1 ? 'border-r border-border-color' : ''
-                          } ${
-                            hourIndex < hours.length - 1 ? 'border-b border-border-color' : ''
-                          } ${slotBg}`}
-                        >
-                          {booking ? (
-                            <div className={`${cardStyle} p-3 rounded-xl h-full flex flex-col justify-between transform hover:scale-[1.03] transition-transform duration-200 border-2 border-transparent hover:border-white/50 cursor-pointer`}>
-                              <div className="text-center space-y-1">
-                                <div className="flex items-center justify-center gap-2 mb-1">
-                                  {statusIcon}
-                                </div>
-                                <div className="font-bold text-sm leading-tight truncate">
-                                  {booking.users?.first_name} {booking.users?.last_name || booking.users?.username}
-                                </div>
-                                <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium capitalize 
-                                  ${isConfirmed ? 'bg-white/30' : 'bg-white/40'}`}
-                                >
-                                  {isRefunded ? 'Refunded' : (isCancelled ? 'Cancelled' : booking.status)}
-                                </div>
-                                <div className="text-sm font-semibold mt-1">
-                                  ₹{booking.total_amount ? booking.total_amount.toLocaleString("en-IN") : 'N/A'}
-                                </div>
-                              </div>
-                              
-                              {/* REFUND OPTION */}
-                              {isRefundable && (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleRefundClick(booking); }}
-                                  className="mt-2 w-full flex items-center justify-center space-x-1 px-2 py-1 bg-white/95 text-red-600 rounded-lg text-xs font-semibold hover:bg-white transition-all duration-200 shadow-md"
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                                  </svg>
-                                  <span>Issue Refund</span>
-                                </button>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="h-full flex items-center justify-center text-light-text">
-                              <div className="text-center space-y-1">
-                                <div className="w-6 h-6 mx-auto bg-gray-200 rounded-full flex items-center justify-center">
-                                  <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                </div>
-                                <div className="text-xs">Available</div>
-                              </div>
-                            </div>
-                          )}
+              {/* Calendar Body */}
+              <div className="overflow-x-auto">
+                <div className="grid" style={{ gridTemplateColumns: `120px repeat(${facilitiesToDisplay.length}, minmax(200px, 1fr))` }}>
+                  {hours.map((hour, hourIndex) => (
+                    <React.Fragment key={hour}>
+                      {/* Time Column - Enhanced BG for time tracking */}
+                      <div className={`p-4 flex flex-col items-center justify-center border-r border-border-color ${isToday && hour === new Date().getHours() ? 'bg-yellow-50 font-extrabold border-l-4 border-yellow-500' : 'bg-gray-50'} ${hourIndex < hours.length - 1 ? 'border-b border-border-color' : ''}`}>
+                        <div className="text-center">
+                          <div className={`font-semibold text-dark-text text-md ${isToday && hour === new Date().getHours() ? 'text-yellow-800' : ''}`}>{formatTime(hour)}</div>
+                          <div className="text-xs text-medium-text">{hour}:00 - {hour + 1}:00</div>
                         </div>
-                      );
-                    })}
-                  </React.Fragment>
-                ))}
+                      </div>
+                      
+                      {/* Facility Columns */}
+                      {facilitiesToDisplay.map((facility, facilityIndex) => {
+                        const booking = getBookingForSlot(facility.facility_id, hour);
+                        
+                        const isCancelled = booking && booking.status === 'cancelled';
+                        const isRefunded = booking && booking.payment_status === 'refunded';
+                        const isConfirmed = booking && booking.status === 'confirmed';
+                        const isRefundable = isCancelled && !isRefunded;
+
+                        let slotBg = 'hover:bg-hover-bg';
+                        let cardStyle = '';
+                        let statusIcon = null;
+                        
+                        if (isConfirmed) {
+                            slotBg = 'bg-primary-green-light/5';
+                            cardStyle = 'bg-gradient-to-br from-primary-green to-primary-green-dark shadow-xl shadow-green-200/50 text-white';
+                            statusIcon = <FaCheckCircle className="text-white/90" />;
+                        } else if (isRefunded) {
+                            slotBg = 'bg-gray-100';
+                            cardStyle = 'bg-gray-500 shadow-lg text-white';
+                            statusIcon = <FaMoneyBillWave className="text-white/90" />;
+                        } else if (isCancelled) {
+                            slotBg = 'bg-red-50'; 
+                            cardStyle = 'bg-red-600 shadow-xl shadow-red-200/50 text-white';
+                            statusIcon = <FaTimesCircle className="text-white/90" />;
+                        }
+
+                        return (
+                          <div 
+                            key={`${facility.facility_id}-${hour}`} 
+                            className={`p-2 min-h-[100px] transition-all duration-200 ${
+                              facilityIndex < facilitiesToDisplay.length - 1 ? 'border-r border-border-color' : ''
+                            } ${
+                              hourIndex < hours.length - 1 ? 'border-b border-border-color' : ''
+                            } ${slotBg}`}
+                          >
+                            {booking ? (
+                              <div className={`${cardStyle} p-3 rounded-xl h-full flex flex-col justify-between transform hover:scale-[1.03] transition-transform duration-200 border-2 border-transparent hover:border-white/50 cursor-pointer`}>
+                                <div className="text-center space-y-1">
+                                  <div className="flex items-center justify-center gap-2 mb-1">
+                                    {statusIcon}
+                                  </div>
+                                  <div className="font-bold text-sm leading-tight truncate">
+                                    {booking.users?.first_name} {booking.users?.last_name || booking.users?.username}
+                                  </div>
+                                  <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium capitalize 
+                                    ${isConfirmed ? 'bg-white/30' : 'bg-white/40'}`}
+                                  >
+                                    {isRefunded ? 'Refunded' : (isCancelled ? 'Cancelled' : booking.status)}
+                                  </div>
+                                  <div className="text-sm font-semibold mt-1">
+                                    ₹{booking.total_amount ? booking.total_amount.toLocaleString("en-IN") : 'N/A'}
+                                  </div>
+                                </div>
+                                
+                                {/* REFUND OPTION */}
+                                {isRefundable && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleRefundClick(booking); }}
+                                    className="mt-2 w-full flex items-center justify-center space-x-1 px-2 py-1 bg-white/95 text-red-600 rounded-lg text-xs font-semibold hover:bg-white transition-all duration-200 shadow-md"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    <span>Issue Refund</span>
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="h-full flex items-center justify-center text-light-text">
+                                <div className="text-center space-y-1">
+                                  <div className="w-6 h-6 mx-auto bg-gray-200 rounded-full flex items-center justify-center">
+                                    <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                  </div>
+                                  <div className="text-xs">Available</div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
