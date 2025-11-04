@@ -1,16 +1,15 @@
-// src/pages/player/MyBookingsPage.jsx
-
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { BookingCard } from "../../components/bookings/BookingCard";
 import {
   LoadingSpinner,
   ErrorState,
 } from "../../components/common/LoadingAndError";
-import { Calendar } from "lucide-react";
+import { Calendar, Plus } from "lucide-react";
+import SegmentedControl from "../../components/common/SegmentedControl";
 
 // Constants outside component to prevent recreation
 const MONTHS = [
@@ -19,16 +18,6 @@ const MONTHS = [
 ];
 
 const ITEMS_PER_PAGE = 36;
-
-// Utility functions outside component
-const safeParseDate = (dateString) => {
-  try {
-    const date = new Date(dateString);
-    return date instanceof Date && !isNaN(date) ? date : null;
-  } catch {
-    return null;
-  }
-};
 
 function MyBookingsPage() {
   const [view, setView] = useState("upcoming");
@@ -40,6 +29,7 @@ function MyBookingsPage() {
   const [error, setError] = useState({ upcoming: null, past: null });
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const highlightedId = searchParams.get('highlight');
 
@@ -126,34 +116,27 @@ function MyBookingsPage() {
     fetchPastBookings();
   }, [fetchPastBookings]);
 
-  // 👇 --- THIS FUNCTION WAS INCORRECT ---
-  // It must accept 'reason' and pass it to the RPC
   const handleCancelBooking = async (bookingId, reason) => {
     if (!user || !bookingId || !reason) return;
 
-    // Start loading toast
     const loadingToast = toast.loading('Canceling booking...');
 
     try {
-      // Call the secure PostgreSQL function using RPC
       const { error: rpcError } = await supabase.rpc(
         'cancel_booking_transaction', 
         { 
           p_booking_id: bookingId, 
           p_user_id: user.id,
-          p_cancellation_reason: reason // 👈 Pass the reason here
+          p_cancellation_reason: reason
         }
       );
 
       if (rpcError) {
-        // Throw to enter catch block and handle DB errors
         throw new Error(rpcError.message);
       }
 
-      // Success notification
       toast.success('Booking successfully cancelled and slot released.', { id: loadingToast });
       
-      // Refresh the booking list
       handleRefresh();
 
     } catch (err) {
@@ -161,20 +144,17 @@ function MyBookingsPage() {
       const dbErrorMessage = err.message || "Could not cancel booking. Please try again.";
       let friendlyMessage;
 
-      // Map specific database errors to friendly messages
       if (dbErrorMessage.includes('already cancelled')) {
         friendlyMessage = 'Booking is already cancelled.';
       } else if (dbErrorMessage.includes('Booking not found')) {
         friendlyMessage = 'Booking not found or not owned by you.';
       } else {
-        friendlyMessage = dbErrorMessage; // Use the direct DB error if it's clear
+        friendlyMessage = dbErrorMessage;
       }
 
-      // Error notification
       toast.error(friendlyMessage, { id: loadingToast });
     }
   };
-  // 👆 --- END OF CORRECTED FUNCTION ---
 
   const bookingsToShow = useMemo(() => 
     view === "upcoming" ? upcomingBookings : pastBookings,
@@ -186,28 +166,13 @@ function MyBookingsPage() {
 
   return (
     <div className="container mx-auto px-4 py-12">
-      <h1 className="text-4xl font-bold text-dark-text mb-8">My Bookings</h1>
-      <div className="flex justify-center mb-8 border-b border-border-color">
-        <button
-          onClick={() => setView("upcoming")}
-          className={`px-6 py-3 font-semibold transition ${
-            view === "upcoming"
-              ? "text-primary-green border-b-2 border-primary-green"
-              : "text-medium-text"
-          }`}
-        >
-          Upcoming
-        </button>
-        <button
-          onClick={() => setView("past")}
-          className={`px-6 py-3 font-semibold transition ${
-            view === "past"
-              ? "text-primary-green border-b-2 border-primary-green"
-              : "text-medium-text"
-          }`}
-        >
-          Past
-        </button>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-4xl font-bold text-dark-text">My Bookings</h1>
+        <SegmentedControl 
+          options={[{label: 'Upcoming', value: 'upcoming'}, {label: 'Past', value: 'past'}]}
+          value={view}
+          onChange={setView}
+        />
       </div>
 
       {view === "past" && (
@@ -249,24 +214,29 @@ function MyBookingsPage() {
         <ErrorState message={currentError} />
       ) : bookingsToShow.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {bookingsToShow.map((booking) => (
-            <BookingCard
-              key={booking.booking_id}
-              booking={booking}
-              onReviewSubmitted={handleReviewSubmitted}
-              onCancelBooking={handleCancelBooking}
-              isHighlighted={booking.booking_id === highlightedId}
-            />
+          {bookingsToShow.map((booking, index) => (
+            <div key={booking.booking_id} className="fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+              <BookingCard
+                booking={booking}
+                onReviewSubmitted={handleReviewSubmitted}
+                onCancelBooking={handleCancelBooking}
+                isHighlighted={booking.booking_id === highlightedId}
+              />
+            </div>
           ))}
         </div>
       ) : (
         <div className="text-center py-16 bg-card-bg rounded-lg border border-border-color-light">
           <Calendar size={48} className="mx-auto text-medium-text/50 mb-4" />
           <h3 className="text-xl font-semibold text-dark-text">No {view} bookings found</h3>
-          <p className="text-medium-text mt-2">
+          <p className="text-medium-text mt-2 mb-4">
             {view === "upcoming" ? "Time to book your next game!" : 
              `No bookings found for ${months[selectedMonth]} ${selectedYear}`}
           </p>
+          <button onClick={() => navigate('/explore')} className="bg-primary-green text-white px-6 py-2 rounded-lg font-semibold hover:bg-primary-green-dark transition-colors flex items-center mx-auto">
+            <Plus size={16} className="mr-2" />
+            Book a Venue
+          </button>
         </div>
       )}
 
