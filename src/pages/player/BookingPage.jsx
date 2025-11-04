@@ -1,5 +1,4 @@
-// src/pages/player/BookingPage.jsx
-import React, { useState, useEffect, useCallback } from "react"; // No more 'useRef'
+import React, { useState, useEffect, useCallback } from "react";
 import {
   useLocation,
   useNavigate,
@@ -10,10 +9,9 @@ import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
 import { useModal } from "../../ModalContext";
 import toast from "react-hot-toast";
-import { FiXCircle } from "react-icons/fi"; // Removed offer icons
-import BookingOfferSection from "../../components/bookings/BookingOfferSection"; // --- NEW: Import component ---
+import { FiXCircle } from "react-icons/fi";
+import BookingOfferSection from "../../components/bookings/BookingOfferSection";
 
-// --- Helper Functions (Unchanged) ---
 const formatDate = (dateString) =>
   new Date(dateString).toLocaleDateString("en-US", {
     weekday: "long",
@@ -21,6 +19,7 @@ const formatDate = (dateString) =>
     month: "long",
     day: "numeric",
   });
+
 const formatTime = (dateString) =>
   new Date(dateString).toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -28,9 +27,6 @@ const formatTime = (dateString) =>
     hour12: true,
   });
 
-// --- Debounce Hook (REMOVED) ---
-
-// --- Component ---
 function BookingPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -47,16 +43,11 @@ function BookingPage() {
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [confirmError, setConfirmError] = useState(null);
 
-  // --- MODIFIED: Simplified Offer State ---
-  // This state is now controlled by the child component via the callback
   const [appliedOffer, setAppliedOffer] = useState(null);
   const [discountAmount, setDiscountAmount] = useState(0);
-  // --- All other offer state has been REMOVED ---
 
-  // --- Effect to Fetch Booking Data (Unchanged) ---
   useEffect(() => {
-    // ... (existing data fetching logic remains the same) ...
-     if (bookingDetails) {
+    if (bookingDetails) {
       setPageLoading(false);
       return;
     }
@@ -101,9 +92,8 @@ function BookingPage() {
     };
 
     fetchBookingData();
-  }, [facilityId, slotId]); // Removed bookingDetails from dependency array
+  }, [facilityId, slotId]);
 
-  // --- Effect to handle missing booking details ---
   useEffect(() => {
     if (!pageLoading && !bookingDetails && !pageError) {
       toast.error("Could not load booking details. Redirecting...");
@@ -111,24 +101,18 @@ function BookingPage() {
     }
   }, [pageLoading, bookingDetails, pageError, navigate]);
 
-  // --- Destructure details ---
   const { venue, facility, slot, price } = bookingDetails || {};
 
-  // --- Calculate Amounts ---
   const baseTotalAmount = price || 0;
-  const finalTotalAmount = Math.max(0, baseTotalAmount - discountAmount); // This now uses the state
+  const finalTotalAmount = Math.max(0, baseTotalAmount - discountAmount);
 
-  // --- ALL OFFER-RELATED LOGIC AND EFFECTS (fetch, validate, handlers) HAVE BEEN REMOVED ---
-
-  // --- NEW: Callback for the child component ---
   const handleOfferUpdate = useCallback((discount, offer) => {
     setDiscountAmount(discount);
     setAppliedOffer(offer);
-  }, []); // Empty dependency array, this function is stable
+  }, []);
 
-  // --- Booking Confirmation Function (MODIFIED) ---
   const handleConfirmBooking = async () => {
-     if (!user) {
+    if (!user) {
       showModal({
         title: "Login Required",
         message: "Please log in to complete your booking.",
@@ -150,7 +134,6 @@ function BookingPage() {
       const facilityIdToBook = facility.facility_id || facility.id;
       const slotIdToBook = slot.slot_id || slot.id;
 
-      // This logic remains the same, but uses the state variables
       const offerIdToSend = (appliedOffer) ? appliedOffer.offer_id : null;
 
       const { data, error: functionError } = await supabase.functions.invoke('create-booking', {
@@ -162,14 +145,14 @@ function BookingPage() {
         }),
       });
 
-       if (functionError) {
-           let errorMessage = 'An error occurred while creating the booking';
-           if (functionError.context && typeof functionError.context.json === 'function') {
-               try { const errorJson = await functionError.context.json(); if (errorJson.error) { errorMessage = errorJson.error; } } catch (e) { /* Ignore */ }
-           } else if (functionError instanceof Error) { errorMessage = functionError.message; }
-           console.error("Create Booking Function Error Raw:", functionError);
-           throw new Error(errorMessage);
-       }
+      if (functionError) {
+        let errorMessage = 'An error occurred while creating the booking';
+        if (functionError.context && typeof functionError.context.json === 'function') {
+          try { const errorJson = await functionError.context.json(); if (errorJson.error) { errorMessage = errorJson.error; } } catch (e) { /* Ignore */ }
+        } else if (functionError instanceof Error) { errorMessage = functionError.message; }
+        console.error("Create Booking Function Error Raw:", functionError);
+        throw new Error(errorMessage);
+      }
       if (data?.error) throw new Error(data.error);
 
       const newBookingId = data?.booking_id;
@@ -191,57 +174,57 @@ function BookingPage() {
     }
   };
 
-  // --- Loading / Error States (Unchanged) ---
   if (pageLoading) {
     return (
-      <div className="min-h-screen bg-background py-8 px-4 text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-green mx-auto mb-4"></div>
-        <h1 className="text-xl font-semibold text-medium-text">Loading Booking Details...</h1>
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-green"></div>
+        <h1 className="text-xl font-semibold text-gray-600 ml-4">Loading Booking Details...</h1>
       </div>
     );
-   }
+  }
+
   if (pageError) {
-     return (
-      <div className="min-h-screen bg-background py-8 px-4 text-center">
-        <h1 className="text-2xl font-bold text-red-600">Error Loading Booking</h1>
-        <p className="text-medium-text mt-2">{pageError}</p>
-        <button
-          onClick={() => navigate("/explore")}
-          className="mt-6 py-2 px-6 rounded-lg font-semibold bg-primary-green text-white hover:bg-primary-green-dark transition-all"
-        >
-          Go to Explore
-        </button>
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600">Error Loading Booking</h1>
+          <p className="text-gray-600 mt-2">{pageError}</p>
+          <button
+            onClick={() => navigate("/explore")}
+            className="mt-6 py-3 px-8 rounded-lg font-semibold bg-primary-green text-white hover:bg-primary-green-dark transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+          >
+            Go to Explore
+          </button>
+        </div>
       </div>
     );
-   }
+  }
+
   if (!venue || !facility || !slot || price === undefined) {
     useEffect(() => {
-        toast.error("Could not load booking details. Redirecting...");
-        navigate("/explore");
+      toast.error("Could not load booking details. Redirecting...");
+      navigate("/explore");
     }, [navigate]);
     return null;
   }
 
-  // --- Render Component ---
   return (
-    <div className="min-h-screen bg-background py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Header (Unchanged) */}
-        <div className="text-center mb-8">
-           <h1 className="text-3xl font-bold text-dark-text mb-2">
+    <div className="min-h-screen bg-gray-100 py-12 px-4">
+      <div className="max-w-3xl mx-auto">
+        <div className="text-center mb-10">
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">
             Confirm Your Booking
           </h1>
-          <p className="text-light-text">
+          <p className="text-gray-600">
             Review details and complete your reservation
           </p>
         </div>
 
-        {/* Booking Confirmation Error Message (Unchanged) */}
         {confirmError && (
-           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="mb-6 p-4 bg-red-100 border border-red-200 rounded-lg">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                 <FiXCircle className="h-5 w-5 text-red-400" />
+                <FiXCircle className="h-5 w-5 text-red-500" />
               </div>
               <div className="ml-3">
                 <p className="text-sm text-red-800">Error: {confirmError}</p>
@@ -250,70 +233,55 @@ function BookingPage() {
           </div>
         )}
 
-        {/* Main Booking Card */}
-        <div className="bg-card-bg rounded-xl shadow-lg border border-border-color overflow-hidden">
-          {/* Venue Header (Unchanged) */}
-          <div className="bg-primary-green text-white p-6 relative overflow-hidden">
-             <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full transform translate-x-16 -translate-y-16"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-5 rounded-full transform -translate-x-12 translate-y-12"></div>
-            <div className="relative z-10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold">{venue.name}</h2>
-                  <p className="text-primary-green-light mt-1">
-                    {facility.sports?.name || 'Sport'} • {facility.name}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <div className="bg-white bg-opacity-15 backdrop-blur-sm rounded-lg px-4 py-3 border border-white border-opacity-20">
-                    <div className="text-sm text-primary-green-light">
-                      Total
-                    </div>
-                    <div className="text-2xl font-bold">₹{finalTotalAmount.toFixed(2)}</div>
-                  </div>
-                </div>
+        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+          <div className="bg-gradient-to-br from-primary-green to-green-600 text-white p-8">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-3xl font-bold">{venue.name}</h2>
+                <p className="opacity-80 mt-1">
+                  {facility.sports?.name || 'Sport'} • {facility.name}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-lg opacity-80">Total</p>
+                <p className="text-4xl font-bold">₹{finalTotalAmount.toFixed(2)}</p>
               </div>
             </div>
           </div>
 
-          {/* Booking Details */}
-          <div className="p-6 space-y-6">
-            {/* Date & Time Section (Unchanged) */}
-            <div className="grid md:grid-cols-2 gap-6">
-               <div className="bg-light-green-bg rounded-lg p-4 border border-primary-green-light border-opacity-30">
-                <div className="flex items-center mb-2">
-                  <svg className="h-5 w-5 text-primary-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                  <span className="text-sm font-medium text-primary-green">Date</span>
+          <div className="p-8 space-y-8">
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="bg-gray-50 rounded-lg p-6">
+                <div className="flex items-center mb-3">
+                  <svg className="h-6 w-6 text-primary-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  <span className="text-lg font-semibold text-gray-800">Date</span>
                 </div>
-                <p className="text-dark-text font-semibold">{formatDate(slot.start_time)}</p>
+                <p className="text-gray-600 font-medium">{formatDate(slot.start_time)}</p>
               </div>
-              <div className="bg-light-green-bg rounded-lg p-4 border border-primary-green-light border-opacity-30">
-                <div className="flex items-center mb-2">
-                   <svg className="h-5 w-5 text-primary-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  <span className="text-sm font-medium text-primary-green">Time</span>
+              <div className="bg-gray-50 rounded-lg p-6">
+                <div className="flex items-center mb-3">
+                  <svg className="h-6 w-6 text-primary-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <span className="text-lg font-semibold text-gray-800">Time</span>
                 </div>
-                <p className="text-dark-text font-semibold">{formatTime(slot.start_time)} - {formatTime(slot.end_time)}</p>
+                <p className="text-gray-600 font-medium">{formatTime(slot.start_time)} - {formatTime(slot.end_time)}</p>
               </div>
             </div>
 
-            {/* Facility Details (Unchanged) */}
-            <div className="border-t border-border-color-light pt-6">
-              <h3 className="text-lg font-semibold text-dark-text mb-4">Facility Details</h3>
-              <div className="grid gap-4">
-                <div className="flex justify-between items-center py-3 px-4 bg-hover-bg rounded-lg">
-                  <span className="text-medium-text">Facility</span><span className="font-semibold text-dark-text">{facility.name}</span>
+            <div className="border-t border-gray-200 pt-8">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Facility Details</h3>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center py-3 px-5 bg-gray-50 rounded-lg">
+                  <span className="text-gray-600">Facility</span><span className="font-semibold text-gray-800">{facility.name}</span>
                 </div>
-                <div className="flex justify-between items-center py-3 px-4 bg-hover-bg rounded-lg">
-                  <span className="text-medium-text">Sport</span><span className="font-semibold text-dark-text">{facility.sports?.name || 'N/A'}</span>
+                <div className="flex justify-between items-center py-3 px-5 bg-gray-50 rounded-lg">
+                  <span className="text-gray-600">Sport</span><span className="font-semibold text-gray-800">{facility.sports?.name || 'N/A'}</span>
                 </div>
-                <div className="flex justify-between items-center py-3 px-4 bg-hover-bg rounded-lg">
-                  <span className="text-medium-text">Venue</span><span className="font-semibold text-dark-text">{venue.name}</span>
+                <div className="flex justify-between items-center py-3 px-5 bg-gray-50 rounded-lg">
+                  <span className="text-gray-600">Venue</span><span className="font-semibold text-gray-800">{venue.name}</span>
                 </div>
               </div>
             </div>
 
-            {/* --- MODIFIED: Offer Code Section --- */}
-            {/* The entire offer section is replaced by the new component */}
             <BookingOfferSection 
               supabase={supabase}
               bookingDetails={bookingDetails}
@@ -321,59 +289,52 @@ function BookingPage() {
               confirmLoading={confirmLoading}
               onOfferApplied={handleOfferUpdate}
             />
-            {/* --- END MODIFIED --- */}
 
-
-            {/* Payment Summary (MODIFIED) */}
-            {/* This section now reads from the local state updated by the callback */}
-            <div className="border-t border-border-color-light pt-6">
-               <h3 className="text-lg font-semibold text-dark-text mb-4">Payment Summary</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-medium-text">Booking Fee</span>
-                  <span className="text-dark-text">₹{baseTotalAmount.toFixed(2)}</span>
+            <div className="border-t border-gray-200 pt-8">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Payment Summary</h3>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Booking Fee</span>
+                  <span className="text-gray-800 font-medium">₹{baseTotalAmount.toFixed(2)}</span>
                 </div>
                 
-                {/* This uses the local discountAmount and appliedOffer state */}
                 {appliedOffer && discountAmount > 0 && (
-                  <div className="flex justify-between items-center py-2 text-green-700">
-                    <span className="text-medium-text">Discount ({appliedOffer.title || 'Offer'})</span>
+                  <div className="flex justify-between items-center text-green-600">
+                    <span className="text-gray-600">Discount ({appliedOffer.title || 'Offer'})</span>
                     <span className="font-semibold">- ₹{discountAmount.toFixed(2)}</span>
                   </div>
                 )}
 
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-medium-text">Platform Fee</span>
-                  <span className="text-dark-text">₹0.00</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Platform Fee</span>
+                  <span className="text-gray-800 font-medium">₹0.00</span>
                 </div>
-                <div className="border-t border-border-color-light pt-3">
+                <div className="border-t border-gray-200 pt-4 mt-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-lg font-semibold text-dark-text">Total Amount</span>
-                    <span className="text-xl font-bold text-primary-green">₹{finalTotalAmount.toFixed(2)}</span>
+                    <span className="text-xl font-bold text-gray-800">Total Amount</span>
+                    <span className="text-2xl font-bold text-primary-green">₹{finalTotalAmount.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
             </div>
-            {/* --- END MODIFIED --- */}
 
           </div>
 
-          {/* Action Buttons (Unchanged) */}
-          <div className="p-6 bg-hover-bg border-t border-border-color-light">
-             <div className="flex gap-4">
+          <div className="p-8 bg-gray-50 border-t border-gray-200">
+            <div className="flex gap-4">
               <button
                 onClick={() => navigate(-1)}
-                className="flex-1 px-6 py-3 border-2 border-border-color text-medium-text font-semibold rounded-lg hover:bg-card-bg hover:border-primary-green-light transition-all duration-200"
+                className="flex-1 py-4 px-6 border-2 border-gray-300 text-gray-600 font-semibold rounded-lg hover:bg-gray-200 transition-all duration-300"
               >
                 Go Back
               </button>
               <button
                 onClick={handleConfirmBooking}
                 disabled={confirmLoading}
-                className={`flex-1 px-6 py-3 font-semibold rounded-lg transition-all duration-200 relative overflow-hidden ${
+                className={`flex-1 py-4 px-6 font-bold text-lg rounded-lg transition-all duration-300 relative overflow-hidden shadow-lg transform hover:-translate-y-1 ${
                   confirmLoading
                     ? "bg-gray-400 cursor-not-allowed text-white"
-                    : "bg-primary-green text-white hover:bg-primary-green-dark shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    : "bg-primary-green text-white hover:bg-primary-green-dark"
                 }`}
               >
                 {!confirmLoading && (
@@ -394,9 +355,8 @@ function BookingPage() {
           </div>
         </div>
 
-        {/* Security Notice (Unchanged) */}
-        <div className="mt-6 text-center">
-           <p className="text-sm text-light-text">
+        <div className="mt-8 text-center">
+          <p className="text-sm text-gray-500">
             🔒 Your payment information is secure and encrypted
           </p>
         </div>

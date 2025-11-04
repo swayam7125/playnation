@@ -1,25 +1,14 @@
 import React from 'react';
 
-/**
- * Reusable component for displaying key performance indicators (KPIs) or summary statistics.
- * @param {object} props
- * @param {string} props.title - The title of the metric.
- * @param {number|string} props.count - The value of the metric.
- * @param {React.Component} props.icon: Icon - The React icon component to display.
- * @param {string} props.bgColor - Tailwind CSS class for the icon's background color (e.g., 'bg-yellow-500').
- * @param {string} props.textColor - Tailwind CSS class for the icon's text color (e.g., 'text-yellow-500').
- */
 function StatsCard({ title, count, icon: Icon, bgColor, textColor }) {
     return (
-        <div className={`bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300`}>
-            <div className="flex items-center justify-between">
-                <div>
-                    <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
-                    <p className="text-3xl font-bold text-gray-900">{count}</p>
-                </div>
-                <div className={`${bgColor} p-3 rounded-xl`}>
-                    <Icon className={`text-xl ${textColor}`} />
-                </div>
+        <div className={`relative overflow-hidden rounded-2xl p-6 text-white shadow-lg transition-all duration-300 ease-in-out hover:shadow-xl hover:-translate-y-1 ${bgColor}`}>
+            <div className="absolute -right-4 -bottom-4 w-24 h-24 opacity-20">
+                <Icon className="w-full h-full" />
+            </div>
+            <div className="relative">
+                <p className="text-sm font-medium opacity-80 mb-1">{title}</p>
+                <p className="text-4xl font-bold">{count}</p>
             </div>
         </div>
     );

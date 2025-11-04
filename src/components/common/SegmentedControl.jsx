@@ -12,7 +12,7 @@ const SegmentedControl = ({ options, value, onChange }) => {
               ? 'bg-white text-primary-green shadow'
               : 'text-gray-500 hover:bg-gray-300'
           }`}>
-          {option.label}
+          {option.icon || option.label}
         </button>
       ))}
     </div>

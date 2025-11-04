@@ -144,36 +144,30 @@ const PlayerDashboardPage = () => {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header with Profile Summary */}
-        <div className="mb-8 flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">
-              Player Dashboard
-            </h1>
-            <p className="text-gray-500 mt-1">
-              Welcome back, {profile?.username}! Here's a summary of your
-              activity.
-            </p>
-          </div>
+    <div className="bg-gray-100 min-h-screen">
+      <div className="bg-primary-green text-white p-8 shadow-lg">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-4xl font-bold">Player Dashboard</h1>
+          <p className="mt-2 opacity-80">
+            Welcome back, {profile?.username}! Here's a summary of your activity.
+          </p>
         </div>
+      </div>
 
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatsCard
             icon={CreditCard}
             title="Available Credits"
             count={isLoadingStats ? "..." : profile?.credits ?? 0}
-            bgColor="bg-emerald-100"
-            textColor="text-emerald-500"
+            bgColor="bg-gradient-to-br from-emerald-500 to-green-500"
           />
           <StatsCard
             icon={Shield}
             title="Bookings Made"
             count={isLoadingBookingsMade ? "..." : bookingsMade?.count ?? 0}
-            bgColor="bg-blue-100"
-            textColor="text-blue-500"
+            bgColor="bg-gradient-to-br from-blue-500 to-indigo-500"
           />
           <StatsCard
             icon={Award}
@@ -181,15 +175,13 @@ const PlayerDashboardPage = () => {
             count={
               isLoadingStats ? "..." : playerStats?.favoriteSport ?? "Not set"
             }
-            bgColor="bg-purple-100"
-            textColor="text-purple-500"
+            bgColor="bg-gradient-to-br from-purple-500 to-pink-500"
           />
           <StatsCard
             icon={Clock}
             title="Member Since"
             count={isLoadingStats ? "..." : playerStats?.memberSince ?? "N/A"}
-            bgColor="bg-indigo-100"
-            textColor="text-indigo-500"
+            bgColor="bg-gradient-to-br from-gray-700 to-gray-800"
           />
         </div>
 
@@ -198,14 +190,14 @@ const PlayerDashboardPage = () => {
           {/* Left Column - Bookings & Activity */}
           <div className="lg:col-span-2 space-y-8">
             {/* Upcoming Booking Section */}
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-2xl shadow-lg p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-700">
+                <h2 className="text-2xl font-semibold text-gray-800">
                   Upcoming Booking
                 </h2>
                 <button
                   onClick={() => navigate("/my-bookings")}
-                  className="text-sm text-blue-600 hover:text-blue-700"
+                  className="text-sm font-medium text-primary-green hover:text-primary-green-dark transition-colors"
                 >
                   View All →
                 </button>
@@ -214,16 +206,16 @@ const PlayerDashboardPage = () => {
               {isLoadingBooking ? (
                 <Loader />
               ) : upcomingBooking ? (
-                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-md">
-                  <h3 className="font-bold text-lg text-gray-800">
+                <div className="bg-light-green-bg border-l-4 border-primary-green p-6 rounded-lg">
+                  <h3 className="font-bold text-2xl text-gray-800">
                     {upcomingBooking.facilities?.venues?.name}
                   </h3>
-                  <p className="text-gray-600">
+                  <p className="text-gray-600 mt-1">
                     {upcomingBooking.facilities?.name}
                   </p>
-                  <div className="flex items-center text-gray-500 mt-2">
-                    <Clock size={16} className="mr-2" />
-                    <span>
+                  <div className="flex items-center text-gray-500 mt-4">
+                    <Clock size={18} className="mr-2" />
+                    <span className="font-medium">
                       {new Date(
                         upcomingBooking.time_slots?.start_time
                       ).toLocaleDateString()}{" "}
@@ -233,14 +225,14 @@ const PlayerDashboardPage = () => {
                       ).toLocaleTimeString()}
                     </span>
                   </div>
-                  <div className="mt-4 flex space-x-4">
+                  <div className="mt-6 flex space-x-4">
                     <button
                       onClick={() =>
                         navigate("/my-bookings", {
                           state: { highlightedId: upcomingBooking.booking_id },
                         })
                       }
-                      className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors"
+                      className="flex-1 bg-primary-green text-white py-3 px-6 rounded-lg font-semibold hover:bg-primary-green-dark transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                     >
                       View Details
                     </button>
@@ -250,19 +242,19 @@ const PlayerDashboardPage = () => {
                           `/venues/${upcomingBooking.facilities?.venues?.id}`
                         )
                       }
-                      className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+                      className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-lg font-semibold hover:bg-gray-300 transition-all duration-300"
                     >
                       View Venue
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="text-center bg-gray-50 rounded-lg p-8">
-                  <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 mb-4">No upcoming bookings.</p>
+                <div className="text-center bg-gray-50 rounded-lg p-12">
+                  <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-6" />
+                  <p className="text-lg text-gray-600 mb-6">No upcoming bookings.</p>
                   <button
                     onClick={() => navigate("/explore")}
-                    className="bg-green-500 text-white py-2 px-6 rounded-lg hover:bg-green-600 transition-colors"
+                    className="bg-primary-green text-white py-3 px-8 rounded-lg font-semibold hover:bg-primary-green-dark transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                   >
                     Explore Venues
                   </button>
@@ -274,24 +266,24 @@ const PlayerDashboardPage = () => {
           {/* Right Column - Quick Actions & Resources */}
           <div className="lg:col-span-1 space-y-8">
             {/* Quick Actions Section */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold text-gray-700 mb-4">
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-2xl font-semibold text-gray-800 mb-6">
                 Quick Actions
               </h2>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <button
                   onClick={() => navigate("/explore")}
-                  className="w-full flex items-center space-x-3 bg-primary-green text-white p-4 rounded-lg hover:bg-green-600 transition-colors"
+                  className="w-full flex items-center space-x-4 bg-primary-green text-white p-5 rounded-xl hover:bg-primary-green-dark transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
                 >
-                  <Calendar className="h-5 w-5" />
-                  <span className="flex-1 text-left">Book a Venue</span>
+                  <Calendar className="h-6 w-6" />
+                  <span className="flex-1 text-left font-semibold">Book a Venue</span>
                 </button>
                 <button
                   onClick={() => navigate("/my-bookings")}
-                  className="w-full flex items-center space-x-3 bg-gray-100 p-4 rounded-lg hover:bg-gray-200 transition-colors"
+                  className="w-full flex items-center space-x-4 bg-gray-200 text-gray-800 p-5 rounded-xl hover:bg-gray-300 transition-all duration-300"
                 >
-                  <Clock className="h-5 w-5 text-gray-500" />
-                  <span className="flex-1 text-left text-gray-700">
+                  <Clock className="h-6 w-6" />
+                  <span className="flex-1 text-left font-semibold">
                     My Bookings
                   </span>
                 </button>
