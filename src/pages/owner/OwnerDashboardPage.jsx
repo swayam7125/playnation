@@ -1,593 +1,369 @@
-import React, { useState, useEffect, useCallback } from "react";
+// src/pages/owner/OwnerDashboardPage.jsx
+import React, { useState, useEffect } from "react"; // Removed useCallback
 import { Link } from "react-router-dom";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
 import {
-  FaRupeeSign, FaCalendarCheck, FaChartLine, FaFutbol, FaClock,
-  FaTrophy, FaCalendarAlt, FaEye, FaList, FaChartBar, FaChevronDown
+  FaRupeeSign,
+  FaCalendarCheck,
+  FaChartLine,
+  FaFutbol,
+  FaClock,
+  FaTrophy,
+  FaCalendarAlt,
+  FaEye,
+  FaList,
+  FaChartBar,
+  FaChevronDown,
+  FaBook, // Added FaBook
 } from "react-icons/fa";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
-import { format, parseISO, startOfDay, endOfDay } from "date-fns";
+import { format, parseISO } from "date-fns"; // Removed startOfDay, endOfDay
+import { FiLoader, FiAlertCircle } from "react-icons/fi"; // Added for loading/error
 
 const KpiCard = ({ icon, title, value, subtitle }) => (
   <div className="group relative overflow-hidden bg-gradient-to-br from-white to-white/50 backdrop-blur-sm border border-border-color/60 rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-primary-green/50">
-    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary-green/5 to-transparent rounded-full -translate-y-16 translate-x-16 group-hover:scale-150 transition-transform duration-500"></div>
-    
-    <div className="relative flex items-start justify-between">
-      <div className="flex-1">
-        <div className="flex items-center space-x-3 mb-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-primary-green to-primary-green-dark text-white rounded-xl flex items-center justify-center text-sm shadow-lg group-hover:scale-110 transition-transform duration-300">
-            {icon}
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-light-text uppercase tracking-wider">{title}</p>
-          </div>
+    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary-green/5 to-transparent rounded-full -translate-y-1/3 translate-x-1/4 opacity-50 group-hover:opacity-100 transition-opacity duration-300"></div>
+    <div className="relative z-10">
+      <div className="flex items-center justify-between">
+        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-green/10 to-primary-green/20 text-primary-green flex items-center justify-center">
+          {icon}
         </div>
-        
-        <div className="mb-2">
-          <span className="text-2xl font-bold text-dark-text">{value}</span>
-        </div>
-        
         {subtitle && (
-          <p className="text-xs text-medium-text font-medium">{subtitle}</p>
+          <span
+            className={`font-semibold text-xs px-2 py-1 rounded-full ${
+              subtitle.startsWith("+")
+                ? "bg-green-100 text-green-700"
+                : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            {subtitle}
+          </span>
         )}
       </div>
+      <p className="text-3xl font-bold text-dark-text mt-3">{value}</p>
+      <p className="text-sm font-medium text-medium-text">{title}</p>
     </div>
   </div>
 );
 
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white/80 backdrop-blur-sm shadow-lg rounded-lg p-3 border border-border-color/60">
+        <p className="label font-semibold text-dark-text">{`${label}`}</p>
+        <p
+          className="intro text-primary-green"
+          style={{ color: payload[0].fill }}
+        >
+          {`${payload[0].name}: ${
+            payload[0].dataKey === "revenue"
+              ? `₹${payload[0].value.toLocaleString("en-IN")}`
+              : payload[0].value
+          }`}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+const COLORS = ["#059669", "#10B981", "#34D399", "#6EE7B7", "#A7F3D0"];
+
 function OwnerDashboardPage() {
   const { user } = useAuth();
-  const [stats, setStats] = useState({
-    todays_revenue: 0,
-    todays_bookings: 0,
-    monthly_revenue: 0,
-    total_revenue: 0,
-    most_popular_sport: "N/A",
-    peak_hour: "N/A",
-    revenue_by_facility: [],
-    sport_distribution: [],
-    hourly_revenue: []
-  });
-  const [todaysBookings, setTodaysBookings] = useState([]);
+  
+  // --- REFACTORED STATE ---
+  // A single state for all statistics
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [venues, setVenues] = useState([]);
-  const [selectedVenue, setSelectedVenue] = useState("all");
 
-  const fetchDashboardData = useCallback(async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      // 1. Fetch owner's approved venues
-      const { data: venuesData, error: venuesError } = await supabase
-        .from('venues')
-        .select('venue_id, name')
-        .eq('owner_id', user.id)
-        .eq('is_approved', true);
-
-      if (venuesError) throw venuesError;
-      setVenues(venuesData || []);
-
-      if (!venuesData || venuesData.length === 0) {
-        setStats({
-          todays_revenue: 0,
-          todays_bookings: 0,
-          monthly_revenue: 0,
-          total_revenue: 0,
-          most_popular_sport: "N/A",
-          peak_hour: "N/A",
-          revenue_by_facility: [],
-          sport_distribution: [],
-          hourly_revenue: []
-        });
-        setTodaysBookings([]);
-        setLoading(false);
-        return;
-      }
-
-      const venueIds =
-        selectedVenue === "all"
-          ? venuesData.map((v) => v.venue_id)
-          : [selectedVenue];
-
-      // 2. Fetch facilities for these venues
-      const { data: facilitiesData, error: facilitiesError } = await supabase
-        .from('facilities')
-        .select('facility_id, name, venue_id, sports(name)')
-        .in('venue_id', venueIds);
-
-      if (facilitiesError) throw facilitiesError;
-
-      const facilityIds = facilitiesData?.map(f => f.facility_id) || [];
-
-      if (facilityIds.length === 0) {
-        setStats({
-          todays_revenue: 0,
-          todays_bookings: 0,
-          monthly_revenue: 0,
-          total_revenue: 0,
-          most_popular_sport: "N/A",
-          peak_hour: "N/A",
-          revenue_by_facility: [],
-          sport_distribution: [],
-          hourly_revenue: []
-        });
-        setTodaysBookings([]);
-        setLoading(false);
-        return;
-      }
-
-      // 3. Fetch all bookings for these facilities
-      const { data: bookingsData, error: bookingsError } = await supabase
-        .from('bookings')
-        .select('booking_id, facility_id, start_time, total_amount, status, users:users!bookings_user_id_fkey(username, first_name, last_name, email)')
-        .in('facility_id', facilityIds)
-        .eq('status', 'confirmed');
-
-      if (bookingsError) throw bookingsError;
-
-      const allBookings = bookingsData || [];
-
-      // 4. Calculate today's stats
-      const today = new Date();
-      const todayStart = startOfDay(today);
-      const todayEnd = endOfDay(today);
-
-      const todaysBookingsList = allBookings.filter(b => {
-        const bookingDate = new Date(b.start_time);
-        return bookingDate >= todayStart && bookingDate <= todayEnd;
-      });
-
-      const todays_revenue = todaysBookingsList.reduce((sum, b) => sum + (b.total_amount || 0), 0);
-      const todays_bookings = todaysBookingsList.length;
-
-      // 5. Calculate monthly revenue (current month)
-      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-      const monthlyBookings = allBookings.filter(b => {
-        const bookingDate = new Date(b.start_time);
-        return bookingDate >= monthStart;
-      });
-      const monthly_revenue = monthlyBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
-
-      // 6. Calculate total revenue
-      const total_revenue = allBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
-
-      // 7. Calculate hourly revenue for today
-      const hourlyMap = {};
-      todaysBookingsList.forEach(b => {
-        const hour = new Date(b.start_time).getHours();
-        const hourLabel = `${hour}:00`;
-        hourlyMap[hourLabel] = (hourlyMap[hourLabel] || 0) + (b.total_amount || 0);
-      });
-
-      const hourly_revenue = Object.entries(hourlyMap)
-        .map(([hour, revenue]) => ({ date: hour, revenue }))
-        .sort((a, b) => parseInt(a.date) - parseInt(b.date));
-
-      // 8. Find peak hour
-      const peakHourEntry = Object.entries(hourlyMap)
-        .sort((a, b) => b[1] - a[1])[0];
-      const peak_hour = peakHourEntry ? peakHourEntry[0] : "N/A";
-
-      // 9. Revenue by facility (today)
-      const facilityRevenueMap = {};
-      todaysBookingsList.forEach(b => {
-        const facility = facilitiesData.find(f => f.facility_id === b.facility_id);
-        if (facility) {
-          facilityRevenueMap[facility.facility_id] = {
-            name: facility.name,
-            revenue: (facilityRevenueMap[facility.facility_id]?.revenue || 0) + (b.total_amount || 0)
-          };
-        }
-      });
-
-      const revenue_by_facility = Object.values(facilityRevenueMap)
-        .sort((a, b) => b.revenue - a.revenue);
-
-      // 10. Sport distribution (today)
-      const sportMap = {};
-      todaysBookingsList.forEach(b => {
-        const facility = facilitiesData.find(f => f.facility_id === b.facility_id);
-        const sportName = facility?.sports?.name || 'Unknown';
-        sportMap[sportName] = (sportMap[sportName] || 0) + 1;
-      });
-
-      const sport_distribution = Object.entries(sportMap)
-        .map(([name, bookings]) => ({ name, bookings }))
-        .sort((a, b) => b.bookings - a.bookings);
-
-      const most_popular_sport = sport_distribution[0]?.name || "N/A";
-
-      // 11. Set all stats
-      setStats({
-        todays_revenue,
-        todays_bookings,
-        monthly_revenue,
-        total_revenue,
-        most_popular_sport,
-        peak_hour,
-        revenue_by_facility,
-        sport_distribution,
-        hourly_revenue
-      });
-
-      // 12. Set upcoming bookings (future bookings today)
-      const upcomingBookings = todaysBookingsList
-        .filter(b => new Date(b.start_time) > new Date())
-        .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
-        .slice(0, 10)
-        .map(b => {
-          const facility = facilitiesData.find(f => f.facility_id === b.facility_id);
-          const venue = venuesData.find(v => v.venue_id === facility?.venue_id);
-          return {
-            ...b,
-            facility_name: facility?.name || 'Unknown',
-            venue_name: venue?.name || 'Unknown'
-          };
-        });
-
-      setTodaysBookings(upcomingBookings);
-
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, selectedVenue]);
-
+  // --- REFACTORED EFFECT ---
+  // Single useEffect to fetch all stats from the new RPC function
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    const fetchDashboardStats = async () => {
+      setLoading(true);
+      setError(null);
+      
+      // Call the new function
+      const { data, error } = await supabase.rpc('get_owner_dashboard_all_stats');
 
-  if (loading) return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-white to-light-green-bg/30 flex items-center justify-center">
-      <div className="text-center">
-        <div className="relative mb-6">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-green/30 border-t-primary-green mx-auto"></div>
-          <div className="absolute inset-0 rounded-full border-4 border-primary-green/10"></div>
-        </div>
-        <p className="text-medium-text font-medium">Loading Today's Dashboard...</p>
-        <p className="text-sm text-light-text">Fetching your latest operational metrics</p>
-      </div>
-    </div>
-  );
+      if (error) {
+        console.error("Error fetching dashboard statistics:", error);
+        setError(error.message);
+      } else {
+        setStats(data);
+      }
+      setLoading(false);
+    };
 
-  if (error) return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-white to-light-green-bg/30 flex items-center justify-center">
-      <div className="text-center p-8 bg-white rounded-2xl border border-border-color shadow-lg max-w-md">
-        <div className="p-4 bg-red-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-          <FaChartLine className="text-red-600 text-2xl" />
-        </div>
-        <h3 className="text-xl font-semibold text-dark-text mb-2">Error Loading Dashboard</h3>
-        <p className="text-red-600 mb-4">{error}</p>
-        <button 
-          onClick={fetchDashboardData}
-          className="px-6 py-2 bg-primary-green text-white rounded-xl hover:bg-primary-green-dark transition-colors"
-        >
-          Retry
-        </button>
-      </div>
-    </div>
-  );
-
-  const COLORS = ["#10B981", "#059669", "#047857", "#065F46", "#064E3B", "#034E3B"];
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white/95 backdrop-blur border border-border-color/50 rounded-xl p-4 shadow-2xl">
-          <p className="font-bold text-dark-text mb-2 pb-2 border-b border-border-color/50">{label}</p>
-          {payload.map((entry, index) => (
-            <p key={index} className="font-semibold text-medium-text my-1" style={{ color: entry.color }}>
-              {entry.name}: {entry.name.includes("Revenue") ? `₹${entry.value.toLocaleString("en-IN")}` : entry.value}
-            </p>
-          ))}
-        </div>
-      );
+    if (user) {
+      fetchDashboardStats();
     }
-    return null;
+  }, [user]); // Re-fetches only if the user changes
+
+  // Helper to format large numbers (from original file)
+  const formatStatValue = (value) => {
+    if (value >= 10000000) return `${(value / 10000000).toFixed(1)} Cr`;
+    if (value >= 100000) return `${(value / 100000).toFixed(1)} L`;
+    if (value >= 1000) return `${(value / 1000).toFixed(1)} K`;
+    return value;
   };
 
+  // Loader component for charts (from original file)
+  const ChartLoader = () => (
+    <div className="h-[280px] flex items-center justify-center">
+      <FiLoader className="animate-spin text-primary-green text-3xl" />
+    </div>
+  );
+  
+  // --- ALL OTHER STATE AND USEEFFECTS (for stats) ARE REMOVED ---
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-white to-light-green-bg/30">
-      <div className="container mx-auto px-6 py-8 max-w-7xl">
-        
-        {/* Header */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-primary-green via-primary-green-dark to-primary-green rounded-3xl shadow-2xl mb-8">
-          <div className="absolute inset-0 bg-gradient-to-r from-black/5 to-black/10"></div>
-          <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-48 translate-x-48"></div>
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full translate-y-32 -translate-x-32"></div>
-          
-          <div className="relative px-8 py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="w-14 h-14 bg-white/15 backdrop-blur rounded-2xl flex items-center justify-center border border-white/20">
-                  <FaChartLine className="w-7 h-7 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-white tracking-tight">Today's Operational Dashboard</h1>
-                  <p className="text-white/80 text-sm">Real-time metrics for {format(new Date(), "EEEE, MMMM d")}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-4">
-                <Link 
-                  to="/owner/reports"
-                  className="bg-white/10 backdrop-blur text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 border border-white/20 no-underline flex items-center space-x-2"
-                >
-                  <FaChartBar className="w-4 h-4" />
-                  <span>View Reports</span>
-                </Link>
-                <Link 
-                  to="/owner/calendar"
-                  className="bg-white/10 backdrop-blur text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 border border-white/20 no-underline flex items-center space-x-2"
-                >
-                  <FaCalendarAlt className="w-4 h-4" />
-                  <span>View Calendar</span>
-                </Link>
-                <Link 
-                  to="/owner/my-venues" 
-                  className="bg-white/10 backdrop-blur text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/20 transition-all duration-200 border border-white/20 no-underline flex items-center space-x-2"
-                >
-                  <FaEye className="w-4 h-4" />
-                  <span>Manage Venues</span>
-                </Link>
-              </div>
-            </div>
+    <div className="min-h-screen bg-background text-dark-text p-4 md:p-8">
+      {/* Header (Original Styling) */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-dark-text">Dashboard</h1>
+          <p className="text-lg text-medium-text mt-1">
+            Welcome back, {user?.user_metadata?.first_name || "Owner"}!
+          </p>
+        </div>
+        <div className="flex items-center gap-4 mt-4 sm:mt-0">
+          <Link
+            to="/owner/reports"
+            className="flex items-center gap-2 text-sm font-medium text-primary-green hover:text-primary-green-dark transition-colors"
+          >
+            <FaChartBar />
+            <span>View Full Reports</span>
+          </Link>
+          <div className="relative">
+            <button className="flex items-center gap-2 text-sm font-medium text-medium-text bg-white border border-border-color/60 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+              <FaCalendarAlt className="text-gray-400" />
+              <span>Today</span>
+              <FaChevronDown className="w-3 h-3 text-gray-400" />
+            </button>
+            {/* Dropdown can be added here if needed */}
           </div>
         </div>
+      </div>
 
-        {/* Venue Filter Dropdown - NOW STYLED */}
-        <div className="mb-6 flex justify-end">
-          <div className="relative w-64">
-            <select
-              value={selectedVenue}
-              onChange={(e) => setSelectedVenue(e.target.value)}
-              className="appearance-none w-full px-4 py-2.5 pr-10 bg-white border border-border-color rounded-xl shadow-sm text-sm font-medium text-dark-text focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-primary-green cursor-pointer"
-            >
-              <option value="all">All Venues</option>
-              {venues.map((venue) => (
-                <option key={venue.venue_id} value={venue.venue_id}>
-                  {venue.name}
-                </option>
-              ))}
-            </select>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-              <FaChevronDown className="w-4 h-4 text-gray-400" />
+      {/* Main Stats Grid (Original Styling & KPIs) */}
+      {loading && !stats ? (
+        // Skeleton Loader
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-gradient-to-br from-white to-white/50 border border-border-color/60 rounded-2xl p-5 h-[156px] animate-pulse">
+              <div className="w-12 h-12 rounded-full bg-gray-200"></div>
+              <div className="h-7 bg-gray-300 rounded w-1/2 mt-3"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/3 mt-2"></div>
             </div>
-          </div>
+          ))}
         </div>
-
-
-        {/* KPI Cards Grid - UPDATED FOR 2x3 LAYOUT */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <KpiCard 
-            icon={<FaRupeeSign />} 
-            title="Today's Revenue" 
-            value={`₹${stats.todays_revenue.toLocaleString("en-IN")}`} 
-            subtitle={`${stats.todays_bookings} bookings today`}
+      ) : error ? (
+        // Error Message
+        <div className="mb-8 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center gap-3">
+          <FiAlertCircle size={20} />
+          <span>Could not load dashboard statistics: {error}</span>
+        </div>
+      ) : stats ? (
+        // Loaded Stats (Mapped from new `stats` object to ORIGINAL KPIs)
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <KpiCard
+            icon={<FaRupeeSign size={20} />}
+            title="Today's Revenue"
+            value={`₹${formatStatValue(stats.todays_revenue)}`}
+            subtitle={`${stats.todays_bookings} booking(s)`}
           />
-          <KpiCard 
-            icon={<FaCalendarCheck />} 
-            title="Today's Bookings" 
-            value={stats.todays_bookings} 
-            subtitle={`${todaysBookings.length} upcoming`}
+          <KpiCard
+            icon={<FaCalendarCheck size={20} />}
+            title="Upcoming Bookings"
+            value={stats.upcoming_bookings}
+            subtitle="Future confirmed"
           />
-          <KpiCard 
-            icon={<FaClock />} 
-            title="Peak Hour Today" 
-            value={stats.peak_hour} 
-            subtitle="Busiest time slot"
+          <KpiCard
+            icon={<FaChartLine size={20} />}
+            title="Total Revenue"
+            value={`₹${formatStatValue(stats.total_revenue)}`}
+            subtitle="All-time"
           />
-          <KpiCard 
-            icon={<FaFutbol />} 
-            title="Most Popular Sport" 
-            value={stats.most_popular_sport} 
-            subtitle={`${stats.sport_distribution[0]?.bookings || 0} bookings`}
-          />
-          <KpiCard 
-            icon={<FaCalendarAlt />} 
-            title="Monthly Revenue" 
-            value={`₹${stats.monthly_revenue.toLocaleString("en-IN")}`} 
-            subtitle="Current month"
-          />
-          <KpiCard 
-            icon={<FaChartLine />} 
-            title="Total Revenue" 
-            value={`₹${stats.total_revenue.toLocaleString("en-IN")}`} 
-            subtitle="All time across venues"
+          <KpiCard
+            icon={<FaBook size={20} />}
+            title="Total Bookings"
+            value={formatStatValue(stats.total_bookings)}
+            subtitle="All-time"
           />
         </div>
+      ) : null}
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-          {/* Upcoming Bookings List */}
-          <div className="lg:col-span-1 bg-white/80 backdrop-blur border border-border-color/50 rounded-2xl p-6 shadow-xl">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="w-10 h-10 bg-primary-green/10 rounded-xl flex items-center justify-center">
-                <FaList className="w-5 h-5 text-primary-green" />
-              </div>
-              <h3 className="text-lg font-bold text-dark-text">Upcoming Bookings</h3>
-            </div>
-
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-              {todaysBookings.length > 0 ? (
-                todaysBookings.map((booking) => (
-                  <div key={booking.booking_id} className="p-3 bg-light-green-bg/50 border-l-4 border-primary-green rounded-lg">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="font-semibold text-dark-text text-sm">
-                          {format(parseISO(booking.start_time), 'h:mm a')}
-                        </p>
-                        <p className="text-xs text-medium-text">
-                          {booking.facility_name}
-                        </p>
-                        <p className="text-xs text-light-text">
-                          {booking.venue_name}
-                        </p>
-                      </div>
-                      <span className="font-bold text-primary-green">
-                        ₹{booking.total_amount.toLocaleString("en-IN")}
-                      </span>
-                    </div>
-                    {booking.users && (
-                      <p className="text-xs text-medium-text">
-                        {booking.users.first_name || booking.users.username}
-                      </p>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-10 text-medium-text">
-                  <FaCalendarCheck className="w-8 h-8 text-gray-400 mx-auto mb-3" />
-                  <p className="font-medium">No upcoming bookings today</p>
-                  <p className="text-sm text-light-text">New bookings will appear here</p>
-                </div>
-              )}
-            </div>
-            <Link to="/owner/calendar" className="text-primary-green text-sm font-semibold mt-4 block text-center hover:underline">
-              View Full Calendar
-            </Link>
-          </div>
-
-          {/* Hourly Revenue Trend (Default on Dashboard) */}
-          <div className="lg:col-span-2 bg-white/80 backdrop-blur border border-border-color/50 rounded-2xl p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-primary-green/10 rounded-xl flex items-center justify-center">
-                  <FaChartLine className="w-5 h-5 text-primary-green" />
-                </div>
-                <h3 className="text-lg font-bold text-dark-text">Hourly Revenue Trend (Today)</h3>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-medium-text">
-                <div className="w-3 h-3 bg-primary-green rounded-full"></div>
-                <span>Revenue</span>
-              </div>
-            </div>
-            
-            {stats.hourly_revenue.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={stats.hourly_revenue}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10B981" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" strokeOpacity={0.5} />
-                  <XAxis dataKey="date" stroke="#6B7280" fontSize={12} />
-                  <YAxis stroke="#6B7280" fontSize={12} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="revenue" 
-                    stroke="#10B981" 
-                    fillOpacity={1} 
-                    fill="url(#colorRevenue)" 
-                    strokeWidth={3}
-                    dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, stroke: '#10B981', strokeWidth: 2, fill: '#fff' }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[280px] flex flex-col items-center justify-center text-medium-text">
+      {/* Charts Section (Original Styling) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Revenue Trend Chart */}
+        <div className="lg:col-span-2 bg-white border border-border-color/60 shadow-sm rounded-2xl p-6">
+          <h2 className="text-xl font-semibold text-dark-text mb-4">
+            Revenue Trend (Last 6 Months)
+          </h2>
+          {loading ? (
+            <ChartLoader />
+          ) : stats && stats.revenue_trend?.length > 0 ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart data={stats.revenue_trend}>
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="5%"
+                      stopColor="#10B981"
+                      stopOpacity={0.8}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor="#10B981"
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" vertical={false} />
+                <XAxis
+                  dataKey="month"
+                  tickFormatter={(val) => format(parseISO(val), "MMM yy")}
+                  stroke="#6b7280"
+                  fontSize={12}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  stroke="#6b7280"
+                  fontSize={12}
+                  tickFormatter={(val) => `₹${formatStatValue(val)}`}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Area
+                  type="monotone"
+                  dataKey="revenue"
+                  name="Revenue" // Added name for tooltip
+                  stroke="#059669"
+                  fill="url(#colorRevenue)"
+                  strokeWidth={2.5}
+                  dot={{ r: 4, fill: "#059669", fillOpacity: 1 }}
+                  activeDot={{ r: 6, fill: "#fff", stroke: "#059669", strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[280px] flex flex-col items-center justify-center text-medium-text">
                 <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
                   <FaChartLine className="w-8 h-8 text-gray-400" />
                 </div>
-                <p className="font-medium">No revenue data for today yet</p>
-                <p className="text-sm text-light-text">Data will appear after bookings</p>
-                <Link to="/owner/reports" className="text-primary-green text-sm font-semibold mt-4 block hover:underline">
-                  View Long-Term Reports
-                </Link>
+                <p className="font-medium">No revenue data yet</p>
+                <p className="text-sm text-light-text">
+                  New bookings will appear here.
+                </p>
               </div>
+          )}
+        </div>
+
+        {/* Other Stats Column */}
+        <div className="flex flex-col gap-6">
+          {/* Peak Hours */}
+          <div className="bg-white border border-border-color/60 shadow-sm rounded-2xl p-6">
+            <h2 className="text-lg font-semibold text-dark-text mb-4">
+              Peak Booking Hours
+            </h2>
+            {loading ? (
+              <ChartLoader />
+            ) : stats && stats.peak_hours?.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={stats.peak_hours.slice(0, 5)} layout="vertical" margin={{ left: 10, right: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e0e0e0" />
+                  <XAxis type="number" hide />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    stroke="#6b7280"
+                    fontSize={12}
+                    width={50} // Explicit width for labels
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="bookings" name="Bookings" fill="#10B981" radius={[0, 8, 8, 0]} barSize={20}>
+                    {stats.peak_hours.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[280px] flex flex-col items-center justify-center text-medium-text">
+                  <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                    <FaClock className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <p className="font-medium">No booking data yet</p>
+                  <p className="text-sm text-light-text">
+                    Peak hours will be calculated soon.
+                  </p>
+                </div>
             )}
           </div>
 
-          {/* Revenue by Facility & Sport Distribution */}
-          <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Revenue by Facility */}
-            <div className="bg-white/80 backdrop-blur border border-border-color/50 rounded-2xl p-6 shadow-xl">
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="w-10 h-10 bg-primary-green/10 rounded-xl flex items-center justify-center">
-                  <FaTrophy className="w-5 h-5 text-primary-green" />
-                </div>
-                <h3 className="text-lg font-bold text-dark-text">Revenue by Facility (Today)</h3>
-              </div>
-              
-              {stats.revenue_by_facility.length > 0 ? (
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={stats.revenue_by_facility.slice(0, 6)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" strokeOpacity={0.5} />
-                    <XAxis dataKey="name" stroke="#6B7280" fontSize={12} angle={-45} textAnchor="end" height={80} />
-                    <YAxis stroke="#6B7280" fontSize={12} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="revenue" fill="#10B981" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[280px] flex flex-col items-center justify-center text-medium-text">
-                  <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
-                    <FaTrophy className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <p className="font-medium">No facility data yet</p>
-                  <p className="text-sm text-light-text">Data will appear after bookings</p>
-                </div>
-              )}
-            </div>
-
-            {/* Sport Distribution */}
-            <div className="bg-white/80 backdrop-blur border border-border-color/50 rounded-2xl p-6 shadow-xl">
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="w-10 h-10 bg-primary-green/10 rounded-xl flex items-center justify-center">
-                  <FaFutbol className="w-5 h-5 text-primary-green" />
-                </div>
-                <h3 className="text-lg font-bold text-dark-text">Sport Distribution (Today)</h3>
-              </div>
-              
-              {stats.sport_distribution.length > 0 ? (
-                <ResponsiveContainer width="100%" height={280}>
+          {/* Sport Distribution */}
+          <div className="bg-white border border-border-color/60 shadow-sm rounded-2xl p-6">
+            <h2 className="text-lg font-semibold text-dark-text mb-4">
+              Sport Distribution
+            </h2>
+            {loading ? (
+              <ChartLoader />
+            ) : stats && stats.sport_distribution?.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
-                    <Pie 
-                      data={stats.sport_distribution} 
-                      cx="50%" 
-                      cy="50%" 
-                      labelLine={false} 
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} 
-                      outerRadius={90} 
-                      fill="#8884d8" 
+                    <Pie
+                      data={stats.sport_distribution}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`
+                      }
+                      outerRadius={90}
+                      fill="#8884d8"
                       dataKey="bookings"
+                      nameKey="name" // Use nameKey to match the data
                     >
                       {stats.sport_distribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
                       ))}
                     </Pie>
                     <Tooltip content={<CustomTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
-              ) : (
-                <div className="h-[280px] flex flex-col items-center justify-center text-medium-text">
+            ) : (
+              <div className="h-[280px] flex flex-col items-center justify-center text-medium-text">
                   <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
                     <FaFutbol className="w-8 h-8 text-gray-400" />
                   </div>
                   <p className="font-medium">No sport data yet</p>
-                  <p className="text-sm text-light-text">Bookings will be categorized here</p>
+                  <p className="text-sm text-light-text">
+                    Bookings will be categorized here
+                  </p>
                 </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
       </div>
