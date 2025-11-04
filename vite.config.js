@@ -1,38 +1,21 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import viteCompression from 'vite-plugin-compression';
-import imagemin from 'vite-plugin-imagemin';
+import viteImagemin from '@vheemstra/vite-plugin-imagemin';
+import imageminGifSicle from 'imagemin-gifsicle';
+import imageminJpegTran from 'imagemin-jpegtran';
+import imageminOptiPng from 'imagemin-optipng';
+import imageminSvgo from 'imagemin-svgo';
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
-    viteCompression(),
-    imagemin({
-      gifsicle: {
-        optimizationLevel: 7,
-        interlaced: false,
-      },
-      optipng: {
-        optimizationLevel: 7,
-      },
-      mozjpeg: {
-        quality: 20,
-      },
-      pngquant: {
-        quality: [0.8, 0.9],
-        speed: 4,
-      },
-      svgo: {
-        plugins: [
-          {
-            name: 'removeViewBox',
-          },
-          {
-            name: 'removeEmptyAttrs',
-            active: false,
-          },
-        ],
+    viteImagemin({
+      plugins: {
+        jpg: imageminJpegTran(),
+        png: imageminOptiPng(),
+        gif: imageminGifSicle(),
+        svg: imageminSvgo(),
       },
     }),
   ],
