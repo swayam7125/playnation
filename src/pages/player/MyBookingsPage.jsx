@@ -11,13 +11,12 @@ import {
 import { Calendar, Plus } from "lucide-react";
 import SegmentedControl from "../../components/common/SegmentedControl";
 
-// Constants outside component to prevent recreation
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
 ];
 
-const ITEMS_PER_PAGE = 36;
+const ITEMS_PER_PAGE = 10;
 
 function MyBookingsPage() {
   const [view, setView] = useState("upcoming");
@@ -165,86 +164,87 @@ function MyBookingsPage() {
   const currentError = view === 'upcoming' ? error.upcoming : error.past;
 
   return (
-    <div className="container mx-auto px-4 py-12">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold text-dark-text">My Bookings</h1>
-        <SegmentedControl 
-          options={[{label: 'Upcoming', value: 'upcoming'}, {label: 'Past', value: 'past'}]}
-          value={view}
-          onChange={setView}
-        />
-      </div>
-
-      {view === "past" && (
-        <div className="mb-6 flex gap-4 items-center justify-start">
-          <div className="w-48">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            >
-              {months.map((month, index) => (
-                <option key={month} value={index}>
-                  {month}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="w-36">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            >
-              {years.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </div>
+    <div className="min-h-screen bg-gray-100">
+      <div className="container mx-auto px-4 py-12">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-800">My Bookings</h1>
+          <SegmentedControl 
+            options={[{label: 'Upcoming', value: 'upcoming'}, {label: 'Past', value: 'past'}]}
+            value={view}
+            onChange={setView}
+          />
         </div>
-      )}
 
-      {isLoading ? (
-        <LoadingSpinner text={`Fetching ${view} bookings...`} />
-      ) : currentError ? (
-        <ErrorState message={currentError} />
-      ) : bookingsToShow.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {bookingsToShow.map((booking, index) => (
-            <div key={booking.booking_id} className="fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+        {view === "past" && (
+          <div className="mb-8 flex gap-4 items-center justify-start bg-white p-4 rounded-xl shadow-md">
+            <div className="w-56">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
+              >
+                {months.map((month, index) => (
+                  <option key={month} value={index}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="w-48">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
+              >
+                {years.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {isLoading ? (
+          <LoadingSpinner text={`Fetching ${view} bookings...`} />
+        ) : currentError ? (
+          <ErrorState message={currentError} />
+        ) : bookingsToShow.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {bookingsToShow.map((booking) => (
               <BookingCard
+                key={booking.booking_id}
                 booking={booking}
                 onReviewSubmitted={handleReviewSubmitted}
                 onCancelBooking={handleCancelBooking}
                 isHighlighted={booking.booking_id === highlightedId}
               />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-16 bg-card-bg rounded-lg border border-border-color-light">
-          <Calendar size={48} className="mx-auto text-medium-text/50 mb-4" />
-          <h3 className="text-xl font-semibold text-dark-text">No {view} bookings found</h3>
-          <p className="text-medium-text mt-2 mb-4">
-            {view === "upcoming" ? "Time to book your next game!" : 
-             `No bookings found for ${months[selectedMonth]} ${selectedYear}`}
-          </p>
-          <button onClick={() => navigate('/explore')} className="bg-primary-green text-white px-6 py-2 rounded-lg font-semibold hover:bg-primary-green-dark transition-colors flex items-center mx-auto">
-            <Plus size={16} className="mr-2" />
-            Book a Venue
-          </button>
-        </div>
-      )}
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-24 bg-white rounded-2xl shadow-lg">
+            <Calendar size={64} className="mx-auto text-gray-400 mb-6" />
+            <h3 className="text-2xl font-semibold text-gray-800">No {view} bookings found</h3>
+            <p className="text-gray-600 mt-3 mb-6">
+              {view === "upcoming" ? "Time to book your next game!" : 
+               `No bookings found for ${months[selectedMonth]} ${selectedYear}`}
+            </p>
+            <button onClick={() => navigate('/explore')} className="bg-primary-green text-white px-8 py-3 rounded-lg font-semibold hover:bg-primary-green-dark transition-colors flex items-center mx-auto shadow-lg transform hover:-translate-y-0.5">
+              <Plus size={20} className="mr-2" />
+              Book a Venue
+            </button>
+          </div>
+        )}
 
-      {view === "past" && bookingsToShow.length === ITEMS_PER_PAGE && (
-        <div className="mt-6 text-center text-sm text-gray-600">
-          Showing first {ITEMS_PER_PAGE} bookings for {months[selectedMonth]} {selectedYear}
-        </div>
-      )}
+        {view === "past" && bookingsToShow.length === ITEMS_PER_PAGE && (
+          <div className="mt-8 text-center text-base text-gray-600">
+            Showing first {ITEMS_PER_PAGE} bookings for {months[selectedMonth]} {selectedYear}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
