@@ -1,58 +1,32 @@
-import React, { Suspense, useState, useEffect } from "react";
-import { supabase } from "../supabaseClient";
+import React, { useMemo } from "react";
 import useVenues from "../hooks/useVenues";
+import useSports from "../hooks/useSports";
 import Loader from "../components/common/Loader";
-
-const Hero = React.lazy(() => import("../components/home/Hero"));
-const HowItWorks = React.lazy(() => import("../components/home/HowItWorks"));
-const FeaturedVenues = React.lazy(() => import("../components/home/FeaturedVenues"));
-const WhyChooseUs = React.lazy(() => import("../components/home/WhyChooseUs"));
-const Testimonials = React.lazy(() => import("../components/home/Testimonials"));
-const Categories = React.lazy(() => import("../components/home/Categories"));
+import Hero from "../components/home/Hero";
+import HowItWorks from "../components/home/HowItWorks";
+import FeaturedVenues from "../components/home/FeaturedVenues";
+import WhyChooseUs from "../components/home/WhyChooseUs";
+import Testimonials from "../components/home/Testimonials";
+import Categories from "../components/home/Categories";
 
 export default function HomePage() {
-  const { venues: topVenues, loading, error } = useVenues({
+  const topVenuesOptions = useMemo(() => ({
     limit: 4,
     sortBy: "rating",
-  });
+  }), []);
 
-  const [sports, setSports] = useState([]);
+  const { venues: topVenues, loading, error } = useVenues(topVenuesOptions);
 
-  useEffect(() => {
-    const fetchSports = async () => {
-      try {
-        const { data: sportsData, error: sportsError } = await supabase
-          .from("sports")
-          .select("*");
-        if (sportsError) throw sportsError;
-        setSports(sportsData || []);
-      } catch (err) {
-        console.error("Error fetching sports:", err.message);
-      }
-    };
-    fetchSports();
-  }, []);
+  const { sports, loading: sportsLoading, error: sportsError } = useSports();
 
   return (
     <div className="bg-background">
-      <Suspense fallback={<Loader />}>
-        <Hero />
-      </Suspense>
-      <Suspense fallback={<Loader />}>
-        <Categories categories={sports} />
-      </Suspense>
-      <Suspense fallback={<Loader />}>
-        <HowItWorks />
-      </Suspense>
-      <Suspense fallback={<Loader />}>
-        <FeaturedVenues venues={topVenues} loading={loading} error={error} />
-      </Suspense>
-      <Suspense fallback={<Loader />}>
-        <WhyChooseUs />
-      </Suspense>
-      <Suspense fallback={<Loader />}>
-        <Testimonials />
-      </Suspense>
+      <Hero />
+      <Categories categories={sports} />
+      <HowItWorks />
+      <FeaturedVenues venues={topVenues} loading={loading} error={error} />
+      <WhyChooseUs />
+      <Testimonials />
     </div>
   );
 }

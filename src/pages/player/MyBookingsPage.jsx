@@ -1,9 +1,9 @@
 // src/pages/player/MyBookingsPage.jsx
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
-import { useLocation } from "react-router-dom"; //
+import { useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import BookingCard from "../../components/bookings/BookingCard";
 import {
@@ -12,71 +12,119 @@ import {
 } from "../../components/common/LoadingAndError";
 import { Calendar } from "lucide-react";
 
-function MyBookingsPage() {
-  const { user } = useAuth();
-  const location = useLocation(); //
-  const [bookings, setBookings] = useState({ upcoming: [], past: [] });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [view, setView] = useState("upcoming");
-  const [refreshKey, setRefreshKey] = useState(0);
-  const highlightedId = location.state?.highlightedId; //
+// Constants outside component to prevent recreation
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
 
-  const fetchBookings = useCallback(async () => {
+const ITEMS_PER_PAGE = 36;
+
+// Utility functions outside component
+const safeParseDate = (dateString) => {
+  try {
+    const date = new Date(dateString);
+    return date instanceof Date && !isNaN(date) ? date : null;
+  } catch {
+    return null;
+  }
+};
+
+function MyBookingsPage() {
+  const [view, setView] = useState("upcoming");
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [upcomingBookings, setUpcomingBookings] = useState([]);
+  const [pastBookings, setPastBookings] = useState([]);
+  const [loading, setLoading] = useState({ upcoming: true, past: true });
+  const [error, setError] = useState({ upcoming: null, past: null });
+  const { user } = useAuth();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const highlightedId = searchParams.get('highlight');
+
+  const years = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return Array.from({ length: currentYear - 2023 + 1 }, (_, i) => 2024 + i);
+  }, []);
+
+  const months = useMemo(() => MONTHS, []);
+
+  const fetchUpcomingBookings = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
-    setError(null);
+
+    setLoading(prev => ({ ...prev, upcoming: true }));
+    setError(prev => ({ ...prev, upcoming: null }));
 
     try {
-      const { data, error: fetchError } = await supabase
+      const nowISO = new Date().toISOString();
+      const { data, error } = await supabase
         .from("bookings")
-        .select(
-          `
+        .select(`
           booking_id, start_time, end_time, total_amount, status, has_been_reviewed,
           facilities ( name, sports ( name ), venues ( venue_id, name, address, city, image_url, cancellation_cutoff_hours ) ),
           reviews ( review_id )
-        `
-        ) //
-        .eq("user_id", user.id);
+        `)
+        .eq("user_id", user.id)
+        .eq("status", "confirmed")
+        .gte("start_time", nowISO)
+        .order("start_time", { ascending: true });
 
-      if (fetchError) throw fetchError;
-
-      const now = new Date();
-      const allBookings = data || [];
-
-      // FIX: Upcoming bookings must be in the future AND have a 'confirmed' status.
-      const upcomingBookings = allBookings
-        .filter((b) => new Date(b.start_time) >= now && b.status === "confirmed") //
-        .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
-
-      // FIX: Past bookings include all bookings that are in the past OR any booking that is not 'confirmed' (cancelled/failed).
-      const pastBookings = allBookings
-        .filter((b) => new Date(b.start_time) < now || b.status !== "confirmed") //
-        .sort((a, b) => new Date(b.start_time) - new Date(b.start_time));
-
-      setBookings({
-        upcoming: upcomingBookings,
-        past: pastBookings,
-      });
+      if (error) throw error;
+      setUpcomingBookings(data || []);
     } catch (err) {
-      console.error("Error fetching bookings:", err.message);
-      setError("Failed to load your bookings. Please try again later.");
+      console.error("Error fetching upcoming bookings:", err.message);
+      setError(prev => ({ ...prev, upcoming: "Failed to load upcoming bookings." }));
     } finally {
-      setLoading(false);
+      setLoading(prev => ({ ...prev, upcoming: false }));
     }
   }, [user]);
 
+  const fetchPastBookings = useCallback(async () => {
+    if (!user) return;
+
+    setLoading(prev => ({ ...prev, past: true }));
+    setError(prev => ({ ...prev, past: null }));
+
+    try {
+      const nowISO = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("bookings")
+        .select(`
+          booking_id, start_time, end_time, total_amount, status, has_been_reviewed,
+          facilities ( name, sports ( name ), venues ( venue_id, name, address, city, image_url, cancellation_cutoff_hours ) ),
+          reviews ( review_id )
+        `)
+        .eq("user_id", user.id)
+        .lt("start_time", nowISO)
+        .filter("start_time", "gte", new Date(selectedYear, selectedMonth, 1).toISOString())
+        .filter("start_time", "lt", new Date(selectedYear, selectedMonth + 1, 1).toISOString())
+        .order("start_time", { ascending: false })
+        .limit(ITEMS_PER_PAGE);
+        
+      if (error) throw error;
+      setPastBookings(data || []);
+    } catch (err) {
+      console.error("Error fetching past bookings:", err.message);
+      setError(prev => ({ ...prev, past: "Failed to load past bookings." }));
+    } finally {
+      setLoading(prev => ({ ...prev, past: false }));
+    }
+  }, [user, selectedMonth, selectedYear]);
+
   useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings, refreshKey]);
+    fetchUpcomingBookings();
+    fetchPastBookings();
+  }, [fetchUpcomingBookings, fetchPastBookings]);
 
-  const handleRefresh = () => {
-    setRefreshKey((prevKey) => prevKey + 1);
-  };
+  const handleRefresh = useCallback(() => {
+    fetchUpcomingBookings();
+    fetchPastBookings();
+  }, [fetchUpcomingBookings, fetchPastBookings]);
 
-  const handleReviewSubmitted = () => {
-    handleRefresh();
-  };
+  const handleReviewSubmitted = useCallback(() => {
+    fetchPastBookings();
+  }, [fetchPastBookings]);
 
   // 👇 --- THIS FUNCTION WAS INCORRECT ---
   // It must accept 'reason' and pass it to the RPC
@@ -128,41 +176,13 @@ function MyBookingsPage() {
   };
   // 👆 --- END OF CORRECTED FUNCTION ---
 
+  const bookingsToShow = useMemo(() => 
+    view === "upcoming" ? upcomingBookings : pastBookings,
+    [view, upcomingBookings, pastBookings]
+  );
 
-  const RenderBookings = () => {
-    const bookingsToShow = view === "upcoming" ? bookings.upcoming : bookings.past;
-
-    if (loading) {
-      return <LoadingSpinner text="Fetching your bookings..." />;
-    }
-    if (error) {
-      return <ErrorState message={error} />;
-    }
-    if (bookingsToShow && bookingsToShow.length > 0) {
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {bookingsToShow.map((booking) => (
-            <BookingCard
-              key={booking.booking_id}
-              booking={booking}
-              onReviewSubmitted={handleReviewSubmitted}
-              onCancelBooking={handleCancelBooking}
-              isHighlighted={booking.booking_id === highlightedId}
-            />
-          ))}
-        </div>
-      );
-    }
-    return (
-      <div className="text-center py-16 bg-card-bg rounded-lg border border-border-color-light">
-        <Calendar size={48} className="mx-auto text-medium-text/50 mb-4" />
-        <h3 className="text-xl font-semibold text-dark-text">No {view} bookings found</h3>
-        <p className="text-medium-text mt-2">
-          {view === "upcoming" ? "Time to book your next game!" : "You haven't played in a while."}
-        </p>
-      </div>
-    );
-  };
+  const isLoading = view === 'upcoming' ? loading.upcoming : loading.past;
+  const currentError = view === 'upcoming' ? error.upcoming : error.past;
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -189,7 +209,72 @@ function MyBookingsPage() {
           Past
         </button>
       </div>
-      <RenderBookings />
+
+      {view === "past" && (
+        <div className="mb-6 flex gap-4 items-center justify-start">
+          <div className="w-48">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            >
+              {months.map((month, index) => (
+                <option key={month} value={index}>
+                  {month}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="w-36">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            >
+              {years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? (
+        <LoadingSpinner text={`Fetching ${view} bookings...`} />
+      ) : currentError ? (
+        <ErrorState message={currentError} />
+      ) : bookingsToShow.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {bookingsToShow.map((booking) => (
+            <BookingCard
+              key={booking.booking_id}
+              booking={booking}
+              onReviewSubmitted={handleReviewSubmitted}
+              onCancelBooking={handleCancelBooking}
+              isHighlighted={booking.booking_id === highlightedId}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-16 bg-card-bg rounded-lg border border-border-color-light">
+          <Calendar size={48} className="mx-auto text-medium-text/50 mb-4" />
+          <h3 className="text-xl font-semibold text-dark-text">No {view} bookings found</h3>
+          <p className="text-medium-text mt-2">
+            {view === "upcoming" ? "Time to book your next game!" : 
+             `No bookings found for ${months[selectedMonth]} ${selectedYear}`}
+          </p>
+        </div>
+      )}
+
+      {view === "past" && bookingsToShow.length === ITEMS_PER_PAGE && (
+        <div className="mt-6 text-center text-sm text-gray-600">
+          Showing first {ITEMS_PER_PAGE} bookings for {months[selectedMonth]} {selectedYear}
+        </div>
+      )}
     </div>
   );
 }

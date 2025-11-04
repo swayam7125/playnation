@@ -76,11 +76,7 @@ function BookingPage() {
 
   // --- Effect to Fetch Booking Data ---
   useEffect(() => {
-    // ... (existing data fetching logic remains the same) ...
-     if (bookingDetails) {
-      setPageLoading(false);
-      return;
-    }
+    if (bookingDetails) return; // Don't fetch if details are already available
 
     const fetchBookingData = async () => {
       if (!facilityId || !slotId) {
@@ -88,11 +84,11 @@ function BookingPage() {
         setPageLoading(false);
         return;
       }
-      setPageLoading(true); // Ensure loading is true while fetching
+      setPageLoading(true);
       try {
         const { data: facilityData, error: facilityError } = await supabase
           .from("facilities")
-          .select(`*, sports (name, sport_id), venues (*)`) // Include sport_id
+          .select(`*, sports (name, sport_id), venues (*)`)
           .eq("facility_id", facilityId)
           .single();
         if (facilityError) throw new Error(`Facility fetch failed: ${facilityError.message}`);
@@ -122,7 +118,15 @@ function BookingPage() {
     };
 
     fetchBookingData();
-  }, [facilityId, slotId, bookingDetails]);
+  }, [facilityId, slotId]); // Removed bookingDetails from dependency array
+
+  // --- Effect to handle missing booking details ---
+  useEffect(() => {
+    if (!pageLoading && !bookingDetails && !pageError) {
+      toast.error("Could not load booking details. Redirecting...");
+      navigate("/explore");
+    }
+  }, [pageLoading, bookingDetails, pageError, navigate]);
 
   // --- Destructure details ---
   const { venue, facility, slot, price } = bookingDetails || {};

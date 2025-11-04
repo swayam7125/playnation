@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Shield, Clock, Calendar, CreditCard, Settings, Award, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import StatsCard from '../../components/common/StatsCard';
@@ -31,6 +31,7 @@ const PlayerDashboardPage = () => {
         )
         .eq('user_id', profile?.user_id)
         .eq('status', 'confirmed')
+        .gte('start_time', new Date().toISOString())
         .order('start_time', { ascending: true })
         .limit(1)
         .single(),
@@ -65,10 +66,12 @@ const PlayerDashboardPage = () => {
     { enabled: !!profile }
   );
 
-  const { venues: topVenues, loading: loadingVenues, error: errorVenues } = useVenues({
+  const topVenuesOptions = useMemo(() => ({
     limit: 4,
     sortBy: 'rating',
-  });
+  }), []);
+
+  const { venues: topVenues, loading: loadingVenues, error: errorVenues } = useVenues(topVenuesOptions);
 
   // Fetch player statistics from bookings
   const { data: playerStats, isLoading: isLoadingStats } = useSupabaseQuery(
@@ -79,7 +82,6 @@ const PlayerDashboardPage = () => {
         .from('bookings')
         .select('facilities(type)')
         .eq('user_id', profile?.user_id)
-        .not('facilities', 'is', null)
         .then(({ data }) => {
           const typeCounts = data?.reduce((acc, booking) => {
             const type = booking.facilities?.type;

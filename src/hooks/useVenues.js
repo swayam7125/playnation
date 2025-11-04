@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 
-const useVenues = (options = {}) => {
+const useVenues = ({ limit, selectedSports = [], selectedAmenities = [], searchTerm, sortBy }) => {
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const { limit, selectedSport, searchTerm, sortBy } = options;
 
   useEffect(() => {
     const fetchVenues = async () => {
@@ -34,11 +32,20 @@ const useVenues = (options = {}) => {
           );
         }
         
-        // Client-side filtering by sport
-        if (selectedSport && selectedSport !== 'all') {
+        // Client-side filtering by sports
+        if (selectedSports.length > 0) {
           processedVenues = processedVenues.filter(venue => {
             return venue.facilities && venue.facilities.some(
-              facility => facility.sport_id === selectedSport
+              facility => selectedSports.includes(facility.sport_id)
+            );
+          });
+        }
+
+        // Client-side filtering by amenities
+        if (selectedAmenities.length > 0) {
+          processedVenues = processedVenues.filter(venue => {
+            return venue.amenities && selectedAmenities.every(
+              amenityId => venue.amenities.includes(amenityId)
             );
           });
         }
@@ -89,7 +96,7 @@ const useVenues = (options = {}) => {
     };
 
     fetchVenues();
-  }, [limit, selectedSport, searchTerm, sortBy]);
+  }, [limit, JSON.stringify(selectedSports), JSON.stringify(selectedAmenities), searchTerm, sortBy]);
 
   // This return value is what's causing the error in your component
   return { venues, loading, error };

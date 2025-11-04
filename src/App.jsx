@@ -1,6 +1,6 @@
 import { Routes, Route, Outlet, useLocation, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import React, { useEffect } from "react"; // 👈 Import React and useEffect
+import React, { useEffect, Suspense, lazy } from "react"; // 👈 Import React and useEffect
 
 // Auth & Context
 import { AuthProvider, useAuth } from "./AuthContext";
@@ -9,39 +9,40 @@ import { ModalProvider } from "./ModalContext";
 // Layout
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
+import SuspenseLoader from "./components/common/SuspenseLoader";
 
 // General Pages
-import HomePage from "./pages/HomePage";
-import ExplorePage from "./pages/ExplorePage";
-import VenuePage from "./pages/VenuePage";
-import AuthPage from "./pages/AuthPage";
-import AboutUsPage from "./pages/AboutUsPage";
-import ContactUsPage from "./pages/ContactUsPage";
+const HomePage = lazy(() => import("./pages/HomePage"));
+const ExplorePage = lazy(() => import("./pages/ExplorePage"));
+const VenuePage = lazy(() => import("./pages/VenuePage"));
+const AuthPage = lazy(() => import("./pages/AuthPage"));
+const AboutUsPage = lazy(() => import("./pages/AboutUsPage"));
+const ContactUsPage = lazy(() => import("./pages/ContactUsPage"));
 
 // Player Pages
-import MyBookingsPage from "./pages/player/MyBookingsPage";
-import ProfilePage from "./pages/player/ProfilePage";
-import BookingPage from "./pages/player/BookingPage";
-import PlayerDashboardPage from "./pages/player/PlayerDashboardPage";
+const MyBookingsPage = lazy(() => import("./pages/player/MyBookingsPage"));
+const ProfilePage = lazy(() => import("./pages/player/ProfilePage"));
+const BookingPage = lazy(() => import("./pages/player/BookingPage"));
+const PlayerDashboardPage = lazy(() => import("./pages/player/PlayerDashboardPage"));
 
 // Owner Pages
-import OwnerDashboardPage from "./pages/owner/OwnerDashboardPage";
-import MyVenuesPage from "./pages/owner/MyVenuesPage";
-import AddVenuePage from "./pages/owner/AddVenuePage";
-import AddFacilitiesPage from "./pages/owner/AddFacilitiesPage";
-import EditVenuePage from "./pages/owner/EditVenuePage";
-import ManageSlotsPage from "./pages/owner/ManageSlotsPage";
-import ManageOffersPage from "./pages/owner/ManageOffersPage";
-import BookingCalendarPage from "./pages/owner/BookingCalendarPage";
-import ReportsPage from "./pages/owner/ReportsPage"; // Adjust path as necessary
+const OwnerDashboardPage = lazy(() => import("./pages/owner/OwnerDashboardPage"));
+const MyVenuesPage = lazy(() => import("./pages/owner/MyVenuesPage"));
+const AddVenuePage = lazy(() => import("./pages/owner/AddVenuePage"));
+const AddFacilitiesPage = lazy(() => import("./pages/owner/AddFacilitiesPage"));
+const EditVenuePage = lazy(() => import("./pages/owner/EditVenuePage"));
+const ManageSlotsPage = lazy(() => import("./pages/owner/ManageSlotsPage"));
+const ManageOffersPage = lazy(() => import("./pages/owner/ManageOffersPage"));
+const BookingCalendarPage = lazy(() => import("./pages/owner/BookingCalendarPage"));
+const ReportsPage = lazy(() => import("./pages/owner/ReportsPage")); // Adjust path as necessary
 
 // Admin Pages
-import AdminUserManagementPage from "./pages/admin/AdminUserManagementPage";
-import AdminVenueManagementPage from "./pages/admin/AdminVenueManagementPage";
-import AdminBookingsPage from "./pages/admin/AdminBookingsPage";
-import AdminManageOffersPage from "./pages/admin/AdminManageOffersPage";
-import AdminNotifyPage from "./pages/admin/AdminNotifyPage";
-import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+const AdminUserManagementPage = lazy(() => import("./pages/admin/AdminUserManagementPage"));
+const AdminVenueManagementPage = lazy(() => import("./pages/admin/AdminVenueManagementPage"));
+const AdminBookingsPage = lazy(() => import("./pages/admin/AdminBookingsPage"));
+const AdminManageOffersPage = lazy(() => import("./pages/admin/AdminManageOffersPage"));
+const AdminNotifyPage = lazy(() => import("./pages/admin/AdminNotifyPage"));
+const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
 
 // --- NEW COMPONENT: Resets scroll position on route change ---
 const ScrollToTop = () => {
@@ -205,107 +206,109 @@ function App() {
               },
             }}
           />
-          <Routes>
-            <Route
-              path="/"
-              element={
-                <>
-                  <ScrollToTop /> <AppLayout />
-                </>
-              }
-            >
-              {/* Public routes */}
-              <Route index element={<HomePage />} />
-              <Route path="about" element={<AboutUsPage />} />
-              <Route path="contact" element={<ContactUsPage />} />
-              {/* Auth Routes */}
-              <Route path="auth" element={<AuthPage />} />
-              <Route path="login" element={<AuthPage />} />
-              <Route path="signup" element={<AuthPage />} />
-              {/* Player Routes - Also accessible by non-logged in users */}
-              <Route path="explore" element={<ExplorePage />} />
+          <Suspense fallback={<SuspenseLoader />}>
+            <Routes>
               <Route
-                path="dashboard"
+                path="/"
                 element={
-                  <RequireAuth allowedRoles={["player"]}>
-                    <PlayerDashboardPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="venues/:venueId"
-                element={
-                  <RequireAuth allowedRoles={["player"]}>
-                    <VenuePage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="my-bookings"
-                element={
-                  <RequireAuth allowedRoles={["player"]}>
-                    <MyBookingsPage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="profile"
-                element={
-                  <RequireAuth allowedRoles={[]}>
-                    <ProfilePage />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="booking/:facilityId"
-                element={
-                  <RequireAuth allowedRoles={["player"]}>
-                    <BookingPage />
-                  </RequireAuth>
-                }
-              />
-              {/* Owner Routes */}
-              <Route
-                path="owner"
-                element={
-                  <RequireAuth allowedRoles={["venue_owner"]}>
-                    <Outlet />
-                  </RequireAuth>
+                  <>
+                    <ScrollToTop /> <AppLayout />
+                  </>
                 }
               >
-                <Route index element={<OwnerDashboardPage />} />
-                <Route path="dashboard" element={<OwnerDashboardPage />} />
-                <Route path="my-venues" element={<MyVenuesPage />} />
-                <Route path="add-venue" element={<AddVenuePage />} />
-                <Route path="edit-venue/:venueId" element={<EditVenuePage />} />
-                <Route path="add-facilities" element={<AddFacilitiesPage />} />
-                <Route path="reports" element={<ReportsPage />} />
-                <Route path="manage-slots" element={<ManageSlotsPage />} />
-                <Route path="manage-offers" element={<ManageOffersPage />} />
-                <Route path="calendar" element={<BookingCalendarPage />} />
-              </Route>
-              {/* Admin Routes */}
-              <Route
-                path="admin"
-                element={
-                  <RequireAuth allowedRoles={["admin"]}>
-                    <Outlet />
-                  </RequireAuth>
-                }
-              >
-                <Route index element={<AdminDashboardPage />} />
-                <Route path="dashboard" element={<AdminDashboardPage />} />
-                <Route path="users" element={<AdminUserManagementPage />} />
-                <Route path="venues" element={<AdminVenueManagementPage />} />
-                <Route path="bookings" element={<AdminBookingsPage />} />
+                {/* Public routes */}
+                <Route index element={<HomePage />} />
+                <Route path="about" element={<AboutUsPage />} />
+                <Route path="contact" element={<ContactUsPage />} />
+                {/* Auth Routes */}
+                <Route path="auth" element={<AuthPage />} />
+                <Route path="login" element={<AuthPage />} />
+                <Route path="signup" element={<AuthPage />} />
+                {/* Player Routes - Also accessible by non-logged in users */}
+                <Route path="explore" element={<ExplorePage />} />
                 <Route
-                  path="manage-offers"
-                  element={<AdminManageOffersPage />}
+                  path="dashboard"
+                  element={
+                    <RequireAuth allowedRoles={["player"]}>
+                      <PlayerDashboardPage />
+                    </RequireAuth>
+                  }
                 />
-                <Route path="notify" element={<AdminNotifyPage />} />
+                <Route
+                  path="venues/:venueId"
+                  element={
+                    <RequireAuth allowedRoles={["player"]}>
+                      <VenuePage />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="my-bookings"
+                  element={
+                    <RequireAuth allowedRoles={["player"]}>
+                      <MyBookingsPage />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="profile"
+                  element={
+                    <RequireAuth allowedRoles={[]}>
+                      <ProfilePage />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="booking/:facilityId"
+                  element={
+                    <RequireAuth allowedRoles={["player"]}>
+                      <BookingPage />
+                    </RequireAuth>
+                  }
+                />
+                {/* Owner Routes */}
+                <Route
+                  path="owner"
+                  element={
+                    <RequireAuth allowedRoles={["venue_owner"]}>
+                      <Outlet />
+                    </RequireAuth>
+                  }
+                >
+                  <Route index element={<OwnerDashboardPage />} />
+                  <Route path="dashboard" element={<OwnerDashboardPage />} />
+                  <Route path="my-venues" element={<MyVenuesPage />} />
+                  <Route path="add-venue" element={<AddVenuePage />} />
+                  <Route path="edit-venue/:venueId" element={<EditVenuePage />} />
+                  <Route path="add-facilities" element={<AddFacilitiesPage />} />
+                  <Route path="reports" element={<ReportsPage />} />
+                  <Route path="manage-slots" element={<ManageSlotsPage />} />
+                  <Route path="manage-offers" element={<ManageOffersPage />} />
+                  <Route path="calendar" element={<BookingCalendarPage />} />
+                </Route>
+                {/* Admin Routes */}
+                <Route
+                  path="admin"
+                  element={
+                    <RequireAuth allowedRoles={["admin"]}>
+                      <Outlet />
+                    </RequireAuth>
+                  }
+                >
+                  <Route index element={<AdminDashboardPage />} />
+                  <Route path="dashboard" element={<AdminDashboardPage />} />
+                  <Route path="users" element={<AdminUserManagementPage />} />
+                  <Route path="venues" element={<AdminVenueManagementPage />} />
+                  <Route path="bookings" element={<AdminBookingsPage />} />
+                  <Route
+                    path="manage-offers"
+                    element={<AdminManageOffersPage />}
+                  />
+                  <Route path="notify" element={<AdminNotifyPage />} />
+                </Route>
               </Route>
-            </Route>
-          </Routes>
+            </Routes>
+          </Suspense>
         </AuthRouter>
       </ModalProvider>
     </AuthProvider>

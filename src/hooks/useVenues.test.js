@@ -71,7 +71,7 @@ describe('useVenues Hook', () => {
     ];
     supabase.rpc.mockResolvedValue({ data: mockVenues, error: null });
 
-    const { result } = renderHook(() => useVenues({ selectedSport: 'basketball' }));
+    const { result } = renderHook(() => useVenues({ selectedSports: ['basketball'] }));
 
     await waitFor(() => {
         expect(result.current.loading).toBe(false);

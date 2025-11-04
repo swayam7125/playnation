@@ -7,7 +7,7 @@ describe('CategoryCard Component', () => {
   it('should render the category name and image correctly', () => {
     const mockCategory = {
       name: 'Cricket',
-      image: 'path/to/cricket.png',
+      image_url: 'path/to/cricket.png',
     };
 
     render(

@@ -2,48 +2,62 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 import VenueCard from "../components/venues/VenueCard";
-import useVenues from "../hooks/useVenues"; // Make sure this is imported
+import useVenues from "../hooks/useVenues";
 import Loader from "../components/common/Loader";
+import FilterDropdown from "../components/common/FilterDropdown";
 
 function ExplorePage() {
   const [sports, setSports] = useState([]);
-  const [selectedSport, setSelectedSport] = useState("all");
+  const [selectedSports, setSelectedSports] = useState([]);
+  const [selectedAmenities, setSelectedAmenities] = useState([]);
   const [sportsLoading, setSportsLoading] = useState(true);
+  const [amenities, setAmenities] = useState([]);
+  const [amenitiesLoading, setAmenitiesLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("name");
   const [viewMode, setViewMode] = useState("grid");
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
     const sportId = searchParams.get("sportId");
     if (sportId) {
-      setSelectedSport(sportId);
+      setSelectedSports([sportId]);
     }
   }, [searchParams]);
 
-  // --- START FIX 1: Destructure the hook's return value ---
+  // Get venues with filters
   const { venues, loading, error } = useVenues({
-    selectedSport: selectedSport,
-    searchTerm: searchTerm,
-    sortBy: sortBy,
+    selectedSports,
+    selectedAmenities,
+    searchTerm,
+    sortBy,
   });
-  // --- END FIX 1 ---
 
   useEffect(() => {
-    const fetchSports = async () => {
+    const fetchData = async () => {
       try {
+        // Fetch sports
         const { data: sportsData, error: sportsError } = await supabase
           .from("sports")
           .select("*");
         if (sportsError) throw sportsError;
         setSports(sportsData || []);
+        
+        // Fetch amenities
+        const { data: amenitiesData, error: amenitiesError } = await supabase
+          .from("amenities")
+          .select("*");
+        if (amenitiesError) throw amenitiesError;
+        setAmenities(amenitiesData || []);
       } catch (err) {
-        console.error("Error fetching sports:", err.message);
+        console.error("Error fetching data:", err.message);
       } finally {
         setSportsLoading(false);
+        setAmenitiesLoading(false);
       }
     };
-    fetchSports();
+    fetchData();
   }, []);
 
   // Note: Your useVenues hook now handles all filtering and sorting
@@ -51,13 +65,15 @@ function ExplorePage() {
   const filteredAndSortedVenues = venues;
 
   const clearFilters = () => {
-    setSelectedSport("all");
+    setSelectedSports([]);
+    setSelectedAmenities([]);
     setSearchTerm("");
     setSortBy("name");
   };
 
   const activeFiltersCount = [
-    selectedSport !== "all",
+    selectedSports.length > 0,
+    selectedAmenities.length > 0,
     searchTerm.length > 0,
   ].filter(Boolean).length;
 
@@ -100,115 +116,108 @@ function ExplorePage() {
       </div>
 
       <div className="container mx-auto px-4 py-4">
-        {/* ... Filters and Controls (no changes) ... */}
-        <div className="bg-card-bg rounded-xl shadow-md p-4 mb-4 border border-border-color-light">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-            {/* Sport Filter */}
-            <div className="flex-1">
-              <label className="block text-xs font-semibold text-dark-text mb-2">
-                Filter by Sport
+        {/* Filter Controls Section */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-10 md:grid-cols-4 gap-4 items-end">
+            {/* Filter by Sports */}
+            <div className="md:col-span-1 lg:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filter by Sports
               </label>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  onClick={() => setSelectedSport("all")}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                    selectedSport === "all"
-                      ? "bg-primary-green text-white shadow-sm"
-                      : "bg-light-green-bg text-primary-green border border-primary-green/20 hover:bg-primary-green hover:text-white"
-                  }`}
-                >
-                  All Sports
-                </button>
-                {!sportsLoading &&
-                  sports.map((sport) => (
-                    <button
-                      key={sport.sport_id}
-                      onClick={() => setSelectedSport(String(sport.sport_id))}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                        selectedSport === String(sport.sport_id)
-                          ? "bg-primary-green text-white shadow-sm"
-                          : "bg-light-green-bg text-primary-green border border-primary-green/20 hover:bg-primary-green hover:text-white"
-                      }`}
-                    >
-                      {sport.name}
-                    </button>
-                  ))}
-              </div>
+              <FilterDropdown
+                options={sports.map((sport) => ({
+                  id: sport.sport_id,
+                  name: sport.name,
+                }))}
+                selectedValues={selectedSports}
+                onChange={setSelectedSports}
+                loading={sportsLoading}
+                placeholder="Select Sports"
+              />
             </div>
 
-            {/* Sort and View Controls */}
-            <div className="flex items-center gap-3">
-              {/* Sort Dropdown */}
-              <div>
-                <label className="block text-xs font-semibold text-dark-text mb-1.5">
-                  Sort by
-                </label>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-3 py-1.5 text-sm border border-border-color rounded-lg text-dark-text bg-card-bg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
-                >
-                  <option value="name">Name</option>
-                  <option value="rating">
-                    Rating
-                  </option>
-                  <option value="price">
-                    Price
-                  </option>
-                </select>
-              </div>
+            {/* Filter by Amenities */}
+            <div className="md:col-span-1 lg:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Filter by Amenities
+              </label>
+              <FilterDropdown
+                options={amenities.map((amenity) => ({
+                  id: amenity.amenity_id,
+                  name: amenity.name,
+                }))}
+                selectedValues={selectedAmenities}
+                onChange={setSelectedAmenities}
+                loading={amenitiesLoading}
+                placeholder="Select Amenities"
+              />
+            </div>
+            <div className="md:col-span-1 lg:col-span-2"></div>
+            {/* Sort Dropdown */}
+            <div className="md:col-span-1 lg:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Sort by
+              </label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="w-full px-4 py-2.5 text-gray-700 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              >
+                <option value="name">Name</option>
+                <option value="rating">Rating</option>
+              </select>
+            </div>
 
-              {/* View Mode Toggle */}
-              <div>
-                <label className="block text-xs font-semibold text-dark-text mb-1.5">
-                  View
-                </label>
-                <div className="flex border border-border-color rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    className={`px-2.5 py-1.5 ${
-                      viewMode === "grid"
-                        ? "bg-primary-green text-white"
-                        : "bg-card-bg text-medium-text hover:bg-hover-bg"
-                    } transition-colors duration-200`}
+            {/* View Mode */}
+            <div className="md:col-span-1 lg:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                View
+              </label>
+              <div className="flex border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`flex-1 px-4 py-2.5 ${
+                    viewMode === "grid"
+                      ? "bg-primary-green text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  <svg
+                    className="w-5 h-5 mx-auto"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => setViewMode("list")}
-                    className={`px-2.5 py-1.5 ${
-                      viewMode === "list"
-                        ? "bg-primary-green text-white"
-                        : "bg-card-bg text-medium-text hover:bg-hover-bg"
-                    } transition-colors duration-200`}
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                    />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`flex-1 px-4 py-2.5 ${
+                    viewMode === "list"
+                      ? "bg-primary-green text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  <svg
+                    className="w-5 h-5 mx-auto"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M4 6h16M4 10h16M4 14h16M4 18h16"
-                      />
-                    </svg>
-                  </button>
-                </div>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M4 6h16M4 10h16M4 14h16M4 18h16"
+                    />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
@@ -218,7 +227,8 @@ function ExplorePage() {
             <div className="mt-3 pt-3 border-t border-border-color-light flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-medium-text">
-                  {activeFiltersCount} filter{activeFiltersCount > 1 ? "s" : ""} active
+                  {activeFiltersCount} filter{activeFiltersCount > 1 ? "s" : ""}{" "}
+                  active
                 </span>
                 <span className="bg-primary-green text-white text-xs px-2 py-0.5 rounded-full">
                   {filteredAndSortedVenues.length}
@@ -234,11 +244,10 @@ function ExplorePage() {
           )}
         </div>
 
-
         {/* --- START FIX 2: Use the variables for conditional rendering --- */}
 
         {/* Use 'loading' (a boolean) */}
-        {loading && <Loader />}
+        {loading && <Loader text="Loading venues..." />}
 
         {/* Use 'error' (a string) */}
         {error && (
@@ -284,7 +293,9 @@ function ExplorePage() {
               No venues found
             </h3>
             <p className="text-medium-text text-sm mb-4">
-              {searchTerm || selectedSport !== "all"
+              {searchTerm ||
+              selectedSports.length > 0 ||
+              selectedAmenities.length > 0
                 ? "Try adjusting your filters or search terms"
                 : "We couldn't find any venues at the moment"}
             </p>
@@ -324,7 +335,6 @@ function ExplorePage() {
           </div>
         )}
         {/* --- END FIX 2 --- */}
-
       </div>
     </div>
   );
