@@ -107,7 +107,7 @@ function AdminDashboardPage() {
       const { count: newUsers, error: newUsersError } = await supabase.from('users').select('*', { count: 'exact', head: true }).gte('registration_date', thirtyDaysAgo.toISOString());
       if (newUsersError) throw newUsersError;
 
-      const { data: pendingVenuesData, error: pendingVenuesError } = await supabase.from('venues').select('*').eq('is_approved', false);
+      const { data: pendingVenuesData, error: pendingVenuesError } = await supabase.from('venues').select('*').eq('is_approved', false).order('created_at', { ascending: false });
       if (pendingVenuesError) throw pendingVenuesError;
       setPendingVenuesList(pendingVenuesData);
 
@@ -152,7 +152,7 @@ function AdminDashboardPage() {
       const { data: recentUsers, error: recentUsersError } = await supabase.from('users').select('*').order('registration_date', { ascending: false }).limit(5);
       if (recentUsersError) throw recentUsersError;
 
-      const { data: recentVenues, error: recentVenuesError } = await supabase.from('venues').select('*').order('created_at', { ascending: false }).limit(5);
+            const { data: recentVenues, error: recentVenuesError } = await supabase.from('venues').select('*, created_at').order('created_at', { ascending: false }).limit(5);
       if (recentVenuesError) throw recentVenuesError;
 
       const { data: recentBookings, error: recentBookingsError } = await supabase.from('bookings').select('*, facilities(venues(name))').order('created_at', { ascending: false }).limit(5);
@@ -345,9 +345,9 @@ function AdminDashboardPage() {
             <div className="space-y-2">
               {recentActivity?.recentVenues.map(venue => (
                 <ActivityItem
-                  key={venue.id}
+                  key={venue.venue_id}
                   title={venue.name}
-                  subtitle={venue.location}
+                  subtitle={venue.address}
                   icon={<FaBuilding className="text-sm" />}
                 />
               ))}
@@ -382,7 +382,7 @@ function AdminDashboardPage() {
             <div className="space-y-3">
               {pendingVenuesList.map(venue => (
                 <div 
-                  key={venue.id} 
+                  key={venue.venue_id} 
                   className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-border-color hover:border-primary-green/30 hover:bg-light-green-bg/30 transition-all duration-200"
                 >
                   <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -391,7 +391,7 @@ function AdminDashboardPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-dark-text truncate">{venue.name}</p>
-                      <p className="text-sm text-medium-text truncate">{venue.location}</p>
+                      <p className="text-sm text-medium-text truncate">{venue.address}</p>
                     </div>
                   </div>
                   <div className="flex gap-2 sm:flex-shrink-0">

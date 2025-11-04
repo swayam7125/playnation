@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import ReviewModal from "../reviews/ReviewModal";
 import CancelBookingModal from "./CancelBookingModal";
+import DownloadInvoiceButton from "../common/DownloadInvoiceButton";
 
 // --- Helper Functions for Formatting ---
 const formatDate = (dateString) => {
@@ -74,7 +75,7 @@ const BookingStatusBadge = ({ status }) => {
 
 // --- Main BookingCard Component ---
 
-function BookingCard({
+export function BookingCard({
   booking,
   onReviewSubmitted,
   onCancelBooking,
@@ -257,6 +258,9 @@ function BookingCard({
                   Book Again
                 </Link>
               )}
+              {status === "confirmed" && (
+                <DownloadInvoiceButton bookingId={booking_id} />
+              )}
             </div>
           </div>
         </div>
@@ -283,5 +287,3 @@ function BookingCard({
     </>
   );
 }
-
-export default BookingCard;

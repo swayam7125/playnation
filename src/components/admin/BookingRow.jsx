@@ -9,6 +9,7 @@ import {
     FaRedo,
     FaUndo
 } from 'react-icons/fa';
+import DownloadInvoiceButton from '../../components/common/DownloadInvoiceButton';
 
 const BookingRow = ({
   booking,
@@ -136,6 +137,9 @@ const BookingRow = ({
             >
               <FaEye />
             </button>
+            {(booking.status === "confirmed" || booking.status === "completed") && booking.payment_status === "paid" && (
+              <DownloadInvoiceButton bookingId={booking.booking_id} />
+            )}
             {booking.status === "cancelled" &&
               booking.payment_status === "paid" && (
                 <button

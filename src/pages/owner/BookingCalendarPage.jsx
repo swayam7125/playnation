@@ -3,6 +3,7 @@ import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
 // Added more colorful icons for status
 import { FaChevronLeft, FaChevronRight, FaCalendarAlt, FaMapMarkerAlt, FaUser, FaClock, FaFilter, FaRedo, FaExclamationTriangle, FaCheckCircle, FaTimesCircle, FaMoneyBillWave } from 'react-icons/fa';
+import DownloadInvoiceButton from '../../components/common/DownloadInvoiceButton';
 
 const getDateStringForInput = (date) => new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 
@@ -503,6 +504,10 @@ function BookingCalendarPage() {
                                     </svg>
                                     <span>Issue Refund</span>
                                   </button>
+                                )}
+                                {/* DOWNLOAD INVOICE BUTTON */}
+                                {isConfirmed && (
+                                  <DownloadInvoiceButton bookingId={booking.booking_id} />
                                 )}
                               </div>
                             ) : (

@@ -5,7 +5,7 @@ import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
 import { useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
-import BookingCard from "../../components/bookings/BookingCard";
+import { BookingCard } from "../../components/bookings/BookingCard";
 import {
   LoadingSpinner,
   ErrorState,
