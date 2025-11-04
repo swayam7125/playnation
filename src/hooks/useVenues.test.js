@@ -19,7 +19,7 @@ describe('useVenues Hook', () => {
     const mockVenues = [{ id: 1, name: 'Grand Arena', avg_rating: 4.5, created_at: '2023-01-01' }];
     supabase.rpc.mockResolvedValue({ data: mockVenues, error: null });
 
-    const { result } = renderHook(() => useVenues());
+    const { result } = renderHook(() => useVenues({}));
 
     expect(result.current.loading).toBe(true);
 
@@ -34,7 +34,7 @@ describe('useVenues Hook', () => {
     const mockError = { message: 'Failed to fetch venues' };
     supabase.rpc.mockResolvedValue({ data: null, error: mockError });
 
-    const { result } = renderHook(() => useVenues());
+    const { result } = renderHook(() => useVenues({}));
 
     expect(result.current.loading).toBe(true);
 

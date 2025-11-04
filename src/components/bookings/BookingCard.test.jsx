@@ -2,12 +2,12 @@
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { vi } from 'vitest';
-import BookingCard from './BookingCard';
+import { BookingCard } from './BookingCard';
 
 // 👇 **MOCK THE FORMATTERS UTILITY** 👇
 // This intercepts the import and replaces it with our fake version.
 vi.mock('../../utils/formatters', () => ({
-  formatCurrency: (amount) => `₹${amount}`, // A simple mock for testing
+  formatCurrency: (amount) => `₹${amount}`,
 }));
 
 describe('BookingCard Component', () => {

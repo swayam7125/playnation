@@ -57,7 +57,7 @@ export const BookingCard = ({
   }, [isHighlighted]);
 
   if (!booking || !booking.facilities || !booking.facilities.venues) {
-    return null; // Or a placeholder
+    return <div>Booking information is currently unavailable</div>; // Or a placeholder
   }
 
   const { start_time, end_time, status, facilities } = booking;

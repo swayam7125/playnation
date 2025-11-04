@@ -77,7 +77,7 @@ describe('ExplorePage Component', () => {
 
     // 👇 **THE FIX IS HERE** 👇
     // We use the exact placeholder text from the component
-    const searchInput = screen.getByPlaceholderText("Search venues...");
+    const searchInput = screen.getByPlaceholderText("Search by venue name, sport, or location...");
     await user.type(searchInput, 'cricket');
 
     expect(useVenues).toHaveBeenLastCalledWith(
