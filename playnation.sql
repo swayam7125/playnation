@@ -1125,78 +1125,38 @@ ALTER FUNCTION public.get_frequently_booked_venues(p_user_id uuid) OWNER TO post
 -- Name: get_invoice_details(uuid); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.get_invoice_details(p_booking_id uuid) RETURNS jsonb
+CREATE FUNCTION public.get_invoice_details(p_booking_id uuid) RETURNS json
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$
-DECLARE
-    invoice_data jsonb;
-BEGIN
-    -- This function is SECURITY DEFINER, so we must check auth.uid() manually
-    -- It will only return data if the person calling it is EITHER:
-    -- 1. The player who made the booking (b.user_id)
-    -- 2. The owner of the venue that was booked (v.owner_id)
-    SELECT
-        jsonb_build_object(
-            'booking', jsonb_build_object(
-                'id', b.booking_id,
-                'created_at', b.created_at,
-                'start_time', b.start_time,
-                'end_time', b.end_time,
-                'total_amount', b.total_amount,
-                'discount_amount', b.discount_amount,
-                'final_amount', (b.total_amount - b.discount_amount)
-            ),
-            'player', jsonb_build_object(
-                'first_name', p.first_name,
-                'last_name', p.last_name,
-                'email', p.email,
-                'phone', p.phone_number
-            ),
-            'venue', jsonb_build_object(
-                'name', v.name,
-                'address', v.address,
-                'city', v.city,
-                'state', v.state,
-                'zip_code', v.zip_code
-            ),
-            'owner', jsonb_build_object(
-                'name', o.first_name || ' ' || o.last_name,
-                'email', o.email
-            ),
-            'facility', jsonb_build_object(
-                'name', f.name,
-                'sport', s.name
-            ),
-            'payment', jsonb_build_object(
-                'id', pay.razorpay_payment_id,
-                'order_id', pay.razorpay_order_id,
-                'method', pay.payment_method,
-                'date', pay.transaction_date,
-                'status', pay.status
-            )
-        )
-    INTO invoice_data
-    FROM
-        public.bookings b
-    JOIN
-        public.users p ON b.user_id = p.user_id
-    JOIN
-        public.facilities f ON b.facility_id = f.facility_id
-    JOIN
-        public.venues v ON f.venue_id = v.venue_id
-    JOIN
-        public.users o ON v.owner_id = o.user_id
-    JOIN
-        public.sports s ON f.sport_id = s.sport_id
-    LEFT JOIN
-        public.payments pay ON b.booking_id = pay.booking_id
-    WHERE
+     DECLARE
+       invoice_data json;
+     BEGIN
+       SELECT json_build_object(
+          'booking', row_to_json(b.*),
+          'player', json_build_object(
+              'first_name', u.first_name,
+              'last_name', u.last_name,
+              'email', u.email,
+              'phone', u.phone_number
+          ),
+          'venue', row_to_json(v.*),
+          'facility', row_to_json(f.*)
+      )
+      INTO invoice_data
+      FROM
+        bookings b
+        JOIN users u ON b.user_id = u.id
+        JOIN facilities f ON b.facility_id = f.facility_id
+        JOIN venues v ON f.venue_id = v.venue_id
+      WHERE
         b.booking_id = p_booking_id
-        AND (b.user_id = auth.uid() OR v.owner_id = auth.uid()); -- Security Check
-
-    RETURN invoice_data;
-END;
-$$;
+        -- CRITICAL SECURITY CHECK:
+        -- This ensures the person calling the function owns the booking.      
+        AND b.user_id = auth.uid();
+   
+      RETURN invoice_data;
+    END;
+   $$;
 
 
 ALTER FUNCTION public.get_invoice_details(p_booking_id uuid) OWNER TO postgres;
@@ -6838,6 +6798,28 @@ COPY auth.audit_log_entries (instance_id, id, payload, created_at, ip_address) F
 00000000-0000-0000-0000-000000000000	cbbe4150-8041-4c2a-962a-38c461b5a57d	{"action":"login","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-04 10:49:25.197884+00	
 00000000-0000-0000-0000-000000000000	b91f56a0-d3fa-463b-8ea4-7c07f40628bc	{"action":"logout","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-04 10:53:25.835465+00	
 00000000-0000-0000-0000-000000000000	a5b05a63-8bc2-45a8-8ddc-8b598d53ed36	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-04 10:53:31.186302+00	
+00000000-0000-0000-0000-000000000000	94737457-b888-40f6-b5b6-c7998bda2fca	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-04 11:50:26.022741+00	
+00000000-0000-0000-0000-000000000000	ab753935-cd69-40e5-a91f-28980f86728d	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-04 11:50:33.207383+00	
+00000000-0000-0000-0000-000000000000	085d5c12-6042-4c8f-87a3-90c5163b9697	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-04 11:50:52.849957+00	
+00000000-0000-0000-0000-000000000000	78d591c4-7f8f-4bf1-b04a-f29920b56eb7	{"action":"login","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-04 11:50:58.055912+00	
+00000000-0000-0000-0000-000000000000	f842d279-6643-4655-9992-163227e13495	{"action":"logout","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-04 11:53:19.620324+00	
+00000000-0000-0000-0000-000000000000	5d452a7d-60b3-4e7f-b744-122741b50ed3	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-04 11:53:23.776833+00	
+00000000-0000-0000-0000-000000000000	cb40d8ad-b02f-48e2-8c32-b09c71f7c29d	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-04 11:53:44.363248+00	
+00000000-0000-0000-0000-000000000000	9b4f29b6-46fe-4c34-9a34-b423b1fca544	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-04 11:53:49.464027+00	
+00000000-0000-0000-0000-000000000000	ec2b9207-401f-487e-988b-8209c15214d2	{"action":"token_refreshed","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-04 12:53:08.602477+00	
+00000000-0000-0000-0000-000000000000	221d289e-d325-4787-9c42-e2732e7e007e	{"action":"token_revoked","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-04 12:53:08.619313+00	
+00000000-0000-0000-0000-000000000000	fdefbff7-bf5b-4486-aeac-b7721ced0818	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-04 13:02:33.694062+00	
+00000000-0000-0000-0000-000000000000	1830d000-a082-48b5-a2e7-a5a7797d05b1	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-04 13:02:41.912973+00	
+00000000-0000-0000-0000-000000000000	5fdf8fdd-378b-46e4-b98c-942048e040c2	{"action":"logout","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-04 13:03:10.81631+00	
+00000000-0000-0000-0000-000000000000	9d87cf40-36cd-43a0-9967-f7e3b0014828	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-04 13:03:21.805208+00	
+00000000-0000-0000-0000-000000000000	fb5ffe69-f155-4858-8c90-e6ccc8ab922a	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-04 13:05:51.380775+00	
+00000000-0000-0000-0000-000000000000	c4463c2b-3899-4409-9e8c-196aadac60d4	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-04 13:05:57.915467+00	
+00000000-0000-0000-0000-000000000000	1778416a-91d4-4f1f-8bdf-5ffcd590b769	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-04 13:15:30.380434+00	
+00000000-0000-0000-0000-000000000000	3ef56961-ddce-4c5a-997a-5f5015c3178e	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-04 13:15:38.815227+00	
+00000000-0000-0000-0000-000000000000	f9d30a65-7e8c-45f9-8e92-5746f8064b8c	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-04 13:16:07.215535+00	
+00000000-0000-0000-0000-000000000000	49261b79-b367-49e7-9a62-46d87332bf9f	{"action":"login","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-04 13:16:14.019378+00	
+00000000-0000-0000-0000-000000000000	9d299036-76b7-42d0-8130-309e35631001	{"action":"token_refreshed","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"token"}	2025-11-04 14:20:26.645935+00	
+00000000-0000-0000-0000-000000000000	2ffc24af-5a34-4e83-acb7-54231b4a5b99	{"action":"token_revoked","actor_id":"e86f726e-9210-47ca-8dc7-c84d46cc55e2","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"token"}	2025-11-04 14:20:26.668885+00	
 \.
 
 
@@ -6880,7 +6862,7 @@ COPY auth.instances (id, uuid, raw_base_config, created_at, updated_at) FROM std
 
 COPY auth.mfa_amr_claims (session_id, created_at, updated_at, authentication_method, id) FROM stdin;
 55477ad7-df17-4491-b802-2a9c75180ff6	2025-11-04 10:38:21.579462+00	2025-11-04 10:38:21.579462+00	password	4d9d4f64-5384-404b-af35-5598c22e05b1
-099cfc97-a8c7-4346-b00f-bf10eec81080	2025-11-04 10:53:31.251636+00	2025-11-04 10:53:31.251636+00	password	f8ebcb96-aa6d-4100-a396-40f758df4e79
+71326c27-5ba8-474c-a8d7-0913f09a630a	2025-11-04 13:16:14.02599+00	2025-11-04 13:16:14.02599+00	password	d0b96704-93c2-4f81-b5a3-db81f045e8ae
 b3b2f7ba-a681-4b11-a231-7da00d6b6c7b	2025-11-04 07:39:32.63513+00	2025-11-04 07:39:32.63513+00	password	ef124ae3-96d2-4b3c-8231-7f114f797233
 21146abb-202e-40d6-883f-3b753ad01ffc	2025-11-04 07:44:15.985962+00	2025-11-04 07:44:15.985962+00	password	84eac673-97e7-4684-b168-de9c317f6fff
 \.
@@ -6939,10 +6921,11 @@ COPY auth.one_time_tokens (id, user_id, token_type, token_hash, relates_to, crea
 --
 
 COPY auth.refresh_tokens (instance_id, id, token, user_id, revoked, created_at, updated_at, parent, session_id) FROM stdin;
+00000000-0000-0000-0000-000000000000	1010	aqhsd4nzappb	e86f726e-9210-47ca-8dc7-c84d46cc55e2	t	2025-11-04 13:16:14.024132+00	2025-11-04 14:20:26.671478+00	\N	71326c27-5ba8-474c-a8d7-0913f09a630a
+00000000-0000-0000-0000-000000000000	1011	rtarame247ad	e86f726e-9210-47ca-8dc7-c84d46cc55e2	f	2025-11-04 14:20:26.684219+00	2025-11-04 14:20:26.684219+00	aqhsd4nzappb	71326c27-5ba8-474c-a8d7-0913f09a630a
 00000000-0000-0000-0000-000000000000	989	46i6vzggp66f	8445e8b1-719d-438b-a533-bbf251d5744e	f	2025-11-04 07:39:32.610195+00	2025-11-04 07:39:32.610195+00	\N	b3b2f7ba-a681-4b11-a231-7da00d6b6c7b
 00000000-0000-0000-0000-000000000000	990	4qrd2rwejesr	2f0354fd-905b-4cea-9f87-0b66457b20e7	f	2025-11-04 07:44:15.977412+00	2025-11-04 07:44:15.977412+00	\N	21146abb-202e-40d6-883f-3b753ad01ffc
 00000000-0000-0000-0000-000000000000	997	5lrrijrisxw2	8b676db1-a2e8-416e-bda7-1aba0f8c1125	f	2025-11-04 10:38:21.570449+00	2025-11-04 10:38:21.570449+00	\N	55477ad7-df17-4491-b802-2a9c75180ff6
-00000000-0000-0000-0000-000000000000	1000	kvxxds5gftkd	e86f726e-9210-47ca-8dc7-c84d46cc55e2	f	2025-11-04 10:53:31.22662+00	2025-11-04 10:53:31.22662+00	\N	099cfc97-a8c7-4346-b00f-bf10eec81080
 \.
 
 
@@ -7042,7 +7025,7 @@ COPY auth.schema_migrations (version) FROM stdin;
 --
 
 COPY auth.sessions (id, user_id, created_at, updated_at, factor_id, aal, not_after, refreshed_at, user_agent, ip, tag, oauth_client_id) FROM stdin;
-099cfc97-a8c7-4346-b00f-bf10eec81080	e86f726e-9210-47ca-8dc7-c84d46cc55e2	2025-11-04 10:53:31.208074+00	2025-11-04 10:53:31.208074+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	49.36.89.80	\N	\N
+71326c27-5ba8-474c-a8d7-0913f09a630a	e86f726e-9210-47ca-8dc7-c84d46cc55e2	2025-11-04 13:16:14.0228+00	2025-11-04 14:20:26.701943+00	\N	aal1	\N	2025-11-04 14:20:26.701862	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	49.36.89.80	\N	\N
 b3b2f7ba-a681-4b11-a231-7da00d6b6c7b	8445e8b1-719d-438b-a533-bbf251d5744e	2025-11-04 07:39:32.584547+00	2025-11-04 07:39:32.584547+00	\N	aal1	\N	\N	Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1	103.178.47.172	\N	\N
 21146abb-202e-40d6-883f-3b753ad01ffc	2f0354fd-905b-4cea-9f87-0b66457b20e7	2025-11-04 07:44:15.973038+00	2025-11-04 07:44:15.973038+00	\N	aal1	\N	\N	Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1	103.178.47.172	\N	\N
 55477ad7-df17-4491-b802-2a9c75180ff6	8b676db1-a2e8-416e-bda7-1aba0f8c1125	2025-11-04 10:38:21.56205+00	2025-11-04 10:38:21.56205+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	49.36.89.80	\N	\N
@@ -7070,12 +7053,12 @@ COPY auth.sso_providers (id, resource_id, created_at, updated_at, disabled) FROM
 --
 
 COPY auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, invited_at, confirmation_token, confirmation_sent_at, recovery_token, recovery_sent_at, email_change_token_new, email_change, email_change_sent_at, last_sign_in_at, raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at, phone, phone_confirmed_at, phone_change, phone_change_token, phone_change_sent_at, email_change_token_current, email_change_confirm_status, banned_until, reauthentication_token, reauthentication_sent_at, is_sso_user, deleted_at, is_anonymous) FROM stdin;
+00000000-0000-0000-0000-000000000000	073c625c-eb02-45e8-9c67-50acbdc72cd6	authenticated	authenticated	harsh@gmail.com	$2a$10$4KK/J4ROUoG4YacY/9oQluMayEemAbAWOSoXzXwIOg53cosk3zCLm	2025-08-10 08:14:37.525903+00	\N		\N		\N			\N	2025-11-04 11:50:58.069803+00	{"provider": "email", "providers": ["email"]}	{"sub": "073c625c-eb02-45e8-9c67-50acbdc72cd6", "email": "harsh@gmail.com", "last_name": "shah", "first_name": "harsh", "email_verified": true, "phone_verified": false}	\N	2025-08-10 08:14:37.499555+00	2025-11-04 11:50:58.098836+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	8445e8b1-719d-438b-a533-bbf251d5744e	authenticated	authenticated	mish@gmail.com	$2a$10$W42G7EBz5qeCmmdUecB7pOcunvmhyJBir2J6iru9lLrXBA6VsOYWy	2025-11-04 07:39:32.552636+00	\N		\N		\N			\N	2025-11-04 07:39:32.583901+00	{"provider": "email", "providers": ["email"]}	{"sub": "8445e8b1-719d-438b-a533-bbf251d5744e", "role": "player", "email": "mish@gmail.com", "username": "Mish", "last_name": "Shah", "first_name": "Mishwa", "phone_number": "7990807001", "email_verified": true, "phone_verified": false}	\N	2025-11-04 07:39:32.445139+00	2025-11-04 07:39:32.633982+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$IAvXmD9RhMUIQWJlFk8BY.MkX1opB5IqVu4w7nJ63C/TMcq0aH66i	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-11-04 13:05:57.91742+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-11-04 13:05:57.920285+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	0fb362ba-7463-4462-a136-4692a0d3e41c	authenticated	authenticated	meet@gmail.com	$2a$10$W3.a18XfQvpVJeCKbkSLgOrQ2rJCn/mq2RkMrouUKdoVaJWLzrS56	2025-11-04 09:46:40.70979+00	\N		\N		\N			\N	2025-11-04 09:46:40.721056+00	{"provider": "email", "providers": ["email"]}	{"sub": "0fb362ba-7463-4462-a136-4692a0d3e41c", "role": "player", "email": "meet@gmail.com", "username": "meet", "last_name": "patel", "first_name": "meet ", "phone_number": "8520459852", "email_verified": true, "phone_verified": false}	\N	2025-11-04 09:46:40.604335+00	2025-11-04 09:46:40.73614+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$IAvXmD9RhMUIQWJlFk8BY.MkX1opB5IqVu4w7nJ63C/TMcq0aH66i	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-11-04 08:40:48.70857+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-11-04 09:39:31.30243+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-11-03 17:32:48.796528+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-11-03 17:32:48.817973+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	073c625c-eb02-45e8-9c67-50acbdc72cd6	authenticated	authenticated	harsh@gmail.com	$2a$10$4KK/J4ROUoG4YacY/9oQluMayEemAbAWOSoXzXwIOg53cosk3zCLm	2025-08-10 08:14:37.525903+00	\N		\N		\N			\N	2025-11-04 10:49:25.206397+00	{"provider": "email", "providers": ["email"]}	{"sub": "073c625c-eb02-45e8-9c67-50acbdc72cd6", "email": "harsh@gmail.com", "last_name": "shah", "first_name": "harsh", "email_verified": true, "phone_verified": false}	\N	2025-08-10 08:14:37.499555+00	2025-11-04 10:49:25.219957+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	e86f726e-9210-47ca-8dc7-c84d46cc55e2	authenticated	authenticated	admin@playnation.com	$2a$10$Odpx/MPYwsSsCf4Uiywd1OgDxHtZ8IXE7531egy3pILZ0da.1sAMu	2025-08-10 08:50:46.562958+00	\N		\N		\N			\N	2025-11-04 10:53:31.207983+00	{"provider": "email", "providers": ["email"]}	{"email_verified": true}	\N	2025-08-10 08:50:46.541627+00	2025-11-04 10:53:31.247092+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-11-04 13:15:38.819509+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-11-04 13:15:38.838656+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	e86f726e-9210-47ca-8dc7-c84d46cc55e2	authenticated	authenticated	admin@playnation.com	$2a$10$Odpx/MPYwsSsCf4Uiywd1OgDxHtZ8IXE7531egy3pILZ0da.1sAMu	2025-08-10 08:50:46.562958+00	\N		\N		\N			\N	2025-11-04 13:16:14.02208+00	{"provider": "email", "providers": ["email"]}	{"email_verified": true}	\N	2025-08-10 08:50:46.541627+00	2025-11-04 14:20:26.693232+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	2f0354fd-905b-4cea-9f87-0b66457b20e7	authenticated	authenticated	mi124@gmail.com	$2a$10$cGbOuVGe.jV/ByPwuh/7c.5zJe6bUEIFR9FSWq/NRi11baGm61WM.	2025-11-04 07:44:15.964968+00	\N		\N		\N			\N	2025-11-04 07:44:15.972943+00	{"provider": "email", "providers": ["email"]}	{"sub": "2f0354fd-905b-4cea-9f87-0b66457b20e7", "role": "venue_owner", "email": "mi124@gmail.com", "username": "Mi123", "last_name": "Shah", "first_name": "Mi", "phone_number": "7965355232", "email_verified": true, "phone_verified": false}	\N	2025-11-04 07:44:15.911844+00	2025-11-04 07:44:15.985406+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	38f0c23d-4d25-42cd-8ec0-426d6636eecd	authenticated	authenticated	fenil@gmail.com	$2a$10$wC5LDx6u5k8FTIHrKPOEwOm1f21cVE8.SfhPAjB.W6wxEek7Ig9ZC	2025-10-12 09:33:09.062174+00	\N		\N		\N			\N	2025-11-01 18:34:17.408664+00	{"provider": "email", "providers": ["email"]}	{"sub": "38f0c23d-4d25-42cd-8ec0-426d6636eecd", "role": "player", "email": "fenil@gmail.com", "username": "fenill", "last_name": "pastagia", "first_name": "fenil", "phone_number": "7586214860", "email_verified": true, "phone_verified": false}	\N	2025-10-12 09:33:09.015285+00	2025-11-03 18:16:20.961791+00	\N	\N			\N		0	2026-12-25 09:16:20.960986+00		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	8b676db1-a2e8-416e-bda7-1aba0f8c1125	authenticated	authenticated	het@gmail.com	$2a$10$xAGuiqQb3lMINNBhD3JpDeEaigAvzWyPS2jMFQoQnzxfi0bnzwF9W	2025-11-04 10:38:21.552571+00	\N		\N		\N			\N	2025-11-04 10:38:21.561964+00	{"provider": "email", "providers": ["email"]}	{"sub": "8b676db1-a2e8-416e-bda7-1aba0f8c1125", "role": "player", "email": "het@gmail.com", "username": "het", "last_name": "desai", "first_name": "het", "phone_number": "9514785365", "email_verified": true, "phone_verified": false}	\N	2025-11-04 10:38:21.510933+00	2025-11-04 10:38:21.578968+00	\N	\N			\N		0	\N		\N	f	\N	f
@@ -8996,7 +8979,7 @@ COPY vault.secrets (id, name, description, secret, key_id, nonce, created_at, up
 -- Name: refresh_tokens_id_seq; Type: SEQUENCE SET; Schema: auth; Owner: supabase_auth_admin
 --
 
-SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 1000, true);
+SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 1011, true);
 
 
 --
