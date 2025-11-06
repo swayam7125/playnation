@@ -11,6 +11,7 @@ import { useModal } from "../../ModalContext";
 import toast from "react-hot-toast";
 import { FiXCircle } from "react-icons/fi";
 import BookingOfferSection from "../../components/bookings/BookingOfferSection";
+import BookingPageSkeleton from "../../components/skeletons/BookingPageSkeleton";
 
 const formatDate = (dateString) =>
   new Date(dateString).toLocaleDateString("en-US", {
@@ -175,12 +176,7 @@ function BookingPage() {
   };
 
   if (pageLoading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-green"></div>
-        <h1 className="text-xl font-semibold text-gray-600 ml-4">Loading Booking Details...</h1>
-      </div>
-    );
+    return <BookingPageSkeleton />;
   }
 
   if (pageError) {

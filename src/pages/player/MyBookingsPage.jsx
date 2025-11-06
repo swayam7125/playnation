@@ -4,12 +4,10 @@ import { useAuth } from "../../AuthContext";
 import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { BookingCard } from "../../components/bookings/BookingCard";
-import {
-  LoadingSpinner,
-  ErrorState,
-} from "../../components/common/LoadingAndError";
+import { ErrorState } from "../../components/common/LoadingAndError";
 import { Calendar, Plus } from "lucide-react";
 import SegmentedControl from "../../components/common/SegmentedControl";
+import MyBookingsSkeleton from "../../components/skeletons/MyBookingsSkeleton";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -209,7 +207,7 @@ function MyBookingsPage() {
         )}
 
         {isLoading ? (
-          <LoadingSpinner text={`Fetching ${view} bookings...`} />
+          <MyBookingsSkeleton />
         ) : currentError ? (
           <ErrorState message={currentError} />
         ) : bookingsToShow.length > 0 ? (

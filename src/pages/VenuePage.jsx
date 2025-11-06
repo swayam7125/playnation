@@ -13,6 +13,7 @@ import {
 import StarRating from "../components/reviews/StarRating";
 import OfferCard from "../components/offers/OfferCard";
 import DOMPurify from "dompurify";
+import { motion, AnimatePresence } from "framer-motion";
 
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
@@ -23,6 +24,8 @@ import "swiper/css/pagination";
 
 import { useAuth } from "../AuthContext";
 import { useModal } from "../ModalContext";
+import VenueSkeleton from "../components/skeletons/VenueSkeleton";
+import SlotSkeleton from "../components/skeletons/SlotSkeleton";
 
 const placeholderImage =
   "https://images.unsplash.com/photo-1593341646782-e02a_a4ff2ab?w=800";
@@ -312,12 +315,8 @@ function VenuePage() {
     );
   };
 
-  if (loading)
-    return (
-       <div className="min-h-screen flex items-center justify-center bg-gray-100">
-           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary-green"></div>
-      </div>
-    );
+  if (loading) return <VenueSkeleton />;
+  
   if (error)
     return (
       <div className="container mx-auto text-center text-red-600 p-12">
@@ -334,7 +333,12 @@ function VenuePage() {
   const isPrevDayDisabled = selectedDate <= getTodayString();
 
   return (
-    <div className="bg-gray-100">
+    <motion.div 
+      className="bg-gray-100"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
       <div className="container mx-auto px-4 py-12">
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
           <div className="relative w-full h-96 overflow-hidden group">
@@ -468,22 +472,49 @@ function VenuePage() {
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {slotsLoading ? (
-                      <div className="col-span-full text-center py-6"><div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-green"></div><p className="text-gray-600 text-base mt-3">Loading slots...</p></div>
-                    ) : slots.length > 0 ? (
-                      slots.map((slot) => (
-                        <button
-                          key={slot.slot_id}
-                          onClick={() => handleSlotSelect(slot)}
-                          disabled={!slot.is_available}
-                          className={`p-4 text-center font-semibold rounded-lg transition-all duration-300 border-2 text-base ${!slot.is_available ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : selectedSlot?.slot_id === slot.slot_id ? "bg-primary-green text-white border-primary-green-dark ring-4 ring-offset-2 ring-primary-green" : "bg-white text-primary-green border-primary-green/50 hover:border-primary-green hover:bg-green-50"}`}>
-                          {formatTime(slot.start_time)}
-                          <span className="block text-sm mt-1 opacity-80">₹{slot.price ?? selectedFacility?.hourly_rate}</span>
-                        </button>
-                      ))
-                    ) : (
-                      <p className="col-span-full text-gray-600 py-6 text-center">No available future slots for {selectedFacility?.name} on {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}.</p>
-                    )}
+                    <AnimatePresence mode="wait">
+                      {slotsLoading ? (
+                        <motion.div
+                          key="slots-loading"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="col-span-full"
+                        >
+                          <SlotSkeleton />
+                        </motion.div>
+                      ) : slots.length > 0 ? (
+                        <motion.div
+                          key="slots-loaded"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.3 }}
+                          className="col-span-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
+                        >
+                          {slots.map((slot) => (
+                            <button
+                              key={slot.slot_id}
+                              onClick={() => handleSlotSelect(slot)}
+                              disabled={!slot.is_available}
+                              className={`p-4 text-center font-semibold rounded-lg transition-all duration-300 border-2 text-base ${!slot.is_available ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed" : selectedSlot?.slot_id === slot.slot_id ? "bg-primary-green text-white border-primary-green-dark ring-4 ring-offset-2 ring-primary-green" : "bg-white text-primary-green border-primary-green/50 hover:border-primary-green hover:bg-green-50"}`}>
+                              {formatTime(slot.start_time)}
+                              <span className="block text-sm mt-1 opacity-80">₹{slot.price ?? selectedFacility?.hourly_rate}</span>
+                            </button>
+                          ))}
+                        </motion.div>
+                      ) : (
+                        <motion.p
+                          key="no-slots"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.3 }}
+                          className="col-span-full text-gray-600 py-6 text-center"
+                        >
+                          No available future slots for {selectedFacility?.name} on {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}.
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
              )}
@@ -534,7 +565,7 @@ function VenuePage() {
         .venue-swiper-pagination .swiper-pagination-bullet { background: white; opacity: 0.7; }
         .venue-swiper-pagination .swiper-pagination-bullet-active { background: #10b981; opacity: 1; }
       `}</style>
-    </div>
+    </motion.div>
   );
 }
 

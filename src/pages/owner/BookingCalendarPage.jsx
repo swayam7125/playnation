@@ -5,6 +5,11 @@ import { useAuth } from '../../AuthContext';
 import { FaChevronLeft, FaChevronRight, FaCalendarAlt, FaMapMarkerAlt, FaUser, FaClock, FaFilter, FaRedo, FaExclamationTriangle, FaCheckCircle, FaTimesCircle, FaMoneyBillWave } from 'react-icons/fa';
 import DownloadInvoiceButton from '../../components/common/DownloadInvoiceButton';
 
+// --- SKELETON IMPORTS ADDED ---
+import useSkeletonLoader from '../../hooks/useSkeletonLoader';
+import { ManageBookingsSkeleton } from '../../components/skeletons/owner';
+// --- END SKELETON IMPORTS ---
+
 const getDateStringForInput = (date) => new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 
 // --- Custom Refund Modal Component (Unchanged) ---
@@ -76,7 +81,10 @@ function BookingCalendarPage() {
   const [selectedVenueId, setSelectedVenueId] = useState('all');
   const [bookingToRefund, setBookingToRefund] = useState(null); 
 
-  // Refactored fetch function to be reusable
+  // --- SKELETON HOOK ADDED ---
+  const showContent = useSkeletonLoader(loading);
+
+  // Refactored fetch function to be reusable (Unchanged)
   const fetchCalendarData = useCallback(async () => {
     if (!user) { setLoading(false); return; }
     setLoading(true);
@@ -96,7 +104,6 @@ function BookingCalendarPage() {
       if (facilityIds.length > 0) {
         const { data: bookingsData, error: bookingsError } = await supabase
           .from('bookings')
-          // Ensure cancellation_reason is selected here
           .select('booking_id, user_id, facility_id, slot_id, start_time, end_time, total_amount, status, payment_status, customer_name, customer_phone, created_at, has_been_reviewed, cancelled_at, cancelled_by, cancellation_reason, offer_id, discount_amount, users:users!bookings_user_id_fkey (username, first_name, last_name, email)')
           .in('facility_id', facilityIds)
           .order('start_time', { ascending: true }); 
@@ -114,12 +121,12 @@ function BookingCalendarPage() {
     }
   }, [user]); 
 
-  // useEffect now uses the reusable fetch function
+  // useEffect now uses the reusable fetch function (Unchanged)
   useEffect(() => {
     fetchCalendarData();
   }, [user, fetchCalendarData]);
 
-  // --- UPDATED REFUND HANDLER for robust error checking ---
+  // --- UPDATED REFUND HANDLER (Unchanged) ---
   const confirmRefundAction = async (booking) => {
     setBookingToRefund(null); // Close the modal immediately
     setLoading(true);
@@ -132,17 +139,13 @@ function BookingCalendarPage() {
 
       if (error) throw error;
 
-      // FIX for ENUM error: Check for successful refund status from the RPC response
       const rpcStatus = data?.[0]?.status || data?.[0]?.payment_status;
 
       if (rpcStatus === 'refunded') {
         alert(`Refund processed successfully for Booking ID: ${booking.booking_id}.`);
       } else {
-        // Show detailed error if the RPC did not return the expected success status
         alert(`Refund attempted, but the status is uncertain or the RPC returned an error. Message: ${data?.[0]?.message || 'Unknown error.'}`);
       }
-
-      // Re-fetch data to update the calendar view
       await fetchCalendarData();
 
     } catch (error) {
@@ -153,13 +156,13 @@ function BookingCalendarPage() {
     }
   };
   
-  // --- NEW: function to open the modal ---
+  // --- NEW: function to open the modal (Unchanged) ---
   const handleRefundClick = (booking) => {
     setBookingToRefund(booking);
   };
   // -------------------------
 
-
+  // --- All useMemo and helper functions are unchanged ---
   const facilitiesToDisplay = useMemo(() => {
     if (selectedVenueId === 'all') return venues.flatMap(v => v.facilities || []);
     return venues.find(v => v.venue_id === selectedVenueId)?.facilities || [];
@@ -218,17 +221,12 @@ function BookingCalendarPage() {
     const bookingDate = new Date(b.start_time);
     return isSameDay(bookingDate, currentDate) && b.status === 'confirmed';
   }).length;
+  // --- End of helper functions ---
 
 
-  if (loading) return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-primary-green border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-medium-text font-medium">Loading your booking calendar...</p>
-      </div>
-    </div>
-  );
+  // --- RENDER LOGIC UPDATED ---
 
+  // 1. Handle Error first
   if (error) return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center p-8 bg-card-bg rounded-2xl border border-red-300 shadow-lg max-w-md">
@@ -244,20 +242,26 @@ function BookingCalendarPage() {
     </div>
   );
 
+  // 2. Handle Loading state
+  if (!showContent) {
+    return <ManageBookingsSkeleton />;
+  }
+  
+  // 3. Render Content (with fade-in)
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background animate-fadeIn">
       
-      {/* RENDER THE MODAL HERE */}
+      {/* RENDER THE MODAL HERE (Unchanged) */}
       <RefundConfirmationModal 
         booking={bookingToRefund}
         onConfirm={confirmRefundAction}
         onCancel={() => setBookingToRefund(null)}
       />
       
-      {/* 🌟 Outer container for alignment 🌟 */}
+      {/* 🌟 Outer container for alignment 🌟 (Unchanged) */}
       <div className="container mx-auto px-6 py-8 max-w-7xl">
 
-        {/* 🌟 Header Section (Green Stripe) 🌟 */}
+        {/* 🌟 Header Section (Green Stripe) 🌟 (Unchanged) */}
         <div className="relative overflow-hidden bg-gradient-to-r from-primary-green via-primary-green-dark to-primary-green rounded-2xl shadow-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-black/5 to-black/10"></div>
           
@@ -272,7 +276,6 @@ function BookingCalendarPage() {
                   <p className="text-white/80 text-sm">Real-time management for all your facility bookings</p>
                 </div>
               </div>
-              {/* Today Button - Conditional styling for clear visual feedback */}
               <button 
                   onClick={() => setCurrentDate(new Date())} 
                   className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 shadow-md ${
@@ -281,14 +284,13 @@ function BookingCalendarPage() {
                           : 'bg-white/10 text-white hover:bg-white/20'
                   }`}
               >
-                  {isToday ? 'Viewing Today' : 'Go To Today'}
+                {isToday ? 'Viewing Today' : 'Go To Today'}
               </button>
             </div>
             
-            {/* Stats Cards - Aligned below the header text */}
+            {/* Stats Cards (Unchanged) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
               
-              {/* Card 1: Date View */}
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:scale-[1.02] transition-transform duration-200 shadow-md">
                 <p className="text-white/70 text-sm font-medium uppercase tracking-wider">Date View</p>
                 <div className="flex items-center gap-2 mt-1">
@@ -297,7 +299,6 @@ function BookingCalendarPage() {
                 </div>
               </div>
               
-              {/* Card 2: Confirmed Bookings */}
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:scale-[1.02] transition-transform duration-200 shadow-md">
                 <p className="text-white/70 text-sm font-medium uppercase tracking-wider">Confirmed Bookings</p>
                 <div className="flex items-center gap-2 mt-1">
@@ -306,7 +307,6 @@ function BookingCalendarPage() {
                 </div>
               </div>
               
-              {/* Card 3: Active Facilities */}
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:scale-[1.02] transition-transform duration-200 shadow-md">
                 <p className="text-white/70 text-sm font-medium uppercase tracking-wider">Active Facilities</p>
                 <div className="flex items-center gap-2 mt-1">
@@ -318,14 +318,13 @@ function BookingCalendarPage() {
           </div>
         </div>
         
-        {/* The rest of the content remains within the mx-auto container */}
+        {/* The rest of the content remains within the mx-auto container (Unchanged) */}
         <div className="py-8">
           
-          {/* 🌟 Control Panel 🌟 */}
+          {/* 🌟 Control Panel 🌟 (Unchanged) */}
           <div className="bg-white rounded-2xl border border-border-color p-6 shadow-2xl mb-8">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
               
-              {/* Date Navigation Block */}
               <div className="flex items-center gap-4">
                 <button 
                   onClick={() => changeDate(-1)} 
@@ -335,7 +334,6 @@ function BookingCalendarPage() {
                   <FaChevronLeft className="text-medium-text group-hover:text-primary-green" />
                 </button>
                 
-                {/* DATE INPUT FIX HERE */}
                 <div className="relative flex items-center border border-border-color rounded-xl bg-white focus-within:border-primary-green focus-within:ring-4 focus-within:ring-primary-green/10 transition-all duration-200">
                   <input 
                     type="date" 
@@ -344,15 +342,13 @@ function BookingCalendarPage() {
                     onChange={e => setCurrentDate(new Date(e.target.value))} 
                   />
                   
-                  {/* Visual wrapper for the date text and icon */}
                   <div className="flex items-center justify-center space-x-2 px-4 py-3 w-40 pointer-events-none">
                       <span className="text-dark-text font-semibold">
-                          {getDateStringForInput(currentDate).split('-').reverse().join('-')}
+                        {getDateStringForInput(currentDate).split('-').reverse().join('-')}
                       </span>
                       <FaCalendarAlt className="text-primary-green w-5 h-5" />
                   </div>
                 </div>
-                {/* END DATE INPUT FIX */}
                 
                 <button 
                   onClick={() => changeDate(1)} 
@@ -363,7 +359,6 @@ function BookingCalendarPage() {
                 </button>
               </div>
 
-              {/* Venue Filter Block */}
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 text-dark-text font-semibold">
                   <FaFilter className="text-primary-green" />
@@ -384,7 +379,6 @@ function BookingCalendarPage() {
               </div>
             </div>
             
-            {/* Selected Date Display */}
             <div className="mt-6 pt-6 border-t border-border-color text-center">
               <h3 className="text-xl font-bold text-dark-text">
                 Viewing Schedule for <span className="text-primary-green">{formatDate(currentDate)}</span>
@@ -392,7 +386,7 @@ function BookingCalendarPage() {
             </div>
           </div>
           
-          {/* Calendar Content */}
+          {/* Calendar Content (Unchanged) */}
           {facilitiesToDisplay.length === 0 ? (
             <div className="bg-white rounded-2xl border border-border-color p-16 text-center shadow-2xl">
               <div className="max-w-md mx-auto">
@@ -405,7 +399,7 @@ function BookingCalendarPage() {
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-border-color shadow-2xl overflow-hidden">
-              {/* Calendar Header */}
+              {/* Calendar Header (Unchanged) */}
               <div className="bg-primary-green/10 border-b-2 border-primary-green/30">
                 <div className="grid" style={{ gridTemplateColumns: `120px repeat(${facilitiesToDisplay.length}, minmax(200px, 1fr))` }}>
                   <div className="p-4 flex flex-col items-center justify-center border-r border-border-color bg-primary-green/10">
@@ -425,12 +419,12 @@ function BookingCalendarPage() {
                 </div>
               </div>
 
-              {/* Calendar Body */}
+              {/* Calendar Body (Unchanged) */}
               <div className="overflow-x-auto">
                 <div className="grid" style={{ gridTemplateColumns: `120px repeat(${facilitiesToDisplay.length}, minmax(200px, 1fr))` }}>
                   {hours.map((hour, hourIndex) => (
                     <React.Fragment key={hour}>
-                      {/* Time Column - Enhanced BG for time tracking */}
+                      {/* Time Column (Unchanged) */}
                       <div className={`p-4 flex flex-col items-center justify-center border-r border-border-color ${isToday && hour === new Date().getHours() ? 'bg-yellow-50 font-extrabold border-l-4 border-yellow-500' : 'bg-gray-50'} ${hourIndex < hours.length - 1 ? 'border-b border-border-color' : ''}`}>
                         <div className="text-center">
                           <div className={`font-semibold text-dark-text text-md ${isToday && hour === new Date().getHours() ? 'text-yellow-800' : ''}`}>{formatTime(hour)}</div>
@@ -438,7 +432,7 @@ function BookingCalendarPage() {
                         </div>
                       </div>
                       
-                      {/* Facility Columns */}
+                      {/* Facility Columns (Unchanged) */}
                       {facilitiesToDisplay.map((facility, facilityIndex) => {
                         const booking = getBookingForSlot(facility.facility_id, hour);
                         
@@ -493,7 +487,6 @@ function BookingCalendarPage() {
                                   </div>
                                 </div>
                                 
-                                {/* REFUND OPTION */}
                                 {isRefundable && (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); handleRefundClick(booking); }}
@@ -505,7 +498,6 @@ function BookingCalendarPage() {
                                     <span>Issue Refund</span>
                                   </button>
                                 )}
-                                {/* DOWNLOAD INVOICE BUTTON */}
                                 {isConfirmed && (
                                   <DownloadInvoiceButton bookingId={booking.booking_id} />
                                 )}

@@ -1,10 +1,14 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import VenueCard from "../venues/VenueCard";
 import { FaArrowRight } from "react-icons/fa";
-import Loader from "../common/Loader";
+import VenueCard from "../venues/VenueCard";
+import FeaturedVenuesSkeleton from "../skeletons/FeaturedVenuesSkeleton";
+import { motion, AnimatePresence } from "framer-motion";
+import useSkeletonLoader from "../../hooks/useSkeletonLoader";
 
 const FeaturedVenues = ({ venues, loading, error }) => {
+  const showContent = useSkeletonLoader(loading);
+
   return (
     <section className="py-20 bg-background">
       <div className="container mx-auto px-6">
@@ -26,29 +30,53 @@ const FeaturedVenues = ({ venues, loading, error }) => {
           </Link>
         </div>
 
-        {loading ? (
-          <Loader />
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {error ? (
-              <div className="col-span-full text-center py-16">
-                <p className="text-xl text-red-500">Could not load venues.</p>
-                <p className="text-sm text-medium-text">{error.message || error.toString()}</p>
-              </div>
-            ) : venues.length > 0 ? (
-              venues.map((venue) => (
-                <div key={venue.venue_id} className="transform hover:scale-105 transition-transform duration-300">
-                  <VenueCard venue={venue} />
+        <AnimatePresence mode="wait">
+          {loading && !showContent ? (
+            <motion.div
+              key="skeleton"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              <FeaturedVenuesSkeleton />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="content"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.6 }}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+            >
+              {error ? (
+                <div className="col-span-full text-center py-16">
+                  <p className="text-xl text-red-500">Could not load venues.</p>
+                  <p className="text-sm text-medium-text">
+                    {error.message || error.toString()}
+                  </p>
                 </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-16">
-                <div className="text-6xl text-border-color mb-4">🏟️</div>
-                <p className="text-xl text-medium-text">No venues available at the moment.</p>
-              </div>
-            )}
-          </div>
-        )}
+              ) : venues.length > 0 ? (
+                venues.map((venue) => (
+                  <div
+                    key={venue.venue_id}
+                    className="transform hover:scale-105 transition-transform duration-300"
+                  >
+                    <VenueCard venue={venue} />
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-16">
+                  <div className="text-6xl text-border-color mb-4">🏟️</div>
+                  <p className="text-xl text-medium-text">
+                    No venues available at the moment.
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </section>
   );

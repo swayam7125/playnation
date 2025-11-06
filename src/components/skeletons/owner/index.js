@@ -1,0 +1,10 @@
+export { default as OwnerDashboardSkeleton } from "./OwnerDashboardSkeleton";
+export { default as ManageVenuesSkeleton } from "./ManageVenuesSkeleton";
+export { default as ManageSlotsSkeleton } from "./ManageSlotsSkeleton";
+export { default as ManageBookingsSkeleton } from "./ManageBookingsSkeleton";
+export { default as OwnerAnalyticsSkeleton } from "./OwnerAnalyticsSkeleton";
+export { default as ReportPageSkeleton } from "./ReportPageSkeleton";
+export { default as AddVenuePageSkeleton } from "./AddVenuePageSkeleton";
+export { default as AddFacilityPageSkeleton } from "./AddFacilityPageSkeleton";
+export { default as EditVenuePageSkeleton } from "./EditVenuePageSkeleton";
+export { default as MyVenuesPageSkeleton } from "./MyVenuesPageSkeleton";

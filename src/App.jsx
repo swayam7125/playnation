@@ -10,6 +10,7 @@ import { ModalProvider } from "./ModalContext";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import SuspenseLoader from "./components/common/SuspenseLoader";
+import PageSkeleton from "./components/skeletons/PageSkeleton"; // Import PageSkeleton
 
 // General Pages
 const HomePage = lazy(() => import("./pages/HomePage"));
@@ -85,7 +86,7 @@ const AuthRouter = ({ children }) => {
   const location = useLocation();
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <PageSkeleton />;
   }
 
   if (user && profile) {
@@ -146,7 +147,7 @@ const RequireAuth = ({ children, allowedRoles = [] }) => {
   const location = useLocation();
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <PageSkeleton />;
   }
 
   if (!user) {
@@ -155,7 +156,7 @@ const RequireAuth = ({ children, allowedRoles = [] }) => {
   }
 
   if (!profile) {
-    return <div>Loading profile...</div>;
+    return <PageSkeleton />;
   }
 
   // Special handling for owners - ensure they can access their routes

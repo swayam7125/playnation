@@ -24,8 +24,12 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { format } from "date-fns";
-import { FiLoader, FiAlertCircle } from "react-icons/fi";
+import { FiAlertCircle } from "react-icons/fi"; // FiLoader removed
 import { formatCurrency } from "../../utils/formatters";
+
+// --- IMPORTS ADDED ---
+import useSkeletonLoader from "../../hooks/useSkeletonLoader"; //
+import { OwnerDashboardSkeleton } from "../../components/skeletons/owner"; //
 
 // Stat Card (Unchanged)
 const StatCard = ({ title, value, icon }) => (
@@ -40,7 +44,7 @@ const StatCard = ({ title, value, icon }) => (
   </div>
 );
 
-// Formatter for the X-axis (hours)
+// Formatter for the X-axis (hours) (Unchanged)
 const formatHour = (hour) => {
   if (hour === 0) return '12 AM';
   if (hour === 12) return '12 PM';
@@ -48,7 +52,7 @@ const formatHour = (hour) => {
   return `${hour - 12} PM`;
 };
 
-// Custom Tooltip for Charts
+// Custom Tooltip for Charts (Unchanged)
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     const hourLabel = formatHour(label);
@@ -69,12 +73,16 @@ function OwnerDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // --- HOOK ADDED ---
+  // Use the skeleton loader hook to manage the transition
+  const showContent = useSkeletonLoader(loading);
+
+  // Data fetching logic (Unchanged)
   useEffect(() => {
     async function fetchDashboardData() {
       if (!user) return;
       try {
         setLoading(true);
-        // We pass the user.id to the function
         const { data, error } = await supabase.rpc("get_owner_today_dashboard", {
           p_owner_id: user.id 
         }); 
@@ -102,7 +110,7 @@ function OwnerDashboardPage() {
     fetchDashboardData();
   }, [user]);
 
-  // Calculate Busiest Hour
+  // Calculate Busiest Hour (Unchanged)
   const busiestHourData = useMemo(() => {
     if (!stats?.hourly_revenue_trend || stats.hourly_revenue_trend.length === 0) {
       return { hour: 'N/A' };
@@ -117,15 +125,10 @@ function OwnerDashboardPage() {
     return { hour: formatHour(busiest.hour_of_day) };
   }, [stats?.hourly_revenue_trend]);
 
+  
+  // --- RENDER LOGIC UPDATED ---
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <FiLoader className="animate-spin text-primary-green h-12 w-12" />
-      </div>
-    );
-  }
-
+  // 1. Handle Error State First
   if (error) {
     return (
       <div className="max-w-4xl mx-auto p-4 md:p-8">
@@ -139,6 +142,15 @@ function OwnerDashboardPage() {
       </div>
     );
   }
+
+  // 2. Show Skeleton while loading or during transition delay
+  // 'showContent' will be false if loading=true, or for a brief period after loading=false
+  if (!showContent) {
+    return <OwnerDashboardSkeleton />; //
+  }
+
+  // 3. Show Page Content (Unchanged from original)
+  // This is only reached if error is null AND showContent is true.
   
   // Check if there is valid chart data to show
   const hasChartData = stats?.hourly_revenue_trend && stats.hourly_revenue_trend.length > 0 && stats.hourly_revenue_trend.some(h => h.revenue > 0);
@@ -170,7 +182,7 @@ function OwnerDashboardPage() {
           </div>
         </div>
 
-        {/* --- NEW LAYOUT: 6 Stat Cards (Full Width) --- */}
+        {/* --- NEW LAYOUT: 6 Stat Cards (Full Width) (Unchanged) --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <StatCard
             title="Today's Revenue"
@@ -204,7 +216,7 @@ function OwnerDashboardPage() {
           />
         </div>
 
-        {/* --- NEW LAYOUT: Chart and Bookings List Grid --- */}
+        {/* --- NEW LAYOUT: Chart and Bookings List Grid (Unchanged) --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* --- Left Column (Chart) --- */}
@@ -254,6 +266,7 @@ function OwnerDashboardPage() {
                           <div>
                             <p className="text-sm font-semibold text-dark-text">{booking.player_name || 'Player'}</p>
                             <p className="text-xs text-medium-text">{booking.facility_name} at {booking.venue_name}</p>
+
                           </div>
                           <p className="text-sm font-bold text-primary-green">
                             {format(new Date(booking.start_time), 'p')}

@@ -4,10 +4,8 @@ import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
 import { FaRupeeSign, FaCalendarCheck, FaCalculator, FaList, FaUsers, FaBuilding } from "react-icons/fa";
 import { format, subDays } from "date-fns";
-import { FiLoader, FiAlertCircle } from "react-icons/fi";
+import { FiAlertCircle } from "react-icons/fi"; // FiLoader is removed
 import { formatCurrency } from "../../utils/formatters";
-
-// --- Import new components ---
 import {
   BarChart,
   Bar,
@@ -21,9 +19,13 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import DownloadReportButton from "../../components/common/DownloadReportButton"; // <-- 1. IMPORT
+import DownloadReportButton from "../../components/common/DownloadReportButton";
 
-// ... (All helper functions and StatCard component are unchanged) ...
+// Skeleton imports
+import useSkeletonLoader from "../../hooks/useSkeletonLoader";
+import { ReportPageSkeleton } from "../../components/skeletons/owner";
+
+// --- Helper Components (Unchanged) ---
 const getLocalDateString = (date) => {
   const offset = date.getTimezoneOffset();
   const adjustedDate = new Date(date.getTime() - offset * 60 * 1000);
@@ -64,7 +66,7 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
     </text>
   );
 };
-// ... (End of unchanged components) ...
+// --- End Helper Components ---
 
 
 function ReportsPage() {
@@ -72,6 +74,7 @@ function ReportsPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const showContent = useSkeletonLoader(loading);
   
   const [dateRangePreset, setDateRangePreset] = useState('7d');
   
@@ -80,7 +83,7 @@ function ReportsPage() {
   const [venues, setVenues] = useState([]);
   const [selectedVenueId, setSelectedVenueId] = useState('');
 
-  // ... (All useEffects are unchanged) ...
+  // --- Data Fetching Hooks (Unchanged) ---
   useEffect(() => {
     async function fetchOwnerVenues() {
       if (!user) return;
@@ -139,17 +142,15 @@ function ReportsPage() {
     }
     fetchReportData();
   }, [user, startDate, endDate, selectedVenueId]);
-  // ... (End of unchanged useEffects) ...
+  // --- End Data Fetching Hooks ---
 
 
-  return (
-    <div className="bg-background min-h-screen">
-      <div className="max-w-7xl mx-auto p-4 md:p-8">
-        <h1 className="text-4xl font-bold text-primary-green-dark mb-8">
-          Reports
-        </h1>
+  // --- CORRECTED RENDER LOGIC ---
 
-        {error && (
+  if (error) {
+    return (
+      <div className="bg-background min-h-screen">
+        <div className="max-w-7xl mx-auto p-4 md:p-8">
           <div className="mb-6 bg-red-50 border border-red-200 text-red-700 p-6 rounded-xl flex items-center space-x-4">
             <FiAlertCircle className="h-8 w-8 text-red-500" />
             <div>
@@ -157,11 +158,26 @@ function ReportsPage() {
               <p className="text-sm">{error}</p>
             </div>
           </div>
-        )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!showContent) {
+    return <ReportPageSkeleton />;
+  }
+  
+  // --- Page Content (with fade-in added) ---
+  return (
+    // --- THIS IS THE LINE TO CHANGE ---
+    <div className="bg-background min-h-screen animate-fadeIn"> 
+      <div className="max-w-7xl mx-auto p-4 md:p-8">
+        <h1 className="text-4xl font-bold text-primary-green-dark mb-8">
+          Reports
+        </h1>
 
         {/* Stat Cards Grid (Unchanged) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* ... StatCards (unchanged) ... */}
           <StatCard
             title="Total Revenue"
             value={formatCurrency(stats?.total_revenue || 0)}
@@ -189,17 +205,16 @@ function ReportsPage() {
           />
         </div>
 
-        {/* Main Content Card (White) */}
+        {/* Main Content Card (Unchanged) */}
         <div className="bg-card-bg border border-border-color-light rounded-xl shadow-lg overflow-hidden">
           
-          {/* Header and Date Pickers */}
+          {/* Header and Date Pickers (Unchanged) */}
           <div className="p-6 border-b border-border-color-light space-y-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
               <h2 className="text-xl font-bold text-primary-green-dark mb-4 md:mb-0">
                 Revenue by Venue
               </h2>
               
-              {/* Date Preset Buttons */}
               <div className="flex items-center gap-2 flex-wrap">
                 {Object.entries(PRESETS).map(([key, label]) => (
                   <button
@@ -218,9 +233,7 @@ function ReportsPage() {
               </div>
             </div>
 
-            {/* --- MODIFIED: Added Download Button --- */}
             <div className="flex flex-col md:flex-row gap-4 w-full items-end">
-              {/* Venue Dropdown */}
               <div className="w-full md:w-auto md:flex-grow lg:flex-grow-0 lg:w-48">
                 <label htmlFor="venueSelect" className="block text-sm font-medium text-medium-text mb-1">Venue</label>
                 <select
@@ -238,7 +251,6 @@ function ReportsPage() {
                 </select>
               </div>
 
-              {/* Conditional Custom Date Pickers */}
               {dateRangePreset === 'custom' && (
                 <>
                   <div className="w-full md:w-auto">
@@ -264,7 +276,6 @@ function ReportsPage() {
                 </>
               )}
 
-              {/* --- 2. ADD THE BUTTON --- */}
               <div className="md:ml-auto">
                 <DownloadReportButton
                   startDate={startDate}
@@ -272,70 +283,64 @@ function ReportsPage() {
                   selectedVenueId={selectedVenueId}
                 />
               </div>
-
             </div>
           </div>
 
-          {/* ... (Table Container and Visualization Section are unchanged) ... */}
-          {loading ? (
-            <div className="h-60 flex justify-center items-center">
-              <FiLoader className="animate-spin text-primary-green h-8 w-8" />
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              {stats?.venue_revenue && stats.venue_revenue.length > 0 ? (
-                <table className="min-w-full divide-y divide-border-color-light">
-                  <thead className="bg-hover-bg">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-medium-text uppercase tracking-wider">
-                        Venue
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-medium-text uppercase tracking-wider">
-                        Bookings
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-medium-text uppercase tracking-wider">
-                        Revenue
-                      </th>
+          {/* Table (Now correctly renders without the old FiLoader) */}
+          <div className="overflow-x-auto">
+            {stats?.venue_revenue && stats.venue_revenue.length > 0 ? (
+              <table className="min-w-full divide-y divide-border-color-light">
+                <thead className="bg-hover-bg">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-medium-text uppercase tracking-wider">
+                      Venue
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-medium-text uppercase tracking-wider">
+                      Bookings
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-medium-text uppercase tracking-wider">
+                      Revenue
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-card-bg divide-y divide-border-color-light">
+                  {stats.venue_revenue.map((venue) => (
+                    <tr key={venue.venue_id} className="hover:bg-hover-bg">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm font-medium text-dark-text">
+                          {venue.name}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-medium-text">
+                          {venue.bookings}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm font-medium text-dark-text">
+                          {formatCurrency(venue.revenue)}
+                        </span>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="bg-card-bg divide-y divide-border-color-light">
-                    {stats.venue_revenue.map((venue) => (
-                      <tr key={venue.venue_id} className="hover:bg-hover-bg">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-medium text-dark-text">
-                            {venue.name}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-medium-text">
-                            {venue.bookings}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-medium text-dark-text">
-                            {formatCurrency(venue.revenue)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="h-40 flex flex-col items-center justify-center text-medium-text">
-                  <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
-                    <FaList className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <p className="font-medium">No venue data for this period</p>
-                  <p className="text-sm text-light-text">
-                    Venue performance will be listed here.
-                  </p>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="h-40 flex flex-col items-center justify-center text-medium-text">
+                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                  <FaList className="w-8 h-8 text-gray-400" />
                 </div>
-              )}
-            </div>
-          )}
+                <p className="font-medium">No venue data for this period</p>
+                <p className="text-sm text-light-text">
+                  Venue performance will be listed here.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
-        {!loading && stats?.venue_revenue && stats.venue_revenue.length > 0 && (
+        {/* Visualizations (Unchanged) */}
+        {stats?.venue_revenue && stats.venue_revenue.length > 0 && (
           <div className="mt-8">
             <h2 className="text-2xl font-bold text-primary-green-dark mb-4">
               Visualizations

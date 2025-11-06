@@ -1,12 +1,18 @@
-// src/pages/owner/ManageOffersPage.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
 import { useModal } from "../../ModalContext";
 import toast from 'react-hot-toast';
 import { FaPlus, FaTicketAlt } from "react-icons/fa";
+import { FiAlertCircle } from "react-icons/fi"; // <-- IMPORT ADDED
 import OwnerOfferCard from "../../components/offers/OwnerOfferCard";
 import OfferForm from "../../components/offers/OfferForm";
+
+// --- SKELETON IMPORTS ADDED ---
+import useSkeletonLoader from "../../hooks/useSkeletonLoader";
+// Using MyVenuesPageSkeleton as it's a grid of cards
+import { MyVenuesPageSkeleton } from "../../components/skeletons/owner"; 
+// --- END SKELETON IMPORTS ---
 
 function ManageOffersPage() {
   const { user, profile } = useAuth(); // Get the user's profile
@@ -15,6 +21,9 @@ function ManageOffersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [formState, setFormState] = useState({ isOpen: false, offer: null });
+
+  // --- SKELETON HOOK ADDED ---
+  const showContent = useSkeletonLoader(loading);
 
   const fetchOffers = useCallback(async () => {
     // ... fetch logic remains the same
@@ -51,6 +60,7 @@ function ManageOffersPage() {
     fetchOffers();
   }, [fetchOffers]);
 
+  // --- All handler functions (handleAddNew, handleEdit, handleSave, etc.) are unchanged ---
   const handleAddNew = () => {
     setFormState({ isOpen: true, offer: null });
   };
@@ -111,35 +121,31 @@ function ManageOffersPage() {
       );
     }
   };
+  // --- End of handler functions ---
 
-  if (loading) {
-    /* ... */
-  }
+
+  // --- RENDER LOGIC UPDATED ---
+
   if (error) {
-    /* ... */
-  }
-
-  // Re-paste loading/error states
-  if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-green mx-auto mb-4"></div>
-          <p className="text-medium-text text-lg">Loading your offers...</p>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-xl flex items-center space-x-4 max-w-md mx-auto">
+          <FiAlertCircle className="h-8 w-8 text-red-500" />
+          <div>
+            <p className="font-bold text-lg">Error Loading Offers</p>
+            <p className="text-sm">{error}</p>
+          </div>
         </div>
       </div>
     );
   }
-  if (error) {
-    return (
-      <p className="container mx-auto text-center p-12 text-red-600">
-        Error: {error}
-      </p>
-    );
+  
+  if (!showContent) {
+    return <MyVenuesPageSkeleton />; // Using MyVenuesPageSkeleton as a substitute
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background animate-fadeIn">
       <div className="container mx-auto px-4 py-12">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-dark-text">Manage Offers</h1>
