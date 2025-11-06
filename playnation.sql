@@ -1070,7 +1070,7 @@ ALTER FUNCTION public.get_explore_page_venues() OWNER TO postgres;
 --
 
 CREATE FUNCTION public.get_favorite_venues(p_user_id uuid) RETURNS TABLE(venue_id uuid, name character varying, booking_count bigint)
-    LANGUAGE sql SECURITY DEFINER
+    LANGUAGE sql
     AS $$
   SELECT
     v.venue_id,
@@ -1760,6 +1760,361 @@ $$;
 ALTER FUNCTION public.get_owner_report_stats(p_start_date date, p_end_date date) OWNER TO postgres;
 
 --
+-- Name: get_owner_report_stats(uuid, date, date); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_owner_report_stats(p_owner_id uuid, p_start_date date, p_end_date date) RETURNS json
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+    -- *** THIS IS THE FIX ***
+    v_owner_id uuid := p_owner_id; -- Use the parameter, not auth.uid()
+    -- *** END OF FIX ***
+    
+    result_json json;
+BEGIN
+    WITH 
+    owner_venues AS (
+      SELECT venue_id, name 
+      FROM public.venues 
+      WHERE owner_id = v_owner_id
+    ),
+    
+    -- Get bookings within the date range
+    bookings_in_range AS (
+      SELECT 
+        f.venue_id,
+        b.total_amount
+      FROM public.bookings b
+      JOIN public.facilities f ON b.facility_id = f.facility_id
+      WHERE f.venue_id IN (SELECT venue_id FROM owner_venues)
+        AND b.start_time::date >= p_start_date
+        AND b.start_time::date <= p_end_date
+        AND b.status IN ('confirmed', 'completed')
+    ),
+    
+    -- Aggregate revenue by venue
+    venue_revenue_agg AS (
+      SELECT
+        ov.venue_id,
+        ov.name,
+        COUNT(b.venue_id) AS bookings,
+        COALESCE(SUM(b.total_amount), 0) AS revenue
+      FROM owner_venues ov
+      LEFT JOIN bookings_in_range b ON ov.venue_id = b.venue_id
+      GROUP BY ov.venue_id, ov.name
+    )
+
+    -- Build the final JSON object
+    SELECT json_build_object(
+        'total_revenue', (SELECT COALESCE(SUM(revenue), 0) FROM venue_revenue_agg),
+        'total_bookings', (SELECT COALESCE(SUM(bookings), 0) FROM venue_revenue_agg),
+        
+        'avg_booking_value', (
+            SELECT CASE 
+                WHEN SUM(bookings) > 0 THEN SUM(revenue) / SUM(bookings)
+                ELSE 0
+            END
+            FROM venue_revenue_agg
+        ),
+        
+        'venue_revenue', (SELECT COALESCE(json_agg(vra), '[]'::json) FROM venue_revenue_agg vra)
+    )
+    INTO result_json;
+    
+    RETURN result_json;
+END;
+$$;
+
+
+ALTER FUNCTION public.get_owner_report_stats(p_owner_id uuid, p_start_date date, p_end_date date) OWNER TO postgres;
+
+--
+-- Name: get_owner_report_stats(uuid, date, date, uuid[]); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_owner_report_stats(p_owner_id uuid, p_start_date date, p_end_date date, p_venue_ids uuid[] DEFAULT NULL::uuid[]) RETURNS json
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+    v_owner_id uuid := p_owner_id;
+    result_json json;
+BEGIN
+    WITH 
+    owner_venues AS (
+      SELECT venue_id, name 
+      FROM public.venues 
+      WHERE owner_id = v_owner_id
+        -- *** THIS IS THE NEW LOGIC ***
+        AND (
+          p_venue_ids IS NULL 
+          OR venue_id = ANY(p_venue_ids)
+        )
+        -- *** END OF NEW LOGIC ***
+    ),
+    
+    bookings_in_range AS (
+      SELECT 
+        f.venue_id,
+        b.total_amount
+      FROM public.bookings b
+      JOIN public.facilities f ON b.facility_id = f.facility_id
+      WHERE f.venue_id IN (SELECT venue_id FROM owner_venues)
+        AND b.start_time::date >= p_start_date
+        AND b.start_time::date <= p_end_date
+        AND b.status IN ('confirmed', 'completed')
+    ),
+    
+    venue_revenue_agg AS (
+      SELECT
+        ov.venue_id,
+        ov.name,
+        COUNT(b.venue_id) AS bookings,
+        COALESCE(SUM(b.total_amount), 0) AS revenue
+      FROM owner_venues ov
+      LEFT JOIN bookings_in_range b ON ov.venue_id = b.venue_id
+      GROUP BY ov.venue_id, ov.name
+    )
+
+    SELECT json_build_object(
+        'total_revenue', (SELECT COALESCE(SUM(revenue), 0) FROM venue_revenue_agg),
+        'total_bookings', (SELECT COALESCE(SUM(bookings), 0) FROM venue_revenue_agg),
+        
+        'avg_booking_value', (
+            SELECT CASE 
+                WHEN SUM(bookings) > 0 THEN SUM(revenue) / SUM(bookings)
+                ELSE 0
+            END
+            FROM venue_revenue_agg
+        ),
+        
+        'venue_revenue', (SELECT COALESCE(json_agg(vra), '[]'::json) FROM venue_revenue_agg vra)
+    )
+    INTO result_json;
+    
+    RETURN result_json;
+END;
+$$;
+
+
+ALTER FUNCTION public.get_owner_report_stats(p_owner_id uuid, p_start_date date, p_end_date date, p_venue_ids uuid[]) OWNER TO postgres;
+
+--
+-- Name: get_owner_today_dashboard(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_owner_today_dashboard() RETURNS json
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+    v_owner_id uuid := auth.uid(); -- This will now work correctly
+    v_today_start timestamptz := DATE_TRUNC('day', NOW() AT TIME ZONE 'Asia/Kolkata');
+    v_today_end timestamptz := v_today_start + INTERVAL '1 day';
+    result_json json;
+BEGIN
+    WITH 
+    owner_venues AS (
+      SELECT venue_id FROM public.venues WHERE owner_id = v_owner_id
+    ),
+    
+    today_bookings AS (
+      SELECT b.total_amount, b.start_time
+      FROM public.bookings b
+      JOIN public.facilities f ON b.facility_id = f.facility_id
+      WHERE f.venue_id IN (SELECT venue_id FROM owner_venues)
+        AND b.start_time >= v_today_start
+        AND b.start_time < v_today_end
+        AND b.status IN ('confirmed', 'completed')
+    ),
+
+    hours AS (
+        SELECT generate_series(0, 23) AS hour
+    ),
+    
+    hourly_trend AS (
+      SELECT 
+        h.hour AS hour_of_day,
+        COALESCE(SUM(tb.total_amount), 0) AS revenue
+      FROM hours h
+      LEFT JOIN today_bookings tb ON EXTRACT(HOUR FROM tb.start_time AT TIME ZONE 'Asia/Kolkata') = h.hour
+      GROUP BY h.hour
+      ORDER BY h.hour
+    ),
+
+    upcoming_list AS (
+      SELECT 
+        b.booking_id,
+        b.start_time,
+        (SELECT first_name || ' ' || last_name FROM users WHERE user_id = b.user_id) AS player_name,
+        f.name AS facility_name,
+        v.name AS venue_name
+      FROM public.bookings b
+      JOIN public.facilities f ON b.facility_id = f.facility_id
+      JOIN public.venues v ON f.venue_id = v.venue_id
+      WHERE f.venue_id IN (SELECT venue_id FROM owner_venues)
+        AND b.start_time >= NOW()
+        AND b.start_time < v_today_end
+        AND b.status = 'confirmed'
+      ORDER BY b.start_time ASC
+      LIMIT 5
+    )
+
+    -- Build the final JSON object
+    SELECT json_build_object(
+        'today_revenue', (SELECT COALESCE(SUM(total_amount), 0) FROM today_bookings),
+        'today_bookings_count', (SELECT COUNT(*) FROM today_bookings),
+        
+        'upcoming_bookings_count_total', (
+            SELECT COUNT(*)
+            FROM public.bookings b
+            JOIN public.facilities f ON b.facility_id = f.facility_id
+            WHERE f.venue_id IN (SELECT venue_id FROM owner_venues)
+              AND b.start_time > NOW()
+              AND b.status = 'confirmed'
+        ),
+        
+        'hourly_revenue_trend', (SELECT COALESCE(json_agg(ht), '[]'::json) FROM hourly_trend ht),
+        'upcoming_bookings_list', (SELECT COALESCE(json_agg(ul), '[]'::json) FROM upcoming_list ul),
+
+        'today_cancellations', (
+            SELECT COUNT(*)
+            FROM public.bookings b
+            JOIN public.facilities f ON b.facility_id = f.facility_id
+            WHERE f.venue_id IN (SELECT venue_id FROM owner_venues)
+              AND b.status = 'cancelled'
+              AND b.updated_at >= v_today_start
+              AND b.updated_at < v_today_end
+        ),
+            
+        'today_new_reviews', (
+            SELECT COUNT(*)
+            FROM public.reviews r
+            WHERE r.venue_id IN (SELECT venue_id FROM owner_venues)
+              AND r.created_at >= v_today_start
+              AND r.created_at < v_today_end
+        )
+    )
+    INTO result_json;
+    
+    RETURN result_json;
+END;
+$$;
+
+
+ALTER FUNCTION public.get_owner_today_dashboard() OWNER TO postgres;
+
+--
+-- Name: get_owner_today_dashboard(uuid); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_owner_today_dashboard(p_owner_id uuid) RETURNS json
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+    -- *** THIS IS THE FIX ***
+    v_owner_id uuid := p_owner_id; -- Use the parameter, not auth.uid()
+    -- *** END OF FIX ***
+    
+    v_today_start timestamptz := DATE_TRUNC('day', NOW() AT TIME ZONE 'Asia/Kolkata');
+    v_today_end timestamptz := v_today_start + INTERVAL '1 day';
+    result_json json;
+BEGIN
+    WITH 
+    owner_venues AS (
+      SELECT venue_id FROM public.venues WHERE owner_id = v_owner_id
+    ),
+    
+    today_bookings AS (
+      SELECT b.total_amount, b.start_time
+      FROM public.bookings b
+      JOIN public.facilities f ON b.facility_id = f.facility_id
+      WHERE f.venue_id IN (SELECT venue_id FROM owner_venues)
+        AND b.start_time >= v_today_start
+        AND b.start_time < v_today_end
+        AND b.status IN ('confirmed', 'completed')
+    ),
+
+    hours AS (
+        SELECT generate_series(0, 23) AS hour
+    ),
+    
+    hourly_trend AS (
+      SELECT 
+        h.hour AS hour_of_day,
+        COALESCE(SUM(tb.total_amount), 0) AS revenue
+      FROM hours h
+      LEFT JOIN today_bookings tb ON EXTRACT(HOUR FROM tb.start_time AT TIME ZONE 'Asia/Kolkata') = h.hour
+      GROUP BY h.hour
+      ORDER BY h.hour
+    ),
+
+    upcoming_list AS (
+      SELECT 
+        b.booking_id,
+        b.start_time,
+        (SELECT first_name || ' ' || last_name FROM users WHERE user_id = b.user_id) AS player_name,
+        f.name AS facility_name,
+        v.name AS venue_name
+      FROM public.bookings b
+      JOIN public.facilities f ON b.facility_id = f.facility_id
+      JOIN public.venues v ON f.venue_id = v.venue_id
+      WHERE f.venue_id IN (SELECT venue_id FROM owner_venues)
+        AND b.start_time >= NOW()
+        AND b.start_time < v_today_end
+        AND b.status = 'confirmed'
+      ORDER BY b.start_time ASC
+      LIMIT 5
+    )
+
+    -- Build the final JSON object
+    SELECT json_build_object(
+        'today_revenue', (SELECT COALESCE(SUM(total_amount), 0) FROM today_bookings),
+        'today_bookings_count', (SELECT COUNT(*) FROM today_bookings),
+        
+        'upcoming_bookings_count_total', (
+            SELECT COUNT(*)
+            FROM public.bookings b
+            JOIN public.facilities f ON b.facility_id = f.facility_id
+            WHERE f.venue_id IN (SELECT venue_id FROM owner_venues)
+              AND b.start_time > NOW()
+              AND b.status = 'confirmed'
+        ),
+        
+        'hourly_revenue_trend', (SELECT COALESCE(json_agg(ht), '[]'::json) FROM hourly_trend ht),
+        'upcoming_bookings_list', (SELECT COALESCE(json_agg(ul), '[]'::json) FROM upcoming_list ul),
+
+        'today_cancellations', (
+            SELECT COUNT(*)
+            FROM public.bookings b
+            JOIN public.facilities f ON b.facility_id = f.facility_id
+            WHERE f.venue_id IN (SELECT venue_id FROM owner_venues)
+              AND b.status = 'cancelled'
+              AND b.updated_at >= v_today_start
+              AND b.updated_at < v_today_end
+        ),
+            
+        'today_new_reviews', (
+            SELECT COUNT(*)
+            FROM public.reviews r
+            WHERE r.venue_id IN (SELECT venue_id FROM owner_venues)
+              AND r.created_at >= v_today_start
+              AND r.created_at < v_today_end
+        )
+    )
+    INTO result_json;
+    
+    RETURN result_json;
+END;
+$$;
+
+
+ALTER FUNCTION public.get_owner_today_dashboard(p_owner_id uuid) OWNER TO postgres;
+
+--
 -- Name: get_owner_venues_details(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -1807,6 +2162,102 @@ $$;
 
 
 ALTER FUNCTION public.get_owner_venues_details() OWNER TO postgres;
+
+--
+-- Name: get_player_dashboard_stats(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_player_dashboard_stats() RETURNS jsonb
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+    result_json jsonb;
+    v_user_id uuid := auth.uid();
+BEGIN
+    SELECT jsonb_build_object(
+        
+        'upcoming_bookings_count', (
+            SELECT COUNT(*)
+            FROM public.bookings
+            WHERE user_id = v_user_id
+              AND status = 'confirmed'
+              AND start_time > NOW()
+        ),
+        
+        'favorite_venues', (
+            SELECT jsonb_agg(fav_venues)
+            FROM (
+                SELECT *
+                FROM public.get_favorite_venues(v_user_id)
+            ) as fav_venues
+        ),
+        
+        'credit_balance', (
+            SELECT credit_balance
+            FROM public.users
+            WHERE user_id = v_user_id
+        ),
+        
+        'total_bookings_count', (
+            SELECT COUNT(*)
+            FROM public.bookings
+            WHERE user_id = v_user_id
+              AND status IN ('confirmed', 'completed')
+        ),
+        
+        'total_spent', (
+            SELECT COALESCE(SUM(total_amount), 0)
+            FROM public.bookings
+            WHERE user_id = v_user_id
+              AND status IN ('confirmed', 'completed')
+        ),
+
+        'upcoming_bookings_list', (
+            SELECT jsonb_agg(upcoming)
+            FROM (
+                SELECT 
+                    b.booking_id,
+                    b.start_time,
+                    b.total_amount,
+                    v.name as venue_name,
+                    f.name as facility_name
+                FROM 
+                    public.bookings b
+                JOIN 
+                    public.facilities f ON b.facility_id = f.facility_id
+                JOIN 
+                    public.venues v ON f.venue_id = v.venue_id
+                WHERE 
+                    b.user_id = v_user_id
+                    AND b.status = 'confirmed'
+                    AND b.start_time > NOW()
+                ORDER BY 
+                    b.start_time ASC
+                LIMIT 3
+            ) as upcoming
+        ),
+
+        'most_played_sport', (
+            SELECT s.name
+            FROM public.bookings b
+            JOIN public.facilities f ON b.facility_id = f.facility_id
+            JOIN public.sports s ON f.sport_id = s.sport_id
+            WHERE b.user_id = v_user_id
+              AND b.status IN ('completed', 'confirmed')
+            GROUP BY s.name
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        )
+    )
+    INTO result_json;
+    
+    RETURN result_json;
+END;
+$$;
+
+
+ALTER FUNCTION public.get_player_dashboard_stats() OWNER TO postgres;
 
 --
 -- Name: get_public_profiles_for_owner(uuid[]); Type: FUNCTION; Schema: public; Owner: postgres
@@ -4084,7 +4535,8 @@ CREATE TABLE auth.mfa_factors (
     phone text,
     last_challenged_at timestamp with time zone,
     web_authn_credential jsonb,
-    web_authn_aaguid uuid
+    web_authn_aaguid uuid,
+    last_webauthn_challenge_data jsonb
 );
 
 
@@ -4095,6 +4547,13 @@ ALTER TABLE auth.mfa_factors OWNER TO supabase_auth_admin;
 --
 
 COMMENT ON TABLE auth.mfa_factors IS 'auth: stores metadata about factors';
+
+
+--
+-- Name: COLUMN mfa_factors.last_webauthn_challenge_data; Type: COMMENT; Schema: auth; Owner: supabase_auth_admin
+--
+
+COMMENT ON COLUMN auth.mfa_factors.last_webauthn_challenge_data IS 'Stores the latest WebAuthn challenge data including attestation/assertion for customer verification';
 
 
 --
@@ -4328,7 +4787,9 @@ CREATE TABLE auth.sessions (
     user_agent text,
     ip inet,
     tag text,
-    oauth_client_id uuid
+    oauth_client_id uuid,
+    refresh_token_hmac_key text,
+    refresh_token_counter bigint
 );
 
 
@@ -4346,6 +4807,20 @@ COMMENT ON TABLE auth.sessions IS 'Auth: Stores session data associated to a use
 --
 
 COMMENT ON COLUMN auth.sessions.not_after IS 'Auth: Not after is a nullable column that contains a timestamp after which the session should be regarded as expired.';
+
+
+--
+-- Name: COLUMN sessions.refresh_token_hmac_key; Type: COMMENT; Schema: auth; Owner: supabase_auth_admin
+--
+
+COMMENT ON COLUMN auth.sessions.refresh_token_hmac_key IS 'Holds a HMAC-SHA256 key used to sign refresh tokens for this session.';
+
+
+--
+-- Name: COLUMN sessions.refresh_token_counter; Type: COMMENT; Schema: auth; Owner: supabase_auth_admin
+--
+
+COMMENT ON COLUMN auth.sessions.refresh_token_counter IS 'Holds the ID (counter) of the last issued refresh token.';
 
 
 --
@@ -7129,6 +7604,42 @@ COPY auth.audit_log_entries (instance_id, id, payload, created_at, ip_address) F
 00000000-0000-0000-0000-000000000000	0c69d4e4-cfb6-413a-8037-e938913af810	{"action":"login","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 08:28:53.740117+00	
 00000000-0000-0000-0000-000000000000	d68b1a8d-67b9-4fc4-a9ab-523999e6933c	{"action":"logout","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-05 08:29:24.931959+00	
 00000000-0000-0000-0000-000000000000	4a155181-0099-4448-922b-f86bfac39436	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 08:29:29.494828+00	
+00000000-0000-0000-0000-000000000000	5394d3d9-f772-482b-a8e7-2620d085fcfa	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 09:50:34.052277+00	
+00000000-0000-0000-0000-000000000000	b0b64759-bb68-40a6-b71d-bee36d71b9f6	{"action":"token_refreshed","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-05 10:49:02.188715+00	
+00000000-0000-0000-0000-000000000000	62c84310-0050-4377-8ccf-f46ad42cd16b	{"action":"token_revoked","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-05 10:49:02.219786+00	
+00000000-0000-0000-0000-000000000000	5f6d713f-4163-40d6-afc6-4f9c0d8df1f9	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-05 10:49:55.139053+00	
+00000000-0000-0000-0000-000000000000	f7109972-12cc-4484-b016-4954ceed385a	{"action":"login","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 10:50:14.580272+00	
+00000000-0000-0000-0000-000000000000	411a5fcf-1545-4f9b-951a-9aa50e377646	{"action":"logout","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-05 10:52:53.918071+00	
+00000000-0000-0000-0000-000000000000	0da16a9f-44ff-4a1c-9f63-8fa0ebfb6415	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 10:53:01.33191+00	
+00000000-0000-0000-0000-000000000000	46d0ce14-823a-4fb7-aaf5-d51545c09809	{"action":"token_refreshed","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-05 11:52:45.743331+00	
+00000000-0000-0000-0000-000000000000	464c6d8e-f4fd-4f90-8fa2-ee41259f7883	{"action":"token_revoked","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-05 11:52:45.768455+00	
+00000000-0000-0000-0000-000000000000	278b2974-1e3d-462e-a1da-3891dee42ab3	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-05 12:40:24.260194+00	
+00000000-0000-0000-0000-000000000000	d88d726b-2cca-4edf-8433-f7de5e281be9	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 12:42:43.529516+00	
+00000000-0000-0000-0000-000000000000	6bcb3194-a2b6-423e-a943-9f3cfeff0a65	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-05 13:04:38.501287+00	
+00000000-0000-0000-0000-000000000000	4ac79813-3adf-48bc-a37d-ae7a493e07c5	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 13:04:47.17938+00	
+00000000-0000-0000-0000-000000000000	c1b17796-f77a-4722-904c-f37df9290738	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-05 13:06:40.95361+00	
+00000000-0000-0000-0000-000000000000	8e5cecb9-0dae-4108-98ab-98b0f71ef26a	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 13:06:46.133925+00	
+00000000-0000-0000-0000-000000000000	38f7df8b-52ab-437e-86e6-f05c7ed80fd8	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-05 13:37:24.353976+00	
+00000000-0000-0000-0000-000000000000	a0f9725b-5e9f-4baa-ac8c-c13766dcaf0e	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 13:37:31.811971+00	
+00000000-0000-0000-0000-000000000000	cda44312-2b10-4796-a960-d6309d638133	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 13:52:03.170399+00	
+00000000-0000-0000-0000-000000000000	bc1115c0-08d7-410f-8741-b113c2cce9ac	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-05 13:52:43.036177+00	
+00000000-0000-0000-0000-000000000000	8faabc0e-290e-48f8-89e0-15a182bbf398	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 13:53:55.832182+00	
+00000000-0000-0000-0000-000000000000	bc8784b0-cd1e-44c8-b5b4-7e93e8a51642	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 14:16:42.467872+00	
+00000000-0000-0000-0000-000000000000	914db03e-60c1-47e1-9e06-5b1b4c1ba161	{"action":"token_refreshed","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-05 15:24:39.15439+00	
+00000000-0000-0000-0000-000000000000	6cf43a8a-f8bd-46d6-91e0-d054ae4024c3	{"action":"token_revoked","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-05 15:24:39.1652+00	
+00000000-0000-0000-0000-000000000000	621366cb-31de-448a-b17b-9155c83ff57a	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-05 15:28:58.889775+00	
+00000000-0000-0000-0000-000000000000	a25f7982-84ee-4c41-9a98-653345b7532b	{"action":"login","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 15:29:03.641775+00	
+00000000-0000-0000-0000-000000000000	4526b6ad-afa5-49cb-8c16-f00a5546f02e	{"action":"logout","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-05 15:29:14.062182+00	
+00000000-0000-0000-0000-000000000000	36c179b0-7395-41ff-91ce-c77efb6f3217	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 15:29:17.528989+00	
+00000000-0000-0000-0000-000000000000	82a91671-41d0-458f-a606-87107f555df0	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-05 16:12:25.960158+00	
+00000000-0000-0000-0000-000000000000	4f790621-8a7c-4070-8ede-e57cba055a9e	{"action":"login","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 16:12:30.831993+00	
+00000000-0000-0000-0000-000000000000	23f3b6eb-781e-4f3d-9935-b3cae261c273	{"action":"logout","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-05 16:32:26.618029+00	
+00000000-0000-0000-0000-000000000000	80235680-3e6a-478d-b7bd-72972b4e5eb2	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 16:32:31.231288+00	
+00000000-0000-0000-0000-000000000000	8086d34b-382b-4a39-a5a0-55381080a466	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-05 19:43:58.692144+00	
+00000000-0000-0000-0000-000000000000	2202c8e7-8e06-4acc-86d6-4688f677a563	{"action":"token_refreshed","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-06 08:30:45.945931+00	
+00000000-0000-0000-0000-000000000000	5e33a545-d77d-41f3-92c2-8329ef998f0f	{"action":"token_revoked","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-06 08:30:45.974947+00	
+00000000-0000-0000-0000-000000000000	4a08bf91-48b9-45c7-a951-5721de28d403	{"action":"token_refreshed","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-06 09:29:54.448712+00	
+00000000-0000-0000-0000-000000000000	b9d1695e-18d7-428b-bda0-33a6b55c30ed	{"action":"token_revoked","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-06 09:29:54.466674+00	
 \.
 
 
@@ -7171,10 +7682,11 @@ COPY auth.instances (id, uuid, raw_base_config, created_at, updated_at) FROM std
 
 COPY auth.mfa_amr_claims (session_id, created_at, updated_at, authentication_method, id) FROM stdin;
 55477ad7-df17-4491-b802-2a9c75180ff6	2025-11-04 10:38:21.579462+00	2025-11-04 10:38:21.579462+00	password	4d9d4f64-5384-404b-af35-5598c22e05b1
-e5c7f29d-8adf-4350-bace-f8c5470ac693	2025-11-05 06:49:12.243091+00	2025-11-05 06:49:12.243091+00	password	b8222668-c7db-4277-b1e7-ab065000189c
-014a6dc3-e426-43cc-b824-dd61c588b32d	2025-11-05 08:29:29.503769+00	2025-11-05 08:29:29.503769+00	password	60cb3822-9fdb-4fb4-9d91-8e00cbfe2537
+26449ece-9642-4715-8db6-f43444408668	2025-11-05 14:16:42.545727+00	2025-11-05 14:16:42.545727+00	password	3bd863c3-2ed8-43ca-84be-401d6be7202e
+d4f8e905-20a5-45e0-9bdc-3fb705f655e1	2025-11-05 16:32:31.254253+00	2025-11-05 16:32:31.254253+00	password	1de3d126-5070-445d-9954-8e0c8e0e6262
 b3b2f7ba-a681-4b11-a231-7da00d6b6c7b	2025-11-04 07:39:32.63513+00	2025-11-04 07:39:32.63513+00	password	ef124ae3-96d2-4b3c-8231-7f114f797233
 21146abb-202e-40d6-883f-3b753ad01ffc	2025-11-04 07:44:15.985962+00	2025-11-04 07:44:15.985962+00	password	84eac673-97e7-4684-b168-de9c317f6fff
+478f262c-86df-431b-b8f5-9e4099bbef9b	2025-11-05 19:43:58.793395+00	2025-11-05 19:43:58.793395+00	password	bd1017ed-9d5b-4380-a9a6-93a58c67b0ff
 \.
 
 
@@ -7190,7 +7702,7 @@ COPY auth.mfa_challenges (id, factor_id, created_at, verified_at, ip_address, ot
 -- Data for Name: mfa_factors; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
 --
 
-COPY auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at, secret, phone, last_challenged_at, web_authn_credential, web_authn_aaguid) FROM stdin;
+COPY auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at, secret, phone, last_challenged_at, web_authn_credential, web_authn_aaguid, last_webauthn_challenge_data) FROM stdin;
 \.
 
 
@@ -7231,11 +7743,14 @@ COPY auth.one_time_tokens (id, user_id, token_type, token_hash, relates_to, crea
 --
 
 COPY auth.refresh_tokens (instance_id, id, token, user_id, revoked, created_at, updated_at, parent, session_id) FROM stdin;
-00000000-0000-0000-0000-000000000000	1029	w4p2lcpeooal	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f	2025-11-05 06:49:12.240782+00	2025-11-05 06:49:12.240782+00	\N	e5c7f29d-8adf-4350-bace-f8c5470ac693
-00000000-0000-0000-0000-000000000000	1031	2jz3ty2cczav	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f	2025-11-05 08:29:29.500653+00	2025-11-05 08:29:29.500653+00	\N	014a6dc3-e426-43cc-b824-dd61c588b32d
 00000000-0000-0000-0000-000000000000	989	46i6vzggp66f	8445e8b1-719d-438b-a533-bbf251d5744e	f	2025-11-04 07:39:32.610195+00	2025-11-04 07:39:32.610195+00	\N	b3b2f7ba-a681-4b11-a231-7da00d6b6c7b
 00000000-0000-0000-0000-000000000000	990	4qrd2rwejesr	2f0354fd-905b-4cea-9f87-0b66457b20e7	f	2025-11-04 07:44:15.977412+00	2025-11-04 07:44:15.977412+00	\N	21146abb-202e-40d6-883f-3b753ad01ffc
+00000000-0000-0000-0000-000000000000	1043	fvyarojestci	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f	2025-11-05 14:16:42.511998+00	2025-11-05 14:16:42.511998+00	\N	26449ece-9642-4715-8db6-f43444408668
 00000000-0000-0000-0000-000000000000	997	5lrrijrisxw2	8b676db1-a2e8-416e-bda7-1aba0f8c1125	f	2025-11-04 10:38:21.570449+00	2025-11-04 10:38:21.570449+00	\N	55477ad7-df17-4491-b802-2a9c75180ff6
+00000000-0000-0000-0000-000000000000	1049	ha7a3benepp5	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f	2025-11-05 19:43:58.746901+00	2025-11-05 19:43:58.746901+00	\N	478f262c-86df-431b-b8f5-9e4099bbef9b
+00000000-0000-0000-0000-000000000000	1048	y4zfqd65mals	c90139a0-2de3-4237-89b8-032367f73a37	t	2025-11-05 16:32:31.241358+00	2025-11-06 08:30:45.97755+00	\N	d4f8e905-20a5-45e0-9bdc-3fb705f655e1
+00000000-0000-0000-0000-000000000000	1050	vthqgmxckvyt	c90139a0-2de3-4237-89b8-032367f73a37	t	2025-11-06 08:30:46.00263+00	2025-11-06 09:29:54.469181+00	y4zfqd65mals	d4f8e905-20a5-45e0-9bdc-3fb705f655e1
+00000000-0000-0000-0000-000000000000	1051	jbzt4w5pd4gm	c90139a0-2de3-4237-89b8-032367f73a37	f	2025-11-06 09:29:54.48158+00	2025-11-06 09:29:54.48158+00	vthqgmxckvyt	d4f8e905-20a5-45e0-9bdc-3fb705f655e1
 \.
 
 
@@ -7327,6 +7842,8 @@ COPY auth.schema_migrations (version) FROM stdin;
 20250901200500
 20250903112500
 20250904133000
+20250925093508
+20251007112900
 \.
 
 
@@ -7334,12 +7851,13 @@ COPY auth.schema_migrations (version) FROM stdin;
 -- Data for Name: sessions; Type: TABLE DATA; Schema: auth; Owner: supabase_auth_admin
 --
 
-COPY auth.sessions (id, user_id, created_at, updated_at, factor_id, aal, not_after, refreshed_at, user_agent, ip, tag, oauth_client_id) FROM stdin;
-e5c7f29d-8adf-4350-bace-f8c5470ac693	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2025-11-05 06:49:12.239156+00	2025-11-05 06:49:12.239156+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0	152.59.35.26	\N	\N
-014a6dc3-e426-43cc-b824-dd61c588b32d	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2025-11-05 08:29:29.499266+00	2025-11-05 08:29:29.499266+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	49.36.91.254	\N	\N
-b3b2f7ba-a681-4b11-a231-7da00d6b6c7b	8445e8b1-719d-438b-a533-bbf251d5744e	2025-11-04 07:39:32.584547+00	2025-11-04 07:39:32.584547+00	\N	aal1	\N	\N	Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1	103.178.47.172	\N	\N
-21146abb-202e-40d6-883f-3b753ad01ffc	2f0354fd-905b-4cea-9f87-0b66457b20e7	2025-11-04 07:44:15.973038+00	2025-11-04 07:44:15.973038+00	\N	aal1	\N	\N	Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1	103.178.47.172	\N	\N
-55477ad7-df17-4491-b802-2a9c75180ff6	8b676db1-a2e8-416e-bda7-1aba0f8c1125	2025-11-04 10:38:21.56205+00	2025-11-04 10:38:21.56205+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	49.36.89.80	\N	\N
+COPY auth.sessions (id, user_id, created_at, updated_at, factor_id, aal, not_after, refreshed_at, user_agent, ip, tag, oauth_client_id, refresh_token_hmac_key, refresh_token_counter) FROM stdin;
+26449ece-9642-4715-8db6-f43444408668	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2025-11-05 14:16:42.494616+00	2025-11-05 14:16:42.494616+00	\N	aal1	\N	\N	Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36	152.59.33.191	\N	\N	\N	\N
+b3b2f7ba-a681-4b11-a231-7da00d6b6c7b	8445e8b1-719d-438b-a533-bbf251d5744e	2025-11-04 07:39:32.584547+00	2025-11-04 07:39:32.584547+00	\N	aal1	\N	\N	Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1	103.178.47.172	\N	\N	\N	\N
+21146abb-202e-40d6-883f-3b753ad01ffc	2f0354fd-905b-4cea-9f87-0b66457b20e7	2025-11-04 07:44:15.973038+00	2025-11-04 07:44:15.973038+00	\N	aal1	\N	\N	Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1	103.178.47.172	\N	\N	\N	\N
+478f262c-86df-431b-b8f5-9e4099bbef9b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2025-11-05 19:43:58.716246+00	2025-11-05 19:43:58.716246+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	152.59.32.94	\N	\N	\N	\N
+d4f8e905-20a5-45e0-9bdc-3fb705f655e1	c90139a0-2de3-4237-89b8-032367f73a37	2025-11-05 16:32:31.235348+00	2025-11-06 09:29:54.492653+00	\N	aal1	\N	2025-11-06 09:29:54.492559	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	49.36.91.166	\N	\N	\N	\N
+55477ad7-df17-4491-b802-2a9c75180ff6	8b676db1-a2e8-416e-bda7-1aba0f8c1125	2025-11-04 10:38:21.56205+00	2025-11-04 10:38:21.56205+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	49.36.89.80	\N	\N	\N	\N
 \.
 
 
@@ -7366,10 +7884,10 @@ COPY auth.sso_providers (id, resource_id, created_at, updated_at, disabled) FROM
 COPY auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, invited_at, confirmation_token, confirmation_sent_at, recovery_token, recovery_sent_at, email_change_token_new, email_change, email_change_sent_at, last_sign_in_at, raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at, phone, phone_confirmed_at, phone_change, phone_change_token, phone_change_sent_at, email_change_token_current, email_change_confirm_status, banned_until, reauthentication_token, reauthentication_sent_at, is_sso_user, deleted_at, is_anonymous) FROM stdin;
 00000000-0000-0000-0000-000000000000	e86f726e-9210-47ca-8dc7-c84d46cc55e2	authenticated	authenticated	admin@playnation.com	$2a$10$Odpx/MPYwsSsCf4Uiywd1OgDxHtZ8IXE7531egy3pILZ0da.1sAMu	2025-08-10 08:50:46.562958+00	\N		\N		\N			\N	2025-11-04 23:44:13.285026+00	{"provider": "email", "providers": ["email"]}	{"email_verified": true}	\N	2025-08-10 08:50:46.541627+00	2025-11-04 23:44:13.320038+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	8445e8b1-719d-438b-a533-bbf251d5744e	authenticated	authenticated	mish@gmail.com	$2a$10$W42G7EBz5qeCmmdUecB7pOcunvmhyJBir2J6iru9lLrXBA6VsOYWy	2025-11-04 07:39:32.552636+00	\N		\N		\N			\N	2025-11-04 07:39:32.583901+00	{"provider": "email", "providers": ["email"]}	{"sub": "8445e8b1-719d-438b-a533-bbf251d5744e", "role": "player", "email": "mish@gmail.com", "username": "Mish", "last_name": "Shah", "first_name": "Mishwa", "phone_number": "7990807001", "email_verified": true, "phone_verified": false}	\N	2025-11-04 07:39:32.445139+00	2025-11-04 07:39:32.633982+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-11-05 06:46:48.553806+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-11-05 06:46:48.5812+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	073c625c-eb02-45e8-9c67-50acbdc72cd6	authenticated	authenticated	harsh@gmail.com	$2a$10$4KK/J4ROUoG4YacY/9oQluMayEemAbAWOSoXzXwIOg53cosk3zCLm	2025-08-10 08:14:37.525903+00	\N		\N		\N			\N	2025-11-05 16:12:30.837552+00	{"provider": "email", "providers": ["email"]}	{"sub": "073c625c-eb02-45e8-9c67-50acbdc72cd6", "email": "harsh@gmail.com", "last_name": "shah", "first_name": "harsh", "email_verified": true, "phone_verified": false}	\N	2025-08-10 08:14:37.499555+00	2025-11-05 16:12:30.852097+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	0fb362ba-7463-4462-a136-4692a0d3e41c	authenticated	authenticated	meet@gmail.com	$2a$10$W3.a18XfQvpVJeCKbkSLgOrQ2rJCn/mq2RkMrouUKdoVaJWLzrS56	2025-11-04 09:46:40.70979+00	\N		\N		\N			\N	2025-11-04 09:46:40.721056+00	{"provider": "email", "providers": ["email"]}	{"sub": "0fb362ba-7463-4462-a136-4692a0d3e41c", "role": "player", "email": "meet@gmail.com", "username": "meet", "last_name": "patel", "first_name": "meet ", "phone_number": "8520459852", "email_verified": true, "phone_verified": false}	\N	2025-11-04 09:46:40.604335+00	2025-11-04 09:46:40.73614+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	073c625c-eb02-45e8-9c67-50acbdc72cd6	authenticated	authenticated	harsh@gmail.com	$2a$10$4KK/J4ROUoG4YacY/9oQluMayEemAbAWOSoXzXwIOg53cosk3zCLm	2025-08-10 08:14:37.525903+00	\N		\N		\N			\N	2025-11-05 08:28:53.763702+00	{"provider": "email", "providers": ["email"]}	{"sub": "073c625c-eb02-45e8-9c67-50acbdc72cd6", "email": "harsh@gmail.com", "last_name": "shah", "first_name": "harsh", "email_verified": true, "phone_verified": false}	\N	2025-08-10 08:14:37.499555+00	2025-11-05 08:28:53.800132+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$IAvXmD9RhMUIQWJlFk8BY.MkX1opB5IqVu4w7nJ63C/TMcq0aH66i	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-11-05 08:29:29.497952+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-11-05 08:29:29.503448+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$IAvXmD9RhMUIQWJlFk8BY.MkX1opB5IqVu4w7nJ63C/TMcq0aH66i	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-11-05 19:43:58.71613+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-11-05 19:43:58.784661+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-11-05 16:32:31.235241+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-11-06 09:29:54.489324+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	2f0354fd-905b-4cea-9f87-0b66457b20e7	authenticated	authenticated	mi124@gmail.com	$2a$10$cGbOuVGe.jV/ByPwuh/7c.5zJe6bUEIFR9FSWq/NRi11baGm61WM.	2025-11-04 07:44:15.964968+00	\N		\N		\N			\N	2025-11-04 07:44:15.972943+00	{"provider": "email", "providers": ["email"]}	{"sub": "2f0354fd-905b-4cea-9f87-0b66457b20e7", "role": "venue_owner", "email": "mi124@gmail.com", "username": "Mi123", "last_name": "Shah", "first_name": "Mi", "phone_number": "7965355232", "email_verified": true, "phone_verified": false}	\N	2025-11-04 07:44:15.911844+00	2025-11-04 07:44:15.985406+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	38f0c23d-4d25-42cd-8ec0-426d6636eecd	authenticated	authenticated	fenil@gmail.com	$2a$10$wC5LDx6u5k8FTIHrKPOEwOm1f21cVE8.SfhPAjB.W6wxEek7Ig9ZC	2025-10-12 09:33:09.062174+00	\N		\N		\N			\N	2025-11-01 18:34:17.408664+00	{"provider": "email", "providers": ["email"]}	{"sub": "38f0c23d-4d25-42cd-8ec0-426d6636eecd", "role": "player", "email": "fenil@gmail.com", "username": "fenill", "last_name": "pastagia", "first_name": "fenil", "phone_number": "7586214860", "email_verified": true, "phone_verified": false}	\N	2025-10-12 09:33:09.015285+00	2025-11-03 18:16:20.961791+00	\N	\N			\N		0	2026-12-25 09:16:20.960986+00		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	8b676db1-a2e8-416e-bda7-1aba0f8c1125	authenticated	authenticated	het@gmail.com	$2a$10$xAGuiqQb3lMINNBhD3JpDeEaigAvzWyPS2jMFQoQnzxfi0bnzwF9W	2025-11-04 10:38:21.552571+00	\N		\N		\N			\N	2025-11-04 10:38:21.561964+00	{"provider": "email", "providers": ["email"]}	{"sub": "8b676db1-a2e8-416e-bda7-1aba0f8c1125", "role": "player", "email": "het@gmail.com", "username": "het", "last_name": "desai", "first_name": "het", "phone_number": "9514785365", "email_verified": true, "phone_verified": false}	\N	2025-11-04 10:38:21.510933+00	2025-11-04 10:38:21.578968+00	\N	\N			\N		0	\N		\N	f	\N	f
@@ -7387,6 +7905,12 @@ COPY public.admin_notifications (id, type, message, data, is_read, created_at) F
 3ac505bc-eccc-45e2-8e22-c3c8fba391f3	new_confirmed_booking	Booking Confirmed: Mish booked Table 1.	{"booking_id": "66d215dc-625a-46ec-85cf-80aedd0ca670", "venue_name": "Fast & Furies", "total_amount": 350, "facility_name": "Table 1"}	f	2025-11-04 07:43:01.950305+00
 f4e21ad1-9fd3-4980-8aef-27fea9d43780	new_confirmed_booking	Booking Confirmed: swayam booked Court 2.	{"booking_id": "83fb5379-31b2-4f43-9a79-ba400503ca27", "venue_name": "Fast & Furies", "total_amount": 1500, "facility_name": "Court 2"}	f	2025-11-04 22:02:22.63443+00
 35b3228b-3721-4c23-abec-4957defd2d88	new_confirmed_booking	Booking Confirmed: swayam booked Table 1.	{"booking_id": "66d4e117-7411-4f28-8021-308e124b7bb2", "venue_name": "Fun & Play", "total_amount": 750, "facility_name": "Table 1"}	f	2025-11-05 08:31:52.772167+00
+31d5282c-c52a-4052-a776-722054c933a6	new_confirmed_booking	Booking Confirmed: swayam booked Court 2.	{"booking_id": "a8a3bb6b-bc81-4c85-a08e-f2023a4c0a8a", "venue_name": "Fast & Furies", "total_amount": 3000, "facility_name": "Court 2"}	f	2025-11-05 12:01:57.465562+00
+dbfc922b-8a21-482c-bc4c-bdba8cec1be1	new_confirmed_booking	Booking Confirmed: swayam booked Table 1.	{"booking_id": "677da1f7-d6af-482c-9bed-9591cadcf802", "venue_name": "Fast & Furies", "total_amount": 700, "facility_name": "Table 1"}	f	2025-11-05 12:02:08.822346+00
+994e032b-0d3d-49a5-894d-de27dcd24aff	new_confirmed_booking	Booking Confirmed: swayam booked Table 1.	{"booking_id": "5f58d3f3-2043-4de7-a872-0aad1b8bf39b", "venue_name": "Fun & Play", "total_amount": 1500, "facility_name": "Table 1"}	f	2025-11-05 12:02:33.469976+00
+e99a8a5f-abea-4758-ad3a-7ba5e4de4ebc	new_confirmed_booking	Booking Confirmed: swayam booked Table 1.	{"booking_id": "b84c5a5a-43fd-4909-acf2-789700d1d67a", "venue_name": "Fun & Play", "total_amount": 750, "facility_name": "Table 1"}	f	2025-11-05 12:02:47.063818+00
+ec99e7da-cd93-4c7e-a7e2-58ec3042309f	new_confirmed_booking	Booking Confirmed: swayam booked Court 1.	{"booking_id": "6e5247f6-9814-4b2a-9b41-659c2de00c45", "venue_name": "Fun Strike ", "total_amount": 500, "facility_name": "Court 1"}	f	2025-11-05 12:03:08.598036+00
+0de4b6cf-4899-4330-b665-b4667b4dec80	new_confirmed_booking	Booking Confirmed: swayam booked Table 1.	{"booking_id": "b616167d-07f1-4506-baee-a52c252c398c", "venue_name": "Fun & Play", "total_amount": 750, "facility_name": "Table 1"}	f	2025-11-05 14:18:11.098953+00
 \.
 
 
@@ -7485,6 +8009,12 @@ ed6cd16e-358d-4434-bc27-ac240f427fae	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	857b3a
 66d215dc-625a-46ec-85cf-80aedd0ca670	8445e8b1-719d-438b-a533-bbf251d5744e	ea904f64-86ad-40cf-88c3-47727800e3da	2f14fda6-7acb-4e0e-990a-316d0344ddac	2025-11-05 08:30:00+00	2025-11-05 09:30:00+00	350	confirmed	paid	\N	\N	2025-11-04 07:43:01.950305+00	f	\N	\N	\N	d56674f1-84c3-45a7-83aa-0a69cbcc4b67	350.00	\N
 83fb5379-31b2-4f43-9a79-ba400503ca27	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	e68d5a25-1d7b-4b59-9599-9a140ee15af9	17192cb6-9fe9-4a79-b45f-c6150d177bec	2025-11-05 05:30:00+00	2025-11-05 06:30:00+00	1500	confirmed	paid	\N	\N	2025-11-04 22:02:22.63443+00	f	\N	\N	\N	d56674f1-84c3-45a7-83aa-0a69cbcc4b67	1500.00	\N
 66d4e117-7411-4f28-8021-308e124b7bb2	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	6da5a2b0-3827-412b-840b-4948f322eb3d	2025-11-05 11:30:00+00	2025-11-05 12:30:00+00	750	confirmed	paid	\N	\N	2025-11-05 08:31:52.772167+00	f	\N	\N	\N	bce6842e-3400-4775-80ee-c8304cf4b38e	750.00	\N
+a8a3bb6b-bc81-4c85-a08e-f2023a4c0a8a	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	e68d5a25-1d7b-4b59-9599-9a140ee15af9	e709af18-555f-4058-8ec5-4d6699c69525	2025-11-05 14:30:00+00	2025-11-05 15:30:00+00	3000	confirmed	paid	\N	\N	2025-11-05 12:01:57.465562+00	f	\N	\N	\N	\N	0.00	\N
+677da1f7-d6af-482c-9bed-9591cadcf802	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	ea904f64-86ad-40cf-88c3-47727800e3da	b359d2f4-e588-4275-a433-dc743162aa24	2025-11-05 13:30:00+00	2025-11-05 14:30:00+00	700	confirmed	paid	\N	\N	2025-11-05 12:02:08.822346+00	f	\N	\N	\N	\N	0.00	\N
+5f58d3f3-2043-4de7-a872-0aad1b8bf39b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	707c227e-fcb2-4658-87b3-d2ad5ce24311	2025-11-05 14:30:00+00	2025-11-05 15:30:00+00	1500	confirmed	paid	\N	\N	2025-11-05 12:02:33.469976+00	f	\N	\N	\N	\N	0.00	\N
+b84c5a5a-43fd-4909-acf2-789700d1d67a	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	23c0799a-03a0-4e29-9cb2-b52326cb856f	2025-11-06 06:30:00+00	2025-11-06 07:30:00+00	750	confirmed	paid	\N	\N	2025-11-05 12:02:47.063818+00	f	\N	\N	\N	d56674f1-84c3-45a7-83aa-0a69cbcc4b67	750.00	\N
+6e5247f6-9814-4b2a-9b41-659c2de00c45	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	a57585d1-1d27-4e22-83a0-fb8e6954fe57	891b1b11-7fb8-4710-a586-61212fbc0c9b	2025-11-06 04:30:00+00	2025-11-06 05:30:00+00	500	confirmed	paid	\N	\N	2025-11-05 12:03:08.598036+00	f	\N	\N	\N	\N	0.00	\N
+b616167d-07f1-4506-baee-a52c252c398c	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	3d171495-7773-40a0-b76e-c0de82db3871	2025-11-06 04:30:00+00	2025-11-06 05:30:00+00	750	confirmed	paid	\N	\N	2025-11-05 14:18:11.098953+00	f	\N	\N	\N	d56674f1-84c3-45a7-83aa-0a69cbcc4b67	750.00	\N
 \.
 
 
@@ -7603,6 +8133,8 @@ a5fea650-391d-408d-aad1-0105b3f26d90	d56674f1-84c3-45a7-83aa-0a69cbcc4b67	bb3e7b
 3bb81cca-238f-424f-8ba0-0a294dce2219	d56674f1-84c3-45a7-83aa-0a69cbcc4b67	8445e8b1-719d-438b-a533-bbf251d5744e	66d215dc-625a-46ec-85cf-80aedd0ca670	2025-11-04 07:43:02.033592+00	350.00
 039afcf8-5f89-48b5-9487-168baf5203a8	d56674f1-84c3-45a7-83aa-0a69cbcc4b67	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	83fb5379-31b2-4f43-9a79-ba400503ca27	2025-11-04 22:02:22.695975+00	1500.00
 f0e45218-8b9d-4dff-976a-c52ef9bca08f	bce6842e-3400-4775-80ee-c8304cf4b38e	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	66d4e117-7411-4f28-8021-308e124b7bb2	2025-11-05 08:31:52.922647+00	750.00
+73ad237a-f958-4502-8174-8f6861f8ec4e	d56674f1-84c3-45a7-83aa-0a69cbcc4b67	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	b84c5a5a-43fd-4909-acf2-789700d1d67a	2025-11-05 12:02:47.106243+00	750.00
+78eb13a0-f82f-4b8f-826b-32ec024d4140	d56674f1-84c3-45a7-83aa-0a69cbcc4b67	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	b616167d-07f1-4506-baee-a52c252c398c	2025-11-05 14:18:11.169151+00	750.00
 \.
 
 
@@ -7662,8 +8194,8 @@ COPY public.sports (sport_id, name, description, image_url) FROM stdin;
 550e8400-e29b-41d4-a716-446655440006	Swimming	Water sport and recreation activity	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/sports-icons/swimming-pool.png
 550e8400-e29b-41d4-a716-446655440007	Table Tennis	Indoor racket sport	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/sports-icons/table-tennis.png
 550e8400-e29b-41d4-a716-446655440003	Basketball	Team sport played on a court with hoops	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/sports-icons/basketball.png
-550e8400-e29b-41d4-a716-446655440005	Badminton	Racket sport played with shuttlecock	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/sports-icons/basketball.png
 550e8400-e29b-41d4-a716-446655440008	Volleyball	Team sport played with net	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/sports-icons/volleyball.png
+550e8400-e29b-41d4-a716-446655440005	Badminton	Racket sport played with shuttlecock	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/sports-icons/badminton.png
 \.
 
 
@@ -8153,6 +8685,7 @@ b25fae62-a425-4a95-b205-b28cf251cbd9	ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	2025-1
 e40a4246-bd00-4de5-b654-c1ae0b6124ba	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-29 03:30:00+00	2025-10-29 04:30:00+00	t	\N	\N
 267fa2d4-dc57-4852-acdc-efd27fe3001b	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-29 04:30:00+00	2025-10-29 05:30:00+00	t	\N	\N
 fd705b8c-1108-4057-b28c-e006eaf10134	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-29 05:30:00+00	2025-10-29 06:30:00+00	t	\N	\N
+23c0799a-03a0-4e29-9cb2-b52326cb856f	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-06 06:30:00+00	2025-11-06 07:30:00+00	f	\N	\N
 48a76c9a-e56d-49f0-ab9f-d4d0a95d9192	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-29 06:30:00+00	2025-10-29 07:30:00+00	t	\N	\N
 ab78a42a-8703-42c5-9b8e-c600840ea967	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-29 07:30:00+00	2025-10-29 08:30:00+00	t	\N	\N
 8bbe37d0-660d-4efd-9075-aeb9b31fd304	2b123724-4e3c-4344-8df1-7b66c1cc81a6	2025-10-29 08:30:00+00	2025-10-29 09:30:00+00	t	\N	\N
@@ -8351,7 +8884,6 @@ f03d3f9e-f0ce-45c6-9c38-3e9af45d4777	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-1
 85b5315b-f58e-4271-9850-99d67b868e5e	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-11-05 11:30:00+00	2025-11-05 12:30:00+00	t	\N	\N
 7a92e6a5-7a53-4739-a965-f990f6223f99	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-11-05 12:30:00+00	2025-11-05 13:30:00+00	t	\N	\N
 eac6792e-31e3-476d-aed2-bf64cd5cbf06	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-11-05 13:30:00+00	2025-11-05 14:30:00+00	t	\N	\N
-e709af18-555f-4058-8ec5-4d6699c69525	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-11-05 14:30:00+00	2025-11-05 15:30:00+00	t	\N	\N
 5224b447-9e84-41cd-9c99-88d5b351ca7f	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-11-06 03:30:00+00	2025-11-06 04:30:00+00	t	\N	\N
 d3907d98-901c-4110-a570-c96bc64954ac	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-11-06 04:30:00+00	2025-11-06 05:30:00+00	t	\N	\N
 e67580ea-3b6b-4c1d-ac12-2d805fd221ea	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-11-06 05:30:00+00	2025-11-06 06:30:00+00	t	\N	\N
@@ -8388,6 +8920,7 @@ fc6305f4-ba43-4f88-b7f7-b64166e37968	ea904f64-86ad-40cf-88c3-47727800e3da	2025-1
 7256db8b-31a6-4255-8208-3afd3f61f904	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-30 13:30:00+00	2025-10-30 14:30:00+00	t	\N	\N
 fe7de751-60a1-4128-89b9-cdad5fd89583	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-30 14:30:00+00	2025-10-30 15:30:00+00	t	\N	\N
 f1754e32-3f5f-4ccf-8516-e83896a53601	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-31 03:30:00+00	2025-10-31 04:30:00+00	t	\N	\N
+e709af18-555f-4058-8ec5-4d6699c69525	e68d5a25-1d7b-4b59-9599-9a140ee15af9	2025-11-05 14:30:00+00	2025-11-05 15:30:00+00	f	\N	\N
 d7aea3d2-d5e6-41f2-bc69-6b1919e1cd48	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-31 05:30:00+00	2025-10-31 06:30:00+00	t	\N	\N
 30410427-25f7-40b7-af62-6b146412fdce	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-31 06:30:00+00	2025-10-31 07:30:00+00	t	\N	\N
 d733498c-83be-42da-ac45-712a078dca61	ea904f64-86ad-40cf-88c3-47727800e3da	2025-10-31 07:30:00+00	2025-10-31 08:30:00+00	t	\N	\N
@@ -8456,7 +8989,6 @@ d285cdf3-adaf-4030-b795-312ce7623c1b	ea904f64-86ad-40cf-88c3-47727800e3da	2025-1
 8c603e50-7c6f-4427-b11b-071ef3d98d26	ea904f64-86ad-40cf-88c3-47727800e3da	2025-11-05 10:30:00+00	2025-11-05 11:30:00+00	t	\N	\N
 1fd1bf78-8442-4d1c-b760-3d03bce0d9c4	ea904f64-86ad-40cf-88c3-47727800e3da	2025-11-05 11:30:00+00	2025-11-05 12:30:00+00	t	\N	\N
 4b2bf60e-171e-4982-996c-6a508ca9f0a2	ea904f64-86ad-40cf-88c3-47727800e3da	2025-11-05 12:30:00+00	2025-11-05 13:30:00+00	t	\N	\N
-b359d2f4-e588-4275-a433-dc743162aa24	ea904f64-86ad-40cf-88c3-47727800e3da	2025-11-05 13:30:00+00	2025-11-05 14:30:00+00	t	\N	\N
 29a181aa-5964-4850-b7b1-9267923c72be	ea904f64-86ad-40cf-88c3-47727800e3da	2025-11-05 14:30:00+00	2025-11-05 15:30:00+00	t	\N	\N
 3759136b-1068-4ed7-b464-85a9ff67badc	ea904f64-86ad-40cf-88c3-47727800e3da	2025-11-06 03:30:00+00	2025-11-06 04:30:00+00	t	\N	\N
 ba6466d6-f3ea-457c-afa1-ca8e9dbb557a	ea904f64-86ad-40cf-88c3-47727800e3da	2025-11-06 04:30:00+00	2025-11-06 05:30:00+00	t	\N	\N
@@ -8511,11 +9043,8 @@ b70d1655-7d06-4962-80f8-07e24e1ee1c7	9566ee54-1213-482b-b766-6d0f87c88776	2025-1
 cfb8c6db-950f-4fc4-b09f-2ea507b70101	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-05 10:30:00+00	2025-11-05 11:30:00+00	t	\N	\N
 b19eb798-3ddf-4c0c-aac9-407853967b65	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-05 12:30:00+00	2025-11-05 13:30:00+00	t	\N	\N
 61964351-7470-405b-9e22-052e235af784	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-05 13:30:00+00	2025-11-05 14:30:00+00	t	\N	\N
-707c227e-fcb2-4658-87b3-d2ad5ce24311	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-05 14:30:00+00	2025-11-05 15:30:00+00	t	\N	\N
 bc37a509-53cf-473e-9ab2-58d459442e39	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-06 03:30:00+00	2025-11-06 04:30:00+00	t	\N	\N
-3d171495-7773-40a0-b76e-c0de82db3871	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-06 04:30:00+00	2025-11-06 05:30:00+00	t	\N	\N
 dd38a6ea-8c9f-4e14-896e-6b22a2dd8650	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-06 05:30:00+00	2025-11-06 06:30:00+00	t	\N	\N
-23c0799a-03a0-4e29-9cb2-b52326cb856f	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-06 06:30:00+00	2025-11-06 07:30:00+00	t	\N	\N
 afd4f121-79f6-4bac-bf20-62d6bc8e60d4	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-06 07:30:00+00	2025-11-06 08:30:00+00	t	\N	\N
 fa9bb6a3-d9f4-4e6c-9a4a-1b6dfd925153	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-06 08:30:00+00	2025-11-06 09:30:00+00	t	\N	\N
 35a36a44-5e35-454b-b2d8-2eb606484bcd	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-06 09:30:00+00	2025-11-06 10:30:00+00	t	\N	\N
@@ -8537,6 +9066,9 @@ bf603c5d-6745-43f9-ad21-172d1eee2745	9566ee54-1213-482b-b766-6d0f87c88776	2025-1
 dad473dd-9cfc-422e-920e-1d496bc4de55	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-04 13:30:00+00	2025-11-04 14:30:00+00	f	\N	\N
 2f14fda6-7acb-4e0e-990a-316d0344ddac	ea904f64-86ad-40cf-88c3-47727800e3da	2025-11-05 08:30:00+00	2025-11-05 09:30:00+00	f	\N	\N
 6da5a2b0-3827-412b-840b-4948f322eb3d	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-05 11:30:00+00	2025-11-05 12:30:00+00	f	\N	\N
+b359d2f4-e588-4275-a433-dc743162aa24	ea904f64-86ad-40cf-88c3-47727800e3da	2025-11-05 13:30:00+00	2025-11-05 14:30:00+00	f	\N	\N
+707c227e-fcb2-4658-87b3-d2ad5ce24311	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-05 14:30:00+00	2025-11-05 15:30:00+00	f	\N	\N
+3d171495-7773-40a0-b76e-c0de82db3871	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-06 04:30:00+00	2025-11-06 05:30:00+00	f	\N	\N
 0e6ccd03-061c-428f-a2bd-d35808f047f2	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-07 13:30:00+00	2025-11-07 14:30:00+00	t	\N	\N
 c67fc4e6-5cc6-46a7-99f5-7bd1ddfa02ca	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-07 14:30:00+00	2025-11-07 15:30:00+00	t	\N	\N
 b04a0eee-f3e6-471e-bd9b-6605c86b85f1	9566ee54-1213-482b-b766-6d0f87c88776	2025-11-08 03:30:00+00	2025-11-08 04:30:00+00	t	\N	\N
@@ -8801,7 +9333,6 @@ e3e44a6a-0065-4058-a350-c730c133120f	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-1
 f707256d-28ea-4b73-8574-586a51b27a89	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-05 13:30:00+00	2025-11-05 14:30:00+00	t	\N	\N
 dbbd3d1c-7815-44e1-b960-789ba85ea5e5	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-05 14:30:00+00	2025-11-05 15:30:00+00	t	\N	\N
 483225e8-7deb-4d06-97e7-89389329c249	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-06 03:30:00+00	2025-11-06 04:30:00+00	t	\N	\N
-891b1b11-7fb8-4710-a586-61212fbc0c9b	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-06 04:30:00+00	2025-11-06 05:30:00+00	t	\N	\N
 24dbba8f-082b-4717-99da-40eb1abcc83d	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-06 05:30:00+00	2025-11-06 06:30:00+00	t	\N	\N
 4522d2b6-8298-4ec9-9904-f57f64e39568	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-06 06:30:00+00	2025-11-06 07:30:00+00	t	\N	\N
 00904529-c6e0-43fa-bb8c-0f2f609f1df1	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-06 07:30:00+00	2025-11-06 08:30:00+00	t	\N	\N
@@ -8825,6 +9356,7 @@ f663ef26-b3dd-43a0-a4fc-d633b9211560	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-1
 416631fd-6aee-4fdc-a23d-3ede7193f70d	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-07 13:30:00+00	2025-11-07 14:30:00+00	t	\N	\N
 626d6493-07c8-4d82-9c0b-3dc73a350980	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-07 14:30:00+00	2025-11-07 15:30:00+00	t	\N	\N
 6db6d9b7-91a7-4a55-aff8-391724aad4d1	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-08 03:30:00+00	2025-11-08 04:30:00+00	t	\N	\N
+891b1b11-7fb8-4710-a586-61212fbc0c9b	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-06 04:30:00+00	2025-11-06 05:30:00+00	f	\N	\N
 81f200af-c595-489d-b00d-77b7ff597745	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-08 04:30:00+00	2025-11-08 05:30:00+00	t	\N	\N
 fbeb9180-a980-493b-a61f-d8477a509189	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-08 05:30:00+00	2025-11-08 06:30:00+00	t	\N	\N
 6c242114-3fd9-428a-87c6-fe67526bafa8	a57585d1-1d27-4e22-83a0-fb8e6954fe57	2025-11-08 06:30:00+00	2025-11-08 07:30:00+00	t	\N	\N
@@ -9296,7 +9828,7 @@ COPY vault.secrets (id, name, description, secret, key_id, nonce, created_at, up
 -- Name: refresh_tokens_id_seq; Type: SEQUENCE SET; Schema: auth; Owner: supabase_auth_admin
 --
 
-SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 1031, true);
+SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 1051, true);
 
 
 --
@@ -11247,6 +11779,27 @@ CREATE POLICY "Owners: All access to their facilities" ON public.facilities USIN
 
 
 --
+-- Name: facilities Players can read all facilities; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Players can read all facilities" ON public.facilities FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: time_slots Players can read all time_slots; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Players can read all time_slots" ON public.time_slots FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: bookings Players can read their own bookings; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Players can read their own bookings" ON public.bookings FOR SELECT TO authenticated USING ((auth.uid() = user_id));
+
+
+--
 -- Name: offers Public can view active offers; Type: POLICY; Schema: public; Owner: postgres
 --
 
@@ -11327,10 +11880,22 @@ CREATE POLICY "Venue owners can delete their own offers" ON public.offers FOR DE
 ALTER TABLE public.admin_notifications ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: bookings; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: contact_messages; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
 ALTER TABLE public.contact_messages ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: facilities; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.facilities ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: favorites; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -11355,6 +11920,12 @@ ALTER TABLE public.offers ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: time_slots; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.time_slots ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: users; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -12247,12 +12818,57 @@ GRANT ALL ON FUNCTION public.get_owner_report_stats(p_start_date date, p_end_dat
 
 
 --
+-- Name: FUNCTION get_owner_report_stats(p_owner_id uuid, p_start_date date, p_end_date date); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.get_owner_report_stats(p_owner_id uuid, p_start_date date, p_end_date date) TO anon;
+GRANT ALL ON FUNCTION public.get_owner_report_stats(p_owner_id uuid, p_start_date date, p_end_date date) TO authenticated;
+GRANT ALL ON FUNCTION public.get_owner_report_stats(p_owner_id uuid, p_start_date date, p_end_date date) TO service_role;
+
+
+--
+-- Name: FUNCTION get_owner_report_stats(p_owner_id uuid, p_start_date date, p_end_date date, p_venue_ids uuid[]); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.get_owner_report_stats(p_owner_id uuid, p_start_date date, p_end_date date, p_venue_ids uuid[]) TO anon;
+GRANT ALL ON FUNCTION public.get_owner_report_stats(p_owner_id uuid, p_start_date date, p_end_date date, p_venue_ids uuid[]) TO authenticated;
+GRANT ALL ON FUNCTION public.get_owner_report_stats(p_owner_id uuid, p_start_date date, p_end_date date, p_venue_ids uuid[]) TO service_role;
+
+
+--
+-- Name: FUNCTION get_owner_today_dashboard(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.get_owner_today_dashboard() TO anon;
+GRANT ALL ON FUNCTION public.get_owner_today_dashboard() TO authenticated;
+GRANT ALL ON FUNCTION public.get_owner_today_dashboard() TO service_role;
+
+
+--
+-- Name: FUNCTION get_owner_today_dashboard(p_owner_id uuid); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.get_owner_today_dashboard(p_owner_id uuid) TO anon;
+GRANT ALL ON FUNCTION public.get_owner_today_dashboard(p_owner_id uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.get_owner_today_dashboard(p_owner_id uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION get_owner_venues_details(); Type: ACL; Schema: public; Owner: postgres
 --
 
 GRANT ALL ON FUNCTION public.get_owner_venues_details() TO anon;
 GRANT ALL ON FUNCTION public.get_owner_venues_details() TO authenticated;
 GRANT ALL ON FUNCTION public.get_owner_venues_details() TO service_role;
+
+
+--
+-- Name: FUNCTION get_player_dashboard_stats(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.get_player_dashboard_stats() TO anon;
+GRANT ALL ON FUNCTION public.get_player_dashboard_stats() TO authenticated;
+GRANT ALL ON FUNCTION public.get_player_dashboard_stats() TO service_role;
 
 
 --

@@ -1,311 +1,299 @@
-import React, { useMemo } from 'react';
-import { Shield, Clock, Calendar, CreditCard, Settings, Award, Activity } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import StatsCard from '../../components/common/StatsCard';
-import Loader from '../../components/common/Loader';
-import { LoadingSpinner, ErrorState } from '../../components/common/LoadingAndError';
-import { useAuth } from '../../AuthContext';
+import React from 'react';
+import { useCallback, useMemo } from 'react';
 import useSupabaseQuery from '../../hooks/useSupabaseQuery';
 import { supabase } from '../../supabaseClient';
-import HeroOfferCarousel from '../../components/offers/HeroOfferCarousel';
-import FeaturedVenues from '../../components/home/FeaturedVenues';
+import { useAuth } from '../../AuthContext';
+import { Link } from 'react-router-dom';
+import Loader from '../../components/common/Loader';
+import { 
+  Calendar, 
+  Wallet, 
+  Receipt, 
+  Star, 
+  Ticket, 
+  AlertTriangle,
+  Award // <-- Re-added icon
+  // Removed Clock
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { formatCurrency } from '../../utils/formatters';
 import useVenues from '../../hooks/useVenues';
+import FeaturedVenues from '../../components/home/FeaturedVenues';
 
-const PlayerDashboardPage = () => {
-  const { profile } = useAuth();
-  const navigate = useNavigate();
+// Stat Card (Unchanged)
+function StatCard({ title, value, icon }) {
+  return (
+    <div className="bg-primary-green-dark border border-primary-green rounded-xl shadow-lg p-6 flex items-center space-x-4 transition-transform hover:scale-105 duration-300">
+      <div className="p-4 rounded-full bg-white"> 
+        {React.cloneElement(icon, { className: "h-7 w-7 text-primary-green-dark" })}
+      </div>
+      <div>
+        <p className="text-sm text-gray-200 font-medium uppercase tracking-wide">{title}</p>
+        <p className="text-2xl font-bold text-white">{value}</p>
+      </div>
+    </div>
+  );
+}
 
-  // Fetch upcoming booking
+// Error Component (Unchanged)
+function DashboardError({ error, title }) {
+  return (
+    <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-xl flex items-center space-x-4">
+      <AlertTriangle className="h-8 w-8 text-red-500" />
+      <div>
+        <p className="font-bold text-lg">{title}</p>
+        <p className="text-sm">{error.message}. Please check your connection or RLS policies.</p>
+      </div>
+    </div>
+  )
+}
+
+// Main Dashboard Component
+export default function PlayerDashboardPage() {
+  const { user } = useAuth();
+
+  // --- Data Fetching (Unchanged) ---
+  const fetchDashboardStats = useCallback(() => {
+    return supabase.rpc('get_player_dashboard_stats');
+  }, []);
+
+  const fetchCurrentOffers = useCallback(() => {
+    return supabase
+      .from('offers')
+      .select('offer_id, title, description, discount_percentage, fixed_discount_amount, offer_type')
+      .eq('is_active', true)
+      .or(`valid_until.is.null,valid_until.gt.${new Date().toISOString()}`)
+      .limit(4);
+  }, []);
+
   const { 
-    data: upcomingBooking, 
-    isLoading: isLoadingBooking,
-    error: bookingError,
-    refetch: refetchBooking 
+    data: statsData, 
+    isLoading: isLoadingStats, 
+    error: statsError 
   } = useSupabaseQuery(
-    'upcoming-booking',
-    () =>
-      supabase
-        .from('bookings')
-        .select(
-          '*, facilities(name, venues(name)), time_slots(start_time, end_time)'
-        )
-        .eq('user_id', profile?.user_id)
-        .eq('status', 'confirmed')
-        .gte('start_time', new Date().toISOString())
-        .order('start_time', { ascending: true })
-        .limit(1)
-        .single(),
-    { enabled: !!profile }
-  );
-
-  const { data: bookingsMade, isLoading: isLoadingBookingsMade } = useSupabaseQuery(
-    'bookings-made',
-    () =>
-      supabase
-        .from('bookings')
-        .select('booking_id', { count: 'exact' })
-        .eq('user_id', profile?.user_id),
-    { enabled: !!profile }
-  );
-
-  // Fetch recent bookings for activity history
-  const {
-    data: recentBookings,
-    isLoading: isLoadingRecent,
-    error: recentError,
-    refetch: refetchRecent
-  } = useSupabaseQuery(
-    'recent-bookings',
-    () =>
-      supabase
-        .from('bookings')
-        .select('*, facilities(name, venues(name)), time_slots(start_time, end_time)')
-        .eq('user_id', profile?.user_id)
-        .order('created_at', { ascending: false })
-        .limit(5),
-    { enabled: !!profile }
+    'playerDashboardStats',
+    fetchDashboardStats,
+    { enabled: !!user, refetchOnWindowFocus: true }
   );
 
   const topVenuesOptions = useMemo(() => ({
     limit: 4,
-    sortBy: 'rating',
+    sortBy: "rating",
   }), []);
 
-  const { venues: topVenues, loading: loadingVenues, error: errorVenues } = useVenues(topVenuesOptions);
-
-  // Fetch player statistics from bookings
-  const { data: playerStats, isLoading: isLoadingStats } = useSupabaseQuery(
-    'player-stats',
-    async () => {
-      // Fetch favorite sport (most booked facility type)
-      const { data: favoriteActivity } = await supabase
-        .from('bookings')
-        .select('facilities(type)')
-        .eq('user_id', profile?.user_id)
-        .then(({ data }) => {
-          const typeCounts = data?.reduce((acc, booking) => {
-            const type = booking.facilities?.type;
-            if (type) {
-              acc[type] = (acc[type] || 0) + 1;
-            }
-            return acc;
-          }, {});
-          const favorite = Object.entries(typeCounts || {})
-            .sort(([,a], [,b]) => b - a)[0]?.[0] || 'Not set';
-          return { data: favorite };
-        });
-
-      return {
-        favoriteSport: favoriteActivity,
-        memberSince: profile ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A'
-      };
-    },
-    { enabled: !!profile }
+  const { 
+    venues: topVenues, 
+    loading: isLoadingTopVenues, 
+    error: topVenuesError 
+  } = useVenues(topVenuesOptions);
+  
+  const { 
+    data: offersData, 
+    isLoading: isLoadingOffers,
+    error: offersError
+  } = useSupabaseQuery(
+    'currentOffers',
+    fetchCurrentOffers,
+    { refetchOnWindowFocus: true } 
   );
+  // --- End Data Fetching ---
 
-  // Fetch credit transactions history
-  const { data: creditHistory } = useSupabaseQuery(
-    'credit-history',
-    () =>
-      supabase
-        .from('credit_transactions')
-        .select('*')
-        .eq('user_id', profile?.user_id)
-        .order('created_at', { ascending: false })
-        .limit(5),
-    { enabled: !!profile }
-  );
+  if (isLoadingStats || isLoadingTopVenues || isLoadingOffers) {
+    return <Loader />;
+  }
 
-  const renderRecentActivity = () => {
-    if (isLoadingRecent) return <LoadingSpinner />;
-    if (recentError) return <ErrorState error={recentError.message} onRetry={() => refetchRecent()} />;
-    
-    return recentBookings?.map((booking) => (
-      <div key={booking.booking_id} className="flex items-center space-x-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
-        <div className="bg-blue-100 p-3 rounded-full">
-          <Calendar className="h-5 w-5 text-blue-600" />
-        </div>
-        <div className="flex-1">
-          <h4 className="font-medium text-gray-900">{booking.facilities?.venues?.name}</h4>
-          <p className="text-sm text-gray-500">
-            {new Date(booking.time_slots?.start_time).toLocaleDateString()} at{" "}
-            {new Date(booking.time_slots?.start_time).toLocaleTimeString()}
-          </p>
-        </div>
-        <span className={`px-3 py-1 rounded-full text-sm ${
-          booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-          booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-          'bg-yellow-100 text-yellow-800'
-        }`}>
-          {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-        </span>
-      </div>
-    ));
-  };
+  const dashboardStats = statsData || {};
+  const offers = offersData || [];
+
+  // --- UPDATED: Destructure stats (hours removed, sport added) ---
+  const {
+    upcoming_bookings_count = 0, 
+    favorite_venues = [],
+    credit_balance = 0,
+    total_bookings_count = 0,
+    total_spent = 0,
+    upcoming_bookings_list = [],
+    most_played_sport = 'N/A' // <-- Re-added
+    // removed total_hours_played
+  } = dashboardStats;
 
   return (
-    <div className="bg-gray-100 min-h-screen">
-      <div className="bg-primary-green text-white p-8 shadow-lg">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-4xl font-bold">Player Dashboard</h1>
-          <p className="mt-2 opacity-80">
-            Welcome back, {profile?.username}! Here's a summary of your activity.
-          </p>
-        </div>
-      </div>
+    <div className="bg-background min-h-screen">
+      <div className="relative z-10 max-w-7xl mx-auto p-4 md:p-8">
+        
+        {/* Welcome Header */}
+        <h1 className="text-4xl font-bold text-primary-green-dark mb-8">
+          Hello, {user?.user_metadata?.first_name || 'Player'}!
+        </h1>
+        
+        {/* Error Section */}
+        {statsError && (
+          <div className="mb-6">
+            <DashboardError error={statsError} title="Error Loading Your Stats" />
+          </div>
+        )}
+        {topVenuesError && (
+          <div className="mb-6">
+            <DashboardError error={topVenuesError} title="Error Loading Featured Venues" />
+          </div>
+        )}
+        {offersError && (
+          <div className="mb-6">
+            <DashboardError error={offersError} title="Error Loading Current Offers" />
+          </div>
+        )}
 
-      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatsCard
-            icon={CreditCard}
-            title="Available Credits"
-            count={isLoadingStats ? "..." : profile?.credits ?? 0}
-            bgColor="bg-gradient-to-br from-emerald-500 to-green-500"
-          />
-          <StatsCard
-            icon={Shield}
-            title="Bookings Made"
-            count={isLoadingBookingsMade ? "..." : bookingsMade?.count ?? 0}
-            bgColor="bg-gradient-to-br from-blue-500 to-indigo-500"
-          />
-          <StatsCard
-            icon={Award}
-            title="Favorite Sport"
-            count={
-              isLoadingStats ? "..." : playerStats?.favoriteSport ?? "Not set"
-            }
-            bgColor="bg-gradient-to-br from-purple-500 to-pink-500"
-          />
-          <StatsCard
-            icon={Clock}
-            title="Member Since"
-            count={isLoadingStats ? "..." : playerStats?.memberSince ?? "N/A"}
-            bgColor="bg-gradient-to-br from-gray-700 to-gray-800"
-          />
-        </div>
-
-        {/* Main Content Area */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          {/* Left Column - Bookings & Activity */}
+        {/* --- Main Two-Column Layout --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* --- Left Column (2/3 width) --- */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Upcoming Booking Section */}
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-semibold text-gray-800">
-                  Upcoming Booking
-                </h2>
-                <button
-                  onClick={() => navigate("/my-bookings")}
-                  className="text-sm font-medium text-primary-green hover:text-primary-green-dark transition-colors"
-                >
-                  View All →
-                </button>
-              </div>
+            
+            {/* --- UPDATED: Stats Grid (4 cards) --- */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <StatCard
+                title="Total Bookings"
+                value={total_bookings_count}
+                icon={<Receipt />}
+              />
+              <StatCard
+                title="Favorite Sport"
+                value={most_played_sport || 'N/A'}
+                icon={<Award />}
+              />
+               <StatCard
+                title="Credit Balance"
+                value={formatCurrency(credit_balance)}
+                icon={<Wallet />}
+              />
+              <StatCard
+                title="Total Spent"
+                value={formatCurrency(total_spent)}
+                icon={<Receipt />}
+              />
+            </div>
 
-              {isLoadingBooking ? (
-                <Loader />
-              ) : upcomingBooking ? (
-                <div className="bg-light-green-bg border-l-4 border-primary-green p-6 rounded-lg">
-                  <h3 className="font-bold text-2xl text-gray-800">
-                    {upcomingBooking.facilities?.venues?.name}
-                  </h3>
-                  <p className="text-gray-600 mt-1">
-                    {upcomingBooking.facilities?.name}
-                  </p>
-                  <div className="flex items-center text-gray-500 mt-4">
-                    <Clock size={18} className="mr-2" />
-                    <span className="font-medium">
-                      {new Date(
-                        upcomingBooking.time_slots?.start_time
-                      ).toLocaleDateString()}{" "}
-                      at{" "}
-                      {new Date(
-                        upcomingBooking.time_slots?.start_time
-                      ).toLocaleTimeString()}
+            {/* Upcoming Bookings Card (White) */}
+            <div className="bg-card-bg border border-border-color-light rounded-xl shadow-lg overflow-hidden">
+              <div className="p-6 border-b border-border-color-light flex justify-between items-center">
+                <div className="flex items-center space-x-3">
+                  <h2 className="text-xl font-bold text-primary-green-dark">
+                    Your Next Bookings
+                  </h2>
+                  {/* --- Badge (Unchanged) --- */}
+                  {upcoming_bookings_count > 0 && (
+                    <span className="bg-primary-green text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                      {upcoming_bookings_count}
                     </span>
-                  </div>
-                  <div className="mt-6 flex space-x-4">
-                    <button
-                      onClick={() =>
-                        navigate("/my-bookings", {
-                          state: { highlightedId: upcomingBooking.booking_id },
-                        })
-                      }
-                      className="flex-1 bg-primary-green text-white py-3 px-6 rounded-lg font-semibold hover:bg-primary-green-dark transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                    >
-                      View Details
-                    </button>
-                    <button
-                      onClick={() =>
-                        navigate(
-                          `/venues/${upcomingBooking.facilities?.venues?.id}`
-                        )
-                      }
-                      className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-lg font-semibold hover:bg-gray-300 transition-all duration-300"
-                    >
-                      View Venue
-                    </button>
-                  </div>
+                  )}
                 </div>
+                <Link to="/my-bookings" className="text-sm font-medium text-primary-green hover:text-primary-green-dark">
+                  View All
+                </Link>
+              </div>
+              
+              {upcoming_bookings_list && upcoming_bookings_list.length > 0 ? (
+                <ul className="divide-y divide-border-color-light">
+                  {upcoming_bookings_list.map((booking) => (
+                    <li key={booking.booking_id} className="p-6 hover:bg-hover-bg transition-colors duration-200">
+                      <div className="flex flex-col md:flex-row justify-between">
+                        <div>
+                          <p className="font-semibold text-primary-green text-lg">{booking.venue_name}</p>
+                          <p className="text-medium-text">{booking.facility_name}</p>
+                        </div>
+                        <div className="text-left md:text-right mt-2 md:mt-0">
+                          <p className="text-dark-text font-medium">
+                            {format(new Date(booking.start_time), 'eee, dd MMM yyyy')}
+                          </p>
+                          <p className="text-light-text text-sm">
+                            {format(new Date(booking.start_time), 'p')}
+                          </p>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               ) : (
-                <div className="text-center bg-gray-50 rounded-lg p-12">
-                  <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-6" />
-                  <p className="text-lg text-gray-600 mb-6">No upcoming bookings.</p>
-                  <button
-                    onClick={() => navigate("/explore")}
-                    className="bg-primary-green text-white py-3 px-8 rounded-lg font-semibold hover:bg-primary-green-dark transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                  >
-                    Explore Venues
-                  </button>
-                </div>
+                <p className="p-6 text-medium-text">You have no upcoming bookings.</p>
               )}
             </div>
           </div>
 
-          {/* Right Column - Quick Actions & Resources */}
+          {/* --- Right Column (1/3 width) --- */}
           <div className="lg:col-span-1 space-y-8">
-            {/* Quick Actions Section */}
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-                Quick Actions
-              </h2>
-              <div className="space-y-4">
-                <button
-                  onClick={() => navigate("/explore")}
-                  className="w-full flex items-center space-x-4 bg-primary-green text-white p-5 rounded-xl hover:bg-primary-green-dark transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                >
-                  <Calendar className="h-6 w-6" />
-                  <span className="flex-1 text-left font-semibold">Book a Venue</span>
-                </button>
-                <button
-                  onClick={() => navigate("/my-bookings")}
-                  className="w-full flex items-center space-x-4 bg-gray-200 text-gray-800 p-5 rounded-xl hover:bg-gray-300 transition-all duration-300"
-                >
-                  <Clock className="h-6 w-6" />
-                  <span className="flex-1 text-left font-semibold">
-                    My Bookings
-                  </span>
-                </button>
+            
+            {/* Favorite Venues Card (White) - Unchanged */}
+            <div className="bg-card-bg border border-border-color-light rounded-xl shadow-lg overflow-hidden">
+              <div className="p-6 border-b border-border-color-light">
+                <h2 className="text-xl font-bold text-primary-green-dark">
+                  Your Favorite Venues
+                </h2>
               </div>
+              
+              {favorite_venues && favorite_venues.length > 0 ? (
+                <ul className="divide-y divide-border-color-light">
+                  {favorite_venues.map((venue) => (
+                    <li key={venue.venue_id} className="p-6 flex justify-between items-center hover:bg-hover-bg transition-colors duration-200">
+                      <div>
+                        <p className="font-semibold text-primary-green text-lg">{venue.name}</p>
+                        <p className="text-medium-text text-sm">{venue.booking_count} {venue.booking_count > 1 ? 'bookings' : 'booking'}</p>
+                      </div>
+                      <Link
+                        to={`/venue/${venue.venue_id}`}
+                        className="px-4 py-2 bg-primary-green text-white text-sm font-medium rounded-md hover:bg-primary-green-dark transition-colors"
+                      >
+                        Book Again
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="p-6 text-medium-text">You don't have any favorite venues yet. Start booking!</p>
+              )}
+            </div>
+
+            {/* Current Offers Card (White) - Unchanged */}
+            <div className="bg-card-bg border border-border-color-light rounded-xl shadow-lg overflow-hidden">
+              <div className="p-6 border-b border-border-color-light">
+                <h2 className="text-xl font-bold text-primary-green-dark">
+                  Current Offers
+                </h2>
+              </div>
+              <ul className="divide-y divide-border-color-light">
+                {offers && offers.length > 0 ? (
+                  offers.map((offer) => (
+                    <li key={offer.offer_id} className="p-4 flex items-center space-x-4 hover:bg-hover-bg">
+                      <div className="p-3 rounded-full bg-light-green-bg">
+                        <Ticket className="h-5 w-5 text-primary-green" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-dark-text">{offer.title}</p>
+                        <p className="text-sm text-medium-text">
+                          {offer.offer_type === 'percentage_discount' 
+                            ? `${offer.discount_percentage}% OFF` 
+                            : `${formatCurrency(offer.fixed_discount_amount)} OFF`}
+                        </p>
+                      </div>
+                    </li>
+                  ))
+                ) : (
+                  <p className="p-6 text-medium-text">No offers available at the moment.</p>
+                )}
+              </ul>
             </div>
           </div>
         </div>
 
-        <div className="mb-8">
-          <HeroOfferCarousel />
-        </div>
-
-        <div className="mb-8">
-          <FeaturedVenues
-            venues={topVenues}
-            loading={loadingVenues}
-            error={errorVenues}
+        {/* Featured Venues Section (Full Width, below the columns) - Unchanged */}
+        <div className="mt-10">
+          <FeaturedVenues 
+            venues={topVenues} 
+            loading={isLoadingTopVenues} 
+            error={topVenuesError} 
           />
         </div>
+
       </div>
     </div>
   );
-};
-
-export default PlayerDashboardPage;
+}

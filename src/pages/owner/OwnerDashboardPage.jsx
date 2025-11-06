@@ -1,21 +1,18 @@
 // src/pages/owner/OwnerDashboardPage.jsx
-import React, { useState, useEffect } from "react"; // Removed useCallback
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
 import {
   FaRupeeSign,
   FaCalendarCheck,
-  FaChartLine,
-  FaFutbol,
-  FaClock,
-  FaTrophy,
-  FaCalendarAlt,
-  FaEye,
   FaList,
   FaChartBar,
-  FaChevronDown,
-  FaBook, // Added FaBook
+  FaRegClock,
+  FaBan,
+  FaPen,
+  FaBolt,
+  FaUsers
 } from "react-icons/fa";
 import {
   AreaChart,
@@ -25,345 +22,253 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
-import { format, parseISO } from "date-fns"; // Removed startOfDay, endOfDay
-import { FiLoader, FiAlertCircle } from "react-icons/fi"; // Added for loading/error
+import { format } from "date-fns";
+import { FiLoader, FiAlertCircle } from "react-icons/fi";
+import { formatCurrency } from "../../utils/formatters";
 
-const KpiCard = ({ icon, title, value, subtitle }) => (
-  <div className="group relative overflow-hidden bg-gradient-to-br from-white to-white/50 backdrop-blur-sm border border-border-color/60 rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-primary-green/50">
-    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary-green/5 to-transparent rounded-full -translate-y-1/3 translate-x-1/4 opacity-50 group-hover:opacity-100 transition-opacity duration-300"></div>
-    <div className="relative z-10">
-      <div className="flex items-center justify-between">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-green/10 to-primary-green/20 text-primary-green flex items-center justify-center">
-          {icon}
-        </div>
-        {subtitle && (
-          <span
-            className={`font-semibold text-xs px-2 py-1 rounded-full ${
-              subtitle.startsWith("+")
-                ? "bg-green-100 text-green-700"
-                : "bg-gray-100 text-gray-700"
-            }`}
-          >
-            {subtitle}
-          </span>
-        )}
-      </div>
-      <p className="text-3xl font-bold text-dark-text mt-3">{value}</p>
-      <p className="text-sm font-medium text-medium-text">{title}</p>
+// Stat Card (Unchanged)
+const StatCard = ({ title, value, icon }) => (
+  <div className="bg-primary-green-dark border border-primary-green rounded-xl shadow-lg p-6 flex items-center space-x-4 transition-transform hover:scale-105 duration-300">
+    <div className="p-4 rounded-full bg-white"> 
+      {React.cloneElement(icon, { className: "h-7 w-7 text-primary-green-dark" })}
+    </div>
+    <div>
+      <p className="text-sm text-gray-200 font-medium uppercase tracking-wide">{title}</p>
+      <p className="text-2xl font-bold text-white">{value}</p>
     </div>
   </div>
 );
 
+// Formatter for the X-axis (hours)
+const formatHour = (hour) => {
+  if (hour === 0) return '12 AM';
+  if (hour === 12) return '12 PM';
+  if (hour < 12) return `${hour} AM`;
+  return `${hour - 12} PM`;
+};
+
+// Custom Tooltip for Charts
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
+    const hourLabel = formatHour(label);
     return (
-      <div className="bg-white/80 backdrop-blur-sm shadow-lg rounded-lg p-3 border border-border-color/60">
-        <p className="label font-semibold text-dark-text">{`${label}`}</p>
-        <p
-          className="intro text-primary-green"
-          style={{ color: payload[0].fill }}
-        >
-          {`${payload[0].name}: ${
-            payload[0].dataKey === "revenue"
-              ? `₹${payload[0].value.toLocaleString("en-IN")}`
-              : payload[0].value
-          }`}
-        </p>
+      <div className="bg-white p-3 rounded-lg shadow-md border border-border-color-light">
+        <p className="text-sm text-medium-text">{`Time: ${hourLabel}`}</p>
+        <p className="text-dark-text font-medium">{`Revenue: ${formatCurrency(payload[0].value)}`}</p>
       </div>
     );
   }
   return null;
 };
 
-const COLORS = ["#059669", "#10B981", "#34D399", "#6EE7B7", "#A7F3D0"];
 
 function OwnerDashboardPage() {
   const { user } = useAuth();
-  
-  // --- REFACTORED STATE ---
-  // A single state for all statistics
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // --- REFACTORED EFFECT ---
-  // Single useEffect to fetch all stats from the new RPC function
   useEffect(() => {
-    const fetchDashboardStats = async () => {
-      setLoading(true);
-      setError(null);
-      
-      // Call the new function
-      const { data, error } = await supabase.rpc('get_owner_dashboard_all_stats');
+    async function fetchDashboardData() {
+      if (!user) return;
+      try {
+        setLoading(true);
+        // We pass the user.id to the function
+        const { data, error } = await supabase.rpc("get_owner_today_dashboard", {
+          p_owner_id: user.id 
+        }); 
+        if (error) throw error;
+        
+        const defaultStats = {
+          today_revenue: 0,
+          today_bookings_count: 0,
+          upcoming_bookings_count_total: 0,
+          hourly_revenue_trend: [],
+          upcoming_bookings_list: [],
+          today_cancellations: 0,
+          today_new_reviews: 0,
+        };
+        
+        setStats(data || defaultStats);
 
-      if (error) {
-        console.error("Error fetching dashboard statistics:", error);
-        setError(error.message);
-      } else {
-        setStats(data);
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err);
+        setError(err.message || "Failed to load dashboard data. Please try again.");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    };
-
-    if (user) {
-      fetchDashboardStats();
     }
-  }, [user]); // Re-fetches only if the user changes
+    fetchDashboardData();
+  }, [user]);
 
-  // Helper to format large numbers (from original file)
-  const formatStatValue = (value) => {
-    if (value >= 10000000) return `${(value / 10000000).toFixed(1)} Cr`;
-    if (value >= 100000) return `${(value / 100000).toFixed(1)} L`;
-    if (value >= 1000) return `${(value / 1000).toFixed(1)} K`;
-    return value;
-  };
+  // Calculate Busiest Hour
+  const busiestHourData = useMemo(() => {
+    if (!stats?.hourly_revenue_trend || stats.hourly_revenue_trend.length === 0) {
+      return { hour: 'N/A' };
+    }
+    const busiest = stats.hourly_revenue_trend.reduce(
+      (max, hour) => (hour.revenue > max.revenue ? hour : max),
+      { revenue: -1 } 
+    );
+    if (busiest.revenue <= 0) { 
+      return { hour: 'N/A' };
+    }
+    return { hour: formatHour(busiest.hour_of_day) };
+  }, [stats?.hourly_revenue_trend]);
 
-  // Loader component for charts (from original file)
-  const ChartLoader = () => (
-    <div className="h-[280px] flex items-center justify-center">
-      <FiLoader className="animate-spin text-primary-green text-3xl" />
-    </div>
-  );
-  
-  // --- ALL OTHER STATE AND USEEFFECTS (for stats) ARE REMOVED ---
 
-  return (
-    <div className="min-h-screen bg-background text-dark-text p-4 md:p-8">
-      {/* Header (Original Styling) */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-dark-text">Dashboard</h1>
-          <p className="text-lg text-medium-text mt-1">
-            Welcome back, {user?.user_metadata?.first_name || "Owner"}!
-          </p>
-        </div>
-        <div className="flex items-center gap-4 mt-4 sm:mt-0">
-          <Link
-            to="/owner/reports"
-            className="flex items-center gap-2 text-sm font-medium text-primary-green hover:text-primary-green-dark transition-colors"
-          >
-            <FaChartBar />
-            <span>View Full Reports</span>
-          </Link>
-          <div className="relative">
-            <button className="flex items-center gap-2 text-sm font-medium text-medium-text bg-white border border-border-color/60 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
-              <FaCalendarAlt className="text-gray-400" />
-              <span>Today</span>
-              <FaChevronDown className="w-3 h-3 text-gray-400" />
-            </button>
-            {/* Dropdown can be added here if needed */}
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <FiLoader className="animate-spin text-primary-green h-12 w-12" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto p-4 md:p-8">
+        <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-xl flex items-center space-x-4">
+          <FiAlertCircle className="h-8 w-8 text-red-500" />
+          <div>
+            <p className="font-bold text-lg">Error Loading Dashboard</p>
+            <p className="text-sm">{error.message}</p>
           </div>
         </div>
       </div>
+    );
+  }
+  
+  // Check if there is valid chart data to show
+  const hasChartData = stats?.hourly_revenue_trend && stats.hourly_revenue_trend.length > 0 && stats.hourly_revenue_trend.some(h => h.revenue > 0);
 
-      {/* Main Stats Grid (Original Styling & KPIs) */}
-      {loading && !stats ? (
-        // Skeleton Loader
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-gradient-to-br from-white to-white/50 border border-border-color/60 rounded-2xl p-5 h-[156px] animate-pulse">
-              <div className="w-12 h-12 rounded-full bg-gray-200"></div>
-              <div className="h-7 bg-gray-300 rounded w-1/2 mt-3"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/3 mt-2"></div>
-            </div>
-          ))}
+  return (
+    <div className="bg-background min-h-screen">
+      <div className="max-w-7xl mx-auto p-4 md:p-8">
+        
+        {/* Header with buttons (Unchanged) */}
+        <div className="flex flex-col md:flex-row justify-between md:items-center mb-8 gap-4">
+          <h1 className="text-4xl font-bold text-primary-green-dark">
+            Today's Dashboard
+          </h1>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/owner/my-venues"
+              className="py-2 px-4 rounded-lg text-sm font-medium transition-colors bg-primary-green text-white hover:bg-primary-green-dark flex items-center gap-2"
+            >
+              <FaList />
+              <span>Manage Venues</span>
+            </Link>
+            <Link
+              to="/owner/reports"
+              className="py-2 px-4 rounded-lg text-sm font-medium transition-colors bg-card-bg text-primary-green border border-border-color-light hover:bg-hover-bg flex items-center gap-2"
+            >
+              <FaChartBar />
+              <span>View Reports</span>
+            </Link>
+          </div>
         </div>
-      ) : error ? (
-        // Error Message
-        <div className="mb-8 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center gap-3">
-          <FiAlertCircle size={20} />
-          <span>Could not load dashboard statistics: {error}</span>
-        </div>
-      ) : stats ? (
-        // Loaded Stats (Mapped from new `stats` object to ORIGINAL KPIs)
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <KpiCard
-            icon={<FaRupeeSign size={20} />}
+
+        {/* --- NEW LAYOUT: 6 Stat Cards (Full Width) --- */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <StatCard
             title="Today's Revenue"
-            value={`₹${formatStatValue(stats.todays_revenue)}`}
-            subtitle={`${stats.todays_bookings} booking(s)`}
+            value={formatCurrency(stats?.today_revenue || 0)}
+            icon={<FaRupeeSign />}
           />
-          <KpiCard
-            icon={<FaCalendarCheck size={20} />}
+          <StatCard
+            title="Today's Bookings"
+            value={stats?.today_bookings_count || 0}
+            icon={<FaCalendarCheck />}
+          />
+          <StatCard
             title="Upcoming Bookings"
-            value={stats.upcoming_bookings}
-            subtitle="Future confirmed"
+            value={stats?.upcoming_bookings_count_total || 0}
+            icon={<FaRegClock />}
           />
-          <KpiCard
-            icon={<FaChartLine size={20} />}
-            title="Total Revenue"
-            value={`₹${formatStatValue(stats.total_revenue)}`}
-            subtitle="All-time"
+          <StatCard
+            title="Today's Cancellations"
+            value={stats?.today_cancellations || 0}
+            icon={<FaBan />}
           />
-          <KpiCard
-            icon={<FaBook size={20} />}
-            title="Total Bookings"
-            value={formatStatValue(stats.total_bookings)}
-            subtitle="All-time"
+          <StatCard
+            title="Today's New Reviews"
+            value={stats?.today_new_reviews || 0}
+            icon={<FaPen />}
+          />
+          <StatCard
+            title="Today's Unique Players"
+            value={stats?.todays_unique_players || 0}
+            icon={<FaUsers />}
           />
         </div>
-      ) : null}
 
-      {/* Charts Section (Original Styling) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Revenue Trend Chart */}
-        <div className="lg:col-span-2 bg-white border border-border-color/60 shadow-sm rounded-2xl p-6">
-          <h2 className="text-xl font-semibold text-dark-text mb-4">
-            Revenue Trend (Last 6 Months)
-          </h2>
-          {loading ? (
-            <ChartLoader />
-          ) : stats && stats.revenue_trend?.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={stats.revenue_trend}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor="#10B981"
-                      stopOpacity={0.8}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor="#10B981"
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" vertical={false} />
-                <XAxis
-                  dataKey="month"
-                  tickFormatter={(val) => format(parseISO(val), "MMM yy")}
-                  stroke="#6b7280"
-                  fontSize={12}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  stroke="#6b7280"
-                  fontSize={12}
-                  tickFormatter={(val) => `₹${formatStatValue(val)}`}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="revenue"
-                  name="Revenue" // Added name for tooltip
-                  stroke="#059669"
-                  fill="url(#colorRevenue)"
-                  strokeWidth={2.5}
-                  dot={{ r: 4, fill: "#059669", fillOpacity: 1 }}
-                  activeDot={{ r: 6, fill: "#fff", stroke: "#059669", strokeWidth: 2 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-[280px] flex flex-col items-center justify-center text-medium-text">
-                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
-                  <FaChartLine className="w-8 h-8 text-gray-400" />
-                </div>
-                <p className="font-medium">No revenue data yet</p>
-                <p className="text-sm text-light-text">
-                  New bookings will appear here.
-                </p>
+        {/* --- NEW LAYOUT: Chart and Bookings List Grid --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* --- Left Column (Chart) --- */}
+          <div className="lg:col-span-2 space-y-8 min-w-0">
+            {/* Hourly Revenue Chart */}
+            <div className="bg-card-bg border border-border-color-light rounded-xl shadow-lg overflow-hidden">
+              <div className="p-6 border-b border-border-color-light">
+                <h2 className="text-xl font-bold text-primary-green-dark">
+                  Today's Revenue (by Hour)
+                </h2>
               </div>
-          )}
-        </div>
-
-        {/* Other Stats Column */}
-        <div className="flex flex-col gap-6">
-          {/* Peak Hours */}
-          <div className="bg-white border border-border-color/60 shadow-sm rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-dark-text mb-4">
-              Peak Booking Hours
-            </h2>
-            {loading ? (
-              <ChartLoader />
-            ) : stats && stats.peak_hours?.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={stats.peak_hours.slice(0, 5)} layout="vertical" margin={{ left: 10, right: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e0e0e0" />
-                  <XAxis type="number" hide />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    stroke="#6b7280"
-                    fontSize={12}
-                    width={50} // Explicit width for labels
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="bookings" name="Bookings" fill="#10B981" radius={[0, 8, 8, 0]} barSize={20}>
-                    {stats.peak_hours.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[280px] flex flex-col items-center justify-center text-medium-text">
-                  <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
-                    <FaClock className="w-8 h-8 text-gray-400" />
+              
+              <div className="p-6 h-[300px]">
+                {hasChartData ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={stats.hourly_revenue_trend} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+                      <XAxis dataKey="hour_of_day" tickFormatter={formatHour} />
+                      <YAxis tickFormatter={(val) => `₹${val}`} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Area type="monotone" dataKey="revenue" stroke="#046241" fill="#059669" fillOpacity={0.1} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-medium-text">
+                    <p className="font-medium">No revenue data for today yet</p>
                   </div>
-                  <p className="font-medium">No booking data yet</p>
-                  <p className="text-sm text-light-text">
-                    Peak hours will be calculated soon.
-                  </p>
-                </div>
-            )}
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Sport Distribution */}
-          <div className="bg-white border border-border-color/60 shadow-sm rounded-2xl p-6">
-            <h2 className="text-lg font-semibold text-dark-text mb-4">
-              Sport Distribution
-            </h2>
-            {loading ? (
-              <ChartLoader />
-            ) : stats && stats.sport_distribution?.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie
-                      data={stats.sport_distribution}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) =>
-                        `${name} ${(percent * 100).toFixed(0)}%`
-                      }
-                      outerRadius={90}
-                      fill="#8884d8"
-                      dataKey="bookings"
-                      nameKey="name" // Use nameKey to match the data
-                    >
-                      {stats.sport_distribution.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-            ) : (
-              <div className="h-[280px] flex flex-col items-center justify-center text-medium-text">
-                  <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
-                    <FaFutbol className="w-8 h-8 text-gray-400" />
+          {/* --- Right Column (Bookings List) --- */}
+          <div className="lg:col-span-1 space-y-8">
+            <div className="bg-card-bg border border-border-color-light rounded-xl shadow-lg overflow-hidden">
+              <div className="p-6 border-b border-border-color-light">
+                <h2 className="text-xl font-bold text-primary-green-dark">
+                  Today's Upcoming Bookings
+                </h2>
+              </div>
+              <div className="p-4">
+                {stats && stats.upcoming_bookings_list && stats.upcoming_bookings_list.length > 0 ? (
+                  <ul className="divide-y divide-border-color-light">
+                    {stats.upcoming_bookings_list.map((booking) => (
+                      <li key={booking.booking_id} className="py-3">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-sm font-semibold text-dark-text">{booking.player_name || 'Player'}</p>
+                            <p className="text-xs text-medium-text">{booking.facility_name} at {booking.venue_name}</p>
+                          </div>
+                          <p className="text-sm font-bold text-primary-green">
+                            {format(new Date(booking.start_time), 'p')}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="h-40 flex flex-col items-center justify-center text-medium-text">
+                    <p className="font-medium">No more bookings for today</p>
                   </div>
-                  <p className="font-medium">No sport data yet</p>
-                  <p className="text-sm text-light-text">
-                    Bookings will be categorized here
-                  </p>
-                </div>
-            )}
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

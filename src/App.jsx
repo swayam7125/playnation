@@ -220,6 +220,7 @@ function App() {
                 <Route index element={<HomePage />} />
                 <Route path="about" element={<AboutUsPage />} />
                 <Route path="contact" element={<ContactUsPage />} />
+                <Route path="venue/:venueId" element={<VenuePage />} />
                 {/* Auth Routes */}
                 <Route path="auth" element={<AuthPage />} />
                 <Route path="login" element={<AuthPage />} />
@@ -237,9 +238,7 @@ function App() {
                 <Route
                   path="venues/:venueId"
                   element={
-                    <RequireAuth allowedRoles={["player"]}>
                       <VenuePage />
-                    </RequireAuth>
                   }
                 />
                 <Route
