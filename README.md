@@ -1,7 +1,3 @@
-Here is a detailed and professional `README.md` file generated for your project, based on the comprehensive analysis of its files.
-
------
-
 # Playnation - Sports Venue Booking Platform
 
 Playnation is a modern, full-stack web application designed to connect players with sports venue owners. It provides a comprehensive, role-based platform for browsing and booking sports facilities, managing venue operations, and administering the entire ecosystem.
