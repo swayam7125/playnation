@@ -3,7 +3,9 @@ import { supabase } from "../../supabaseClient";
 import AdminDashboardSkeleton from "../../components/skeletons/admin/AdminDashboardSkeleton";
 import { FaUsers, FaBuilding, FaCalendarCheck, FaRupeeSign, FaUserPlus, FaClock, FaChartLine, FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import DownloadDropdown from '../../components/common/DownloadDropdown';
 
+// KpiCard, SectionCard, and ActivityItem components remain unchanged
 const KpiCard = ({ icon, title, value, subtitle, trend }) => (
   <div className="group relative overflow-hidden bg-white border border-border-color rounded-2xl p-6 transition-all duration-300 hover:shadow-2xl hover:shadow-primary-green/10 hover:-translate-y-1">
     <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-primary-green/10 via-primary-green/5 to-transparent rounded-full blur-3xl -translate-y-20 translate-x-20 group-hover:scale-150 transition-transform duration-700"></div>
@@ -56,180 +58,105 @@ const ActivityItem = ({ title, subtitle, icon }) => (
   </div>
 );
 
-import DownloadDropdown from '../../components/common/DownloadDropdown';
-
-
 
 function AdminDashboardPage() {
 
   const [stats, setStats] = useState(null);
-
   const [chartData, setChartData] = useState(null);
-
   const [recentActivity, setRecentActivity] = useState(null);
-
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState(null);
-
   const [pendingVenuesList, setPendingVenuesList] = useState([]);
-
   const [isDownloading, setIsDownloading] = useState(false);
 
-
-
+  // handleDownloadReport, handleApproveVenue, handleRejectVenue remain unchanged
   const handleDownloadReport = async (format) => {
-
     setIsDownloading(true);
-
     try {
-
       const { data, error } = await supabase.functions.invoke('generate-admin-report', {
-
         body: { format },
-
       });
-
       if (error) throw error;
 
-
-
       const blob = new Blob([data], { type: format === 'pdf' ? 'application/pdf' : 'text/csv' });
-
       const url = window.URL.createObjectURL(blob);
-
       const a = document.createElement('a');
-
       a.href = url;
-
       a.download = `playnation-report-${new Date().toISOString().split('T')[0]}.${format}`;
-
       document.body.appendChild(a);
-
       a.click();
-
       document.body.removeChild(a);
-
       window.URL.revokeObjectURL(url);
 
-
-
     } catch (error) {
-
       console.error('Error downloading report:', error);
-
       alert('Failed to download report.');
-
     } finally {
-
       setIsDownloading(false);
-
     }
-
   };
 
   const handleApproveVenue = async (venueId) => {
-    // Database logic remains unchanged
     const { error } = await supabase.from('venues').update({ is_approved: true }).eq('venue_id', venueId);
     if (error) {
       console.error('Error approving venue:', error);
     } else {
-      fetchAdminDashboardData();
+      fetchAdminDashboardData(); // Refetch all data
     }
   };
 
   const handleRejectVenue = async (venueId) => {
-    // Database logic remains unchanged
     const { error } = await supabase.from('venues').delete().eq('venue_id', venueId);
     if (error) {
       console.error('Error rejecting venue:', error);
     } else {
-      fetchAdminDashboardData();
+      fetchAdminDashboardData(); // Refetch all data
     }
   };
 
+  // fetchAdminDashboardData remains unchanged from the previous version
   const fetchAdminDashboardData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // All database logic remains unchanged
-      const { count: totalUsers, error: usersError } = await supabase.from('users').select('*', { count: 'exact', head: true });
-      if (usersError) throw usersError;
-
-      const { count: totalVenues, error: venuesError } = await supabase.from('venues').select('*', { count: 'exact', head: true });
-      if (venuesError) throw venuesError;
-
-      const { count: totalBookings, error: bookingsError } = await supabase.from('bookings').select('*', { count: 'exact', head: true });
-      if (bookingsError) throw bookingsError;
-
-      const { data: revenueData, error: revenueError } = await supabase.from('bookings').select('total_amount').eq('payment_status', 'paid');
-      if (revenueError) throw revenueError;
-      const totalRevenue = revenueData.reduce((sum, booking) => sum + booking.total_amount, 0);
-
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const { count: newUsers, error: newUsersError } = await supabase.from('users').select('*', { count: 'exact', head: true }).gte('registration_date', thirtyDaysAgo.toISOString());
-      if (newUsersError) throw newUsersError;
-
-      const { data: pendingVenuesData, error: pendingVenuesError } = await supabase.from('venues').select('*').eq('is_approved', false).order('created_at', { ascending: false });
+      // Call our all-in-one function
+      const { data, error: rpcError } = await supabase.rpc('get_admin_dashboard_all_data');
+      if (rpcError) throw rpcError;
+      
+      if (!data) {
+        throw new Error("Could not fetch admin stats. RPC returned empty.");
+      }
+      
+      // Fetch pending venues (this is the only separate query, and it's fine)
+      const { data: pendingVenuesData, error: pendingVenuesError } = await supabase
+        .from('venues')
+        .select('*')
+        .eq('is_approved', false)
+        .order('created_at', { ascending: false });
       if (pendingVenuesError) throw pendingVenuesError;
       setPendingVenuesList(pendingVenuesData);
 
+      // Set all stats from our single RPC call
       setStats({
-        totalUsers,
-        totalVenues,
-        totalBookings,
-        totalRevenue,
-        newUsers,
+        ...data.stats, // Unpack all KPI stats
         pendingVenues: pendingVenuesData.length,
       });
 
-      const { data: bookingsChartData, error: bookingsChartError } = await supabase.from('bookings').select('created_at').gte('created_at', thirtyDaysAgo.toISOString());
-      if (bookingsChartError) throw bookingsChartError;
+      // Set chart data
+      setChartData({
+        bookingTrend: data.booking_trend,
+        userRoleDistribution: data.user_roles,
+      });
 
-      const bookingsByDay = bookingsChartData.reduce((acc, booking) => {
-        const date = new Date(booking.created_at).toLocaleDateString();
-        acc[date] = (acc[date] || 0) + 1;
-        return acc;
-      }, {});
-
-      const bookingTrend = Object.keys(bookingsByDay).map(date => ({
-        date,
-        count: bookingsByDay[date]
-      }));
-
-      const { data: userRolesData, error: userRolesError } = await supabase.from('users').select('role');
-      if (userRolesError) throw userRolesError;
-
-      const userRoles = userRolesData.reduce((acc, user) => {
-        acc[user.role] = (acc[user.role] || 0) + 1;
-        return acc;
-      }, {});
-
-      const userRoleDistribution = Object.keys(userRoles).map(role => ({
-        name: role,
-        value: userRoles[role]
-      }));
-
-      setChartData({ bookingTrend, userRoleDistribution });
-
-      const { data: recentUsers, error: recentUsersError } = await supabase.from('users').select('*').order('registration_date', { ascending: false }).limit(5);
-      if (recentUsersError) throw recentUsersError;
-
-            const { data: recentVenues, error: recentVenuesError } = await supabase.from('venues').select('*, created_at').order('created_at', { ascending: false }).limit(5);
-      if (recentVenuesError) throw recentVenuesError;
-
-      const { data: recentBookings, error: recentBookingsError } = await supabase.from('bookings').select('*, facilities(venues(name))').order('created_at', { ascending: false }).limit(5);
-      if (recentBookingsError) throw recentBookingsError;
-
-      const { data: topVenuesData, error: topVenuesError } = await supabase.rpc('top_venues_by_booking');
-      if (topVenuesError) throw topVenuesError;
-
-      const { data: topUsersData, error: topUsersError } = await supabase.rpc('top_users_by_booking');
-      if (topUsersError) throw topUsersError;
-
-      setRecentActivity({ recentUsers, recentVenues, recentBookings, topVenues: topVenuesData, topUsers: topUsersData });
+      // Set activity data
+      setRecentActivity({
+        recentUsers: data.recent_users,
+        recentVenues: data.recent_venues,
+        recentBookings: data.recent_bookings,
+        topVenues: data.top_venues,
+        topUsers: data.top_users,
+      });
 
     } catch (error) {
       console.error("Error fetching admin dashboard data:", error);
@@ -238,6 +165,7 @@ function AdminDashboardPage() {
       setLoading(false);
     }
   }, []);
+
 
   useEffect(() => {
     fetchAdminDashboardData();
@@ -283,45 +211,48 @@ function AdminDashboardPage() {
           <p className="text-medium-text ml-5">Monitor and manage your platform's performance</p>
         </div>
 
+        {/* --- ALL FIXES ARE IN THIS SECTION --- */}
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <KpiCard 
             icon={<FaUsers />} 
             title="Total Users" 
-            value={stats.totalUsers.toLocaleString()} 
+            value={(stats.total_users || 0).toLocaleString()} 
             trend="+12%"
           />
           <KpiCard 
             icon={<FaBuilding />} 
             title="Total Venues" 
-            value={stats.totalVenues.toLocaleString()} 
+            value={(stats.total_venues || 0).toLocaleString()} 
             trend="+8%"
           />
           <KpiCard 
             icon={<FaCalendarCheck />} 
             title="Total Bookings" 
-            value={stats.totalBookings.toLocaleString()} 
+            value={(stats.total_bookings || 0).toLocaleString()} 
             trend="+15%"
           />
           <KpiCard 
             icon={<FaRupeeSign />} 
             title="Total Revenue" 
-            value={`₹${stats.totalRevenue.toLocaleString('en-IN')}`}
+            value={`₹${(stats.total_revenue || 0).toLocaleString('en-IN')}`}
             trend="+24%"
           />
           <KpiCard 
             icon={<FaUserPlus />} 
             title="New Users (30d)" 
-            value={stats.newUsers.toLocaleString()}
+            value={(stats.new_users || 0).toLocaleString()}
             subtitle="Last 30 days"
           />
           <KpiCard 
             icon={<FaClock />} 
             title="Pending Venues" 
-            value={stats.pendingVenues.toLocaleString()}
+            value={(stats.pendingVenues || 0).toLocaleString()}
             subtitle="Awaiting approval"
           />
         </div>
+        {/* --- END OF FIXES --- */}
+
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -425,8 +356,8 @@ function AdminDashboardPage() {
             <div className="space-y-2">
               {recentActivity?.recentBookings.map(booking => (
                 <ActivityItem
-                  key={booking.id}
-                  title={booking.facilities.venues.name}
+                  key={booking.booking_id}
+                  title={booking.venue_name}
                   subtitle={new Date(booking.start_time).toLocaleDateString()}
                   icon={<FaCalendarCheck className="text-sm" />}
                 />
