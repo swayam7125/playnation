@@ -46,8 +46,19 @@ const ProfilePage = () => {
       let newAvatarUrl = avatarUrl;
       if (avatarFile) {
         setUploading(true);
+        
+        // Validate file type
+        if (!avatarFile.type.startsWith('image/')) {
+          throw new Error('Please upload an image file');
+        }
+        
+        // Validate file size (max 2MB)
+        if (avatarFile.size > 2 * 1024 * 1024) {
+          throw new Error('File size must be less than 2MB');
+        }
+        
         const fileExt = avatarFile.name.split(".").pop();
-        const fileName = `${user.id}.${fileExt}`;
+        const fileName = `avatar.${fileExt}`;
         const filePath = `${user.id}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
@@ -93,6 +104,19 @@ const ProfilePage = () => {
   const handleAvatarChange = (event) => {
     if (!event.target.files || event.target.files.length === 0) return;
     const file = event.target.files[0];
+    
+    // Additional validation
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file');
+      return;
+    }
+    
+    if (file.size > 2 * 1024 * 1024) {
+      setError('File size must be less than 2MB');
+      return;
+    }
+    
+    setError('');
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
   };
@@ -105,6 +129,12 @@ const ProfilePage = () => {
     setAvatarFile(null);
 
     try {
+      // Delete the file from storage if it exists
+      if (profile.avatar_url) {
+        const filePath = `${user.id}/avatar.${profile.avatar_url.split('.').pop().split('?')[0]}`;
+        await supabase.storage.from("avatars").remove([filePath]);
+      }
+
       const { error } = await supabase
         .from("users")
         .update({ avatar_url: null })
@@ -174,13 +204,22 @@ const ProfilePage = () => {
                       />
                     </div>
                     <div className="flex flex-col gap-3">
+                      {/* Hidden file input - THIS WAS MISSING */}
+                      <input
+                        type="file"
+                        id="avatar-upload"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                        className="hidden"
+                      />
+                      
                       <label
                         htmlFor="avatar-upload"
-                        className="cursor-pointer bg-primary-green text-white font-semibold py-2 px-4 rounded-lg text-sm hover:bg-primary-green-dark transition-colors shadow-md"
+                        className="cursor-pointer bg-primary-green text-white font-semibold py-2 px-4 rounded-lg text-sm hover:bg-primary-green-dark transition-colors shadow-md text-center"
                       >
                         {uploading ? "Uploading..." : "Choose Picture"}
                       </label>
-                      {avatarUrl && (
+                      {(avatarUrl || avatarPreview) && (
                         <button
                           type="button"
                           onClick={handleRemoveAvatar}
