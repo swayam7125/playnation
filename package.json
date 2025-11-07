@@ -36,23 +36,22 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
-    "@vheemstra/vite-plugin-imagemin": "^2.2.1",
     "@vitejs/plugin-react": "^4.7.0",
     "@vitest/coverage-v8": "^3.2.4",
     "autoprefixer": "^10.4.19",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
-    "imagemin-gifsicle": "^7.0.0",
-    "imagemin-jpegtran": "^8.0.0",
-    "imagemin-optipng": "^8.0.0",
-    "imagemin-svgo": "^11.0.1",
     "jsdom": "^27.0.0",
     "postcss": "^8.4.39",
     "supabase": "^2.54.11",
     "tailwindcss": "^3.4.4",
     "vite": "^7.1.0",
     "vite-plugin-compression": "^0.5.1",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "vite-plugin-image-optimizer": "^1.1.7"
+  },
+  "overrides": {
+    "graceful-fs": "^4.2.11"
   }
 }
