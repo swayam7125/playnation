@@ -15,9 +15,11 @@ This project is built with a database-centric architecture, moving complex busin
   - [Project Structure](https://www.google.com/search?q=%23project-structure)
   - [Available Scripts](https://www.google.com/search?q=%23available-scripts)
   - [Backend Deep Dive](https://www.google.com/search?q=%23backend-deep-dive)
-      - [Database Schema & Logic](https://www.google.com/search?q=%23database-schema--logic)
+      - [Database Schema & Logic](https://www.google.com/search?q=%23database-schema-logic)
       - [Supabase Edge Functions](https://www.google.com/search?q=%23supabase-edge-functions)
   - [Testing](https://www.google.com/search?q=%23testing)
+
+-----
 
 ## Core Features
 
@@ -51,6 +53,8 @@ The application is built around three distinct user roles with tailored experien
   - **Global Offer Management:** Create and manage global offers that apply to all venues.
   - **Notification Center:** View system notifications for new bookings or cancellations.
 
+-----
+
 ## Architecture Overview
 
 This project is a modern full-stack application leveraging the Supabase platform.
@@ -65,6 +69,8 @@ This project is a modern full-stack application leveraging the Supabase platform
     1.  **Client-Side:** Routes are protected using a `RequireAuth` component that checks user roles.
     2.  **API-Side:** Edge Functions are secured with JWT verification (`verify_jwt = true`).
     3.  **Database-Side:** **Row Level Security (RLS)** is enabled on all critical tables, ensuring users can only read/write data they are permitted to access. Business logic is encapsulated in `SECURITY DEFINER` SQL functions to run with elevated privileges securely.
+
+-----
 
 ## Tech Stack
 
@@ -97,6 +103,8 @@ This project is a modern full-stack application leveraging the Supabase platform
   - **Runner:** Vitest
   - **Libraries:** React Testing Library, Jest-DOM
   - **UI:** JSDOM
+
+-----
 
 ## Getting Started
 
@@ -173,6 +181,8 @@ You must have the following tools installed on your system:
 
     The application will be running live at `http://127.0.0.1:5173` (or the port specified by Vite).
 
+-----
+
 ## Project Structure
 
 ```
@@ -207,6 +217,8 @@ playnation-c/
 └── vite.config.js          # Vite configuration
 ```
 
+-----
+
 ## Available Scripts
 
 From the root directory (`playnation-c`), you can run:
@@ -216,6 +228,8 @@ From the root directory (`playnation-c`), you can run:
   - `npm run lint`: Lints the project files using ESLint.
   - `npm run preview`: Serves the production build locally.
   - `npm run test`: Runs the test suite with Vitest.
+
+-----
 
 ## Backend Deep Dive
 
@@ -251,6 +265,8 @@ Secure server-side logic is handled by Deno Edge Functions. These are primarily 
   - `/supabase/functions/generate-report`: Generates a PDF report for venue owners.
   - `/supabase/functions/validate-offer`: Checks the validity of a discount code before applying it.
   - `/supabase/functions/update-user-status`: An admin-only function to suspend or reactivate users.
+
+-----
 
 ## Testing
 
