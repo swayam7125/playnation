@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../supabaseClient";
 import { useModal } from "../../ModalContext";
+import toast from 'react-hot-toast';
 import OfferForm from "../../components/offers/OfferForm";
 import OwnerOfferCard from "../../components/offers/OwnerOfferCard";
 import { FaPlus, FaSearch } from "react-icons/fa";
@@ -53,27 +54,30 @@ function AdminManageOffersPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (offerId) => {
-    const isConfirmed = await showModal({
+  const handleDelete = (offerId) => {
+    showModal({
       title: "Confirm Deletion",
       message: "Are you sure you want to delete this offer? This action cannot be undone.",
       confirmText: "Delete",
       confirmStyle: "danger",
+      onConfirm: async () => {
+        const toastId = toast.loading('Deleting offer...');
+        try {
+          const { error } = await supabase
+            .from("offers")
+            .delete()
+            .eq("offer_id", offerId);
+          if (error) throw error;
+          toast.dismiss(toastId);
+          toast.success("Offer deleted successfully.");
+          fetchOffersAndVenues();
+        } catch (err) {
+          toast.dismiss(toastId);
+          toast.error(`Failed to delete offer: ${err.message}`);
+          setError(err.message);
+        }
+      },
     });
-
-    if (isConfirmed) {
-      try {
-        const { error } = await supabase
-          .from("offers")
-          .delete()
-          .eq("offer_id", offerId);
-        if (error) throw error;
-        await showModal({ title: "Success", message: "Offer deleted successfully." });
-        fetchOffersAndVenues();
-      } catch (err) {
-        await showModal({ title: "Error", message: `Failed to delete offer: ${err.message}` });
-      }
-    }
   };
 
   const handleToggle = async (offer) => {

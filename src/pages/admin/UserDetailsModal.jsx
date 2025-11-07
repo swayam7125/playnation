@@ -24,9 +24,9 @@ const UserDetailsModal = ({ user, onClose }) => {
       // Fetch bookings
       const { data: bookingsData } = await supabase
         .from("bookings")
-        .select("*, venues(*)")
+        .select("*, facilities(*, venues(*))")
         .eq("user_id", user.user_id)
-        .order("booking_date", { ascending: false });
+        .order("start_time", { ascending: false });
       setBookings(bookingsData || []);
 
       // Fetch venues if user is a venue owner
@@ -98,11 +98,11 @@ const UserDetailsModal = ({ user, onClose }) => {
                     className="p-3 bg-blue-50 rounded-md text-sm"
                   >
                     <p className="font-semibold">
-                      {booking.venues?.name || "Venue not found"}
+                      {booking.facilities?.venues?.name || "Venue not found"}
                     </p>
                     <p>
                       Date:{" "}
-                      {new Date(booking.booking_date).toLocaleDateString()}
+                      {new Date(booking.start_time).toLocaleDateString()}
                     </p>
                     <p>
                       Status:{" "}

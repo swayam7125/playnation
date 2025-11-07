@@ -3,17 +3,23 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../AuthContext';
 import OwnerVenueCard from '../../components/venues/OwnerVenueCard';
+import useSkeletonLoader from '../../hooks/useSkeletonLoader';
+import { MyVenuesPageSkeleton } from '../../components/skeletons/owner';
+import { FiAlertCircle } from 'react-icons/fi'; // <-- 1. IMPORT ADDED
 
 function MyVenuesPage() {
   const { user } = useAuth();
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('approved');
+  const showContent = useSkeletonLoader(loading);
 
   useEffect(() => {
     const fetchOwnerVenues = async () => {
       if (!user) { setLoading(false); return; }
       setLoading(true);
+      setError(null);
       try {
         const { data, error } = await supabase
           .rpc('get_owner_venues_details'); // Call the new PostgreSQL function
@@ -24,6 +30,7 @@ function MyVenuesPage() {
         
       } catch (error) {
         console.error("Error fetching owner venues:", error);
+        setError(error.message || "Failed to fetch venues.");
       } finally {
         setLoading(false);
       }
@@ -46,11 +53,30 @@ function MyVenuesPage() {
     { key: 'all', label: 'All Venues', count: venues.length }
   ];
 
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 md:p-8">
+        <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-xl flex items-center space-x-4">
+          <FiAlertCircle className="h-8 w-8 text-red-500" />
+          <div>
+            <p className="font-bold text-lg">Error Loading Venues</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!showContent) {
+    return <MyVenuesPageSkeleton />;
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-white to-light-green-bg/30">
+    // Added animate-fadeIn for smooth transition
+    <div className="min-h-screen bg-gradient-to-br from-background via-white to-light-green-bg/30 animate-fadeIn"> 
       <div className="container mx-auto px-6 py-8 max-w-7xl">
         
-        {/* Elegant Header with Integrated Filter Tabs */}
+        {/* Elegant Header with Integrated Filter Tabs (Unchanged) */}
         <div className="relative overflow-hidden bg-gradient-to-r from-primary-green to-primary-green-dark rounded-2xl shadow-xl mb-8">
           <div className="absolute inset-0 bg-black/5"></div>
           <div className="relative px-8 py-6">
@@ -87,7 +113,7 @@ function MyVenuesPage() {
               </div>
             </div>
             
-            {/* Refined Stats Cards that now act as the main filter tabs */}
+            {/* Refined Stats Cards that now act as the main filter tabs (Unchanged) */}
             <div className="grid grid-cols-4 gap-4 mt-6">
               {tabData.map((tab) => (
                 <div key={tab.key} className="bg-white/15 backdrop-blur rounded-xl p-4 border border-white/20 hover:bg-white/20 transition-all duration-200 group cursor-pointer" onClick={() => setActiveTab(tab.key)}>
@@ -103,22 +129,14 @@ function MyVenuesPage() {
             </div>
           </div>
         </div>
-
-        {/* The second set of filter tabs has been REMOVED */}
         
-        {/* Content Area */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-16 bg-white/50 backdrop-blur rounded-2xl border border-border-color/50">
-            <div className="relative">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-green/30 border-t-primary-green"></div>
-              <div className="absolute inset-0 rounded-full border-4 border-primary-green/10"></div>
-            </div>
-            <p className="text-medium-text font-medium mt-4">Loading your venues...</p>
-            <p className="text-light-text text-sm">Please wait</p>
-          </div>
-        ) : filteredVenues.length > 0 ? (
+        {/* --- 2. CLEANUP ---
+          The old `loading ? ...` ternary check was removed from here.
+          We now check for filteredVenues.length directly.
+        */}
+        {filteredVenues.length > 0 ? (
           <div>
-            {/* Results Bar */}
+            {/* Results Bar (Unchanged) */}
             <div className="flex items-center justify-between mb-6 bg-white/60 backdrop-blur rounded-xl px-6 py-4 border border-border-color/50">
               <div className="flex items-center space-x-4">
                 <h2 className="text-lg font-bold text-dark-text">
@@ -148,7 +166,7 @@ function MyVenuesPage() {
               </div>
             </div>
             
-            {/* Venues Grid */}
+            {/* Venues Grid (Unchanged) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredVenues.map(venue => (
                 <div key={venue.venue_id} className="transform hover:scale-[1.02] transition-all duration-300 hover:shadow-xl">
@@ -158,7 +176,7 @@ function MyVenuesPage() {
             </div>
           </div>
         ) : (
-          /* Elegant Empty State */
+          /* Elegant Empty State (Unchanged) */
           <div className="text-center py-16 bg-gradient-to-br from-white/80 to-light-green-bg/50 backdrop-blur rounded-2xl border border-border-color/50">
             <div className="max-w-md mx-auto">
               <div className="w-20 h-20 bg-gradient-to-br from-primary-green/10 to-primary-green-light/10 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur">

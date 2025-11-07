@@ -16,12 +16,12 @@ export default function CategoryCard({ category }) { // Changed to default expor
 
   return (
     <div
-      className="sport-card flex flex-col items-center gap-3 p-6 border border-border-color rounded-xl bg-card-bg cursor-pointer transition-all duration-300 shadow-md hover:shadow-xl hover:-translate-y-1 hover:border-primary-green"
+      className="group sport-card flex flex-col items-center gap-3 p-6 border border-border-color rounded-xl bg-gradient-to-br from-card-bg to-gray-50 cursor-pointer transition-all duration-300 shadow-lg hover:shadow-2xl hover:-translate-y-2 hover:border-primary-green"
       onClick={handleCategoryClick}
     >
-      <div className="w-16 h-16 rounded-lg bg-light-green-bg flex items-center justify-center">
+      <div className="w-16 h-16 rounded-lg bg-light-green-bg flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
         <img
-          src={category.image || "https://via.placeholder.com/40"}
+          src={category.image_url || "https://placehold.co/40"}
           alt={`${category.name} icon`}
           className="w-8 h-8 object-contain"
         />

@@ -1,4 +1,4 @@
-// src/components/home/CategoryCard/CategoryCard.test.jsx
+// src/components/home/CategoryCard.test.jsx
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import CategoryCard from './CategoryCard';
@@ -7,7 +7,7 @@ describe('CategoryCard Component', () => {
   it('should render the category name and image correctly', () => {
     const mockCategory = {
       name: 'Cricket',
-      image: 'path/to/cricket.png',
+      image_url: 'path/to/cricket.png',
     };
 
     render(

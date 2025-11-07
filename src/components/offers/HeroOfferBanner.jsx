@@ -1,9 +1,10 @@
 // src/components/offers/HeroOfferBanner.jsx
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const HeroOfferBanner = ({ offer }) => {
   const [isCopied, setIsCopied] = useState(false);
+  const navigate = useNavigate();
 
   const defaultImageUrl =
     "https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/sign/offer-backgrounds/default-offer-bg.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85Y2RhMjljNy1hZWQ4LTQwNWItOTM4NC1mOWI1ZjE0OTRjOTYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJvZmZlci1iYWNrZ3JvdW5kcy9kZWZhdWx0LW9mZmVyLWJnLnBuZyIsImlhdCI6MTc1ODQ1OTczMywiZXhwIjoxNzg5OTk1NzMzfQ.q_GPfQRmnX92g_TUf8QgY46T5oJOEU0NiigYTfeDBks";
@@ -16,6 +17,14 @@ const HeroOfferBanner = ({ offer }) => {
       setTimeout(() => {
         setIsCopied(false);
       }, 2000);
+    }
+  };
+
+  const handleBookNow = () => {
+    if (offer.venue_id) {
+      navigate(`/venues/${offer.venue_id}`);
+    } else {
+      navigate("/explore");
     }
   };
 
@@ -49,12 +58,12 @@ const HeroOfferBanner = ({ offer }) => {
           >
             {isCopied ? "Copied!" : `Code: ${offer.offer_code}`}
           </button>
-          <Link
-            to="/explore"
+          <button
+            onClick={handleBookNow}
             className="px-6 py-3 rounded-lg font-bold text-lg bg-white text-dark-text hover:bg-gray-200 transition-colors duration-300 shadow-md no-underline"
           >
             Book Now
-          </Link>
+          </button>
         </div>
       </div>
     </div>

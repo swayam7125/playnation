@@ -1,50 +1,46 @@
 // src/hooks/useSupabaseQuery.js
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../supabaseClient';
 
 /**
- * A custom hook to fetch data from Supabase.
- * @param {string} tableName - The name of the table to query.
- * @param {string} selectQuery - The select query string (e.g., '*', 'id, name').
- * @param {Object} filters - An object of filters to apply (e.g., { owner_id: '...' }).
- * @returns {{data: any[], loading: boolean, error: string|null, setData: Function}}
+ * A custom hook to execute a Supabase query.
+ * @param {string} queryKey - A unique key for the query.
+ * @param {Function} queryFn - An async function that returns a Supabase query.
+ * @param {Object} options - Options for the query, e.g., { enabled: true }.
+ * @returns {{data: any, loading: boolean, error: string|null, setData: Function}}
  */
-export default function useSupabaseQuery(tableName, selectQuery, filters = {}) {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function useSupabaseQuery(queryKey, queryFn, { enabled = true } = {}) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState(null);
 
   const fetchData = useCallback(async () => {
-    const filterValues = Object.values(filters);
-    if (filterValues.some(value => value === null || value === undefined)) {
+    if (!enabled) {
+      setLoading(false);
       return;
     }
-    
+
     setLoading(true);
     setError(null);
 
-    let query = supabase.from(tableName).select(selectQuery);
+    try {
+      const { data: resultData, error: queryError } = await queryFn();
 
-    for (const column in filters) {
-      query = query.eq(column, filters[column]);
-    }
+      if (queryError) {
+        throw queryError;
+      }
 
-    const { data: resultData, error: queryError } = await query;
-
-    if (queryError) {
-      console.error(`Error fetching from ${tableName}:`, queryError);
-      setError(queryError.message);
-    } else {
       setData(resultData);
+    } catch (err) {
+      console.error(`Error fetching for query ${queryKey}:`, err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
-  }, [tableName, selectQuery, JSON.stringify(filters)]);
+  }, [queryKey, queryFn, enabled]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Return setData so components can perform optimistic updates
   return { data, loading, error, setData };
 }

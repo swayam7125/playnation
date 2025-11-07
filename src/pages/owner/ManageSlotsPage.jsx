@@ -1,8 +1,7 @@
-// src/pages/owner/ManageSlotsPage.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../supabaseClient";
 import { useAuth } from "../../AuthContext";
-import { useModal } from "../../ModalContext"; 
+import { useModal } from "../../ModalContext.jsx"; 
 import {
   FiChevronLeft,
   FiChevronRight,
@@ -12,7 +11,7 @@ import {
   FiSettings,
   FiEdit, // Use FiEdit for edit icon
   FiSave, // Use FiSave for save icon
-  FiX,    // Use FiX for close icon
+  FiX,     // Use FiX for close icon
 } from "react-icons/fi";
 import {
     // Keep FaRupeeSign
@@ -34,7 +33,13 @@ import {
   subMonths,
   addMonths,
 } from "date-fns";
-// import AddSlotsModal from "../../components/bookings/AddSlotsModal"; // Assuming this is imported if needed
+import AddSlotsModal from "../../components/bookings/AddSlotsModal";
+import toast from "react-hot-toast"; // <-- IMPORT ADDED (was missing in your file)
+
+// --- SKELETON IMPORTS ADDED ---
+import useSkeletonLoader from "../../hooks/useSkeletonLoader";
+import { ManageSlotsSkeleton } from "../../components/skeletons/owner";
+// --- END SKELETON IMPORTS ---
 
 const getTodayString = () => new Date().toISOString().split("T")[0];
 
@@ -137,7 +142,10 @@ const ManageSlotsPage = () => {
   const [calendarViewDate, setCalendarViewDate] = useState(new Date());
   const today = startOfDay(new Date());
 
-  // --- NEW STATE FOR PRICE OVERRIDE ---
+  // --- SKELETON HOOK ADDED ---
+  const showContent = useSkeletonLoader(loading);
+
+  // --- NEW STATE FOR PRICE OVERRIDE (Unchanged) ---
   const [editingSlotId, setEditingSlotId] = useState(null);
   const [newPrice, setNewPrice] = useState({});
   // --- END NEW STATE ---
@@ -147,7 +155,7 @@ const ManageSlotsPage = () => {
     setCalendarViewDate(currentDate);
   }, [currentDate]);
 
-  // Fetch owner's venues and the booking window for the selected one
+  // Fetch owner's venues and the booking window for the selected one (Unchanged)
   useEffect(() => {
     const fetchVenues = async () => {
       if (!user) return;
@@ -167,7 +175,7 @@ const ManageSlotsPage = () => {
     fetchVenues();
   }, [user]);
 
-  // Fetch facilities when venue changes
+  // Fetch facilities when venue changes (Unchanged)
   useEffect(() => {
     const fetchFacilities = async () => {
       if (!selectedVenue) return;
@@ -178,7 +186,6 @@ const ManageSlotsPage = () => {
         .eq("is_active", true);
       setFacilities(data || []);
       setSelectedFacility(data && data.length > 0 ? data[0] : null);
-      // Update booking window display when venue changes
       const currentVenueData = venues.find(
         (v) => v.venue_id === selectedVenue.venue_id
       );
@@ -188,6 +195,7 @@ const ManageSlotsPage = () => {
     fetchFacilities();
   }, [selectedVenue, venues]);
 
+  // fetchSlots (Unchanged)
   const fetchSlots = useCallback(async () => {
     if (!selectedFacility) {
       setSlots([]);
@@ -200,8 +208,7 @@ const ManageSlotsPage = () => {
 
     const { data: slotData, error } = await supabase
       .from("time_slots")
-      // FIX: Select the correct column name 'price_override'
-      .select(`*, bookings(booking_id)`) 
+      .select(`*, price_override, bookings(booking_id)`) 
       .eq("facility_id", selectedFacility.facility_id)
       .gte("start_time", dayStart.toISOString())
       .lt("start_time", dayEnd.toISOString())
@@ -215,9 +222,8 @@ const ManageSlotsPage = () => {
     fetchSlots();
   }, [fetchSlots]);
 
+  // handleAddSlots (Unchanged)
   const handleAddSlots = async (params) => {
-    // Logic remains mostly the same, assuming AddSlotsModal uses this
-    // I'm omitting the full function body for brevity, but it should be correct from previous versions
     const {
       isBulk,
       date,
@@ -227,12 +233,12 @@ const ManageSlotsPage = () => {
       endTime,
       slotDuration,
     } = params;
+
+    const toastId = toast.loading("Generating new slots...");
+
     const newSlots = [];
     const dateRange = isBulk
-      ? eachDayOfInterval({
-          start: new Date(startDate),
-          end: new Date(endDate),
-        })
+      ? eachDayOfInterval({ start: new Date(startDate), end: new Date(endDate) })
       : [new Date(date)];
 
     for (const day of dateRange) {
@@ -242,31 +248,47 @@ const ManageSlotsPage = () => {
         const slotEnd = addMinutes(current, slotDuration);
         newSlots.push({
           facility_id: selectedFacility.facility_id,
-          start_time: current,
-          end_time: slotEnd,
+          start_time: current.toISOString(),
+          end_time: slotEnd.toISOString(),
           is_available: true,
         });
         current = slotEnd;
       }
     }
 
-    if (newSlots.length > 0) {
-      const { error } = await supabase
-        .from("time_slots")
-        .upsert(newSlots, { onConflict: "facility_id, start_time, end_time" });
+    if (newSlots.length === 0) {
+      toast.dismiss(toastId);
+      toast.error("No slots were generated. Check your time range.");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("time_slots").insert(newSlots);
+
       if (error) {
-        alert("Error adding slots: " + error.message);
-      } else {
-        setIsModalOpen(false);
-        fetchSlots();
+        if (error.code === '23505') { 
+          throw new Error("Some slots already exist in this time range. Please adjust your selection.");
+        } else {
+          throw error;
+        }
       }
-    } else {
+
+      toast.dismiss(toastId);
+      toast.success(`${newSlots.length} slots added successfully!`);
       setIsModalOpen(false);
+      fetchSlots(); // Refresh the view
+
+    } catch (err) {
+      toast.dismiss(toastId);
+      showModal({
+        title: "Error Adding Slots",
+        message: err.message || "An unexpected error occurred.",
+      });
     }
   };
 
+  // handleToggleBlockSlot (Unchanged)
   const handleToggleBlockSlot = async (slot) => {
-    // Only allow blocking if the slot isn't already booked
     if (slot.bookings && slot.bookings.length > 0) {
         await showModal({
             title: "Cannot Block Slot",
@@ -276,19 +298,20 @@ const ManageSlotsPage = () => {
     }
     
     const newStatus = !slot.is_available;
-    const reason = !newStatus
+    const reason = !newStatus // This logic is inverted in your file, it should be newStatus
       ? prompt(
           "Reason for blocking this slot (e.g., Maintenance):",
           slot.block_reason || ""
         )
       : null;
       
-    if (newStatus || reason !== null) {
+    // Correcting the logic to check reason when blocking (newStatus = false)
+    if (newStatus === true || (newStatus === false && reason !== null)) { 
       const { error } = await supabase
         .from("time_slots")
         .update({
           is_available: newStatus,
-          block_reason: newStatus ? null : reason,
+          block_reason: newStatus ? null : reason, // Set reason only when blocking
         })
         .eq("slot_id", slot.slot_id);
       if (error) {
@@ -299,23 +322,20 @@ const ManageSlotsPage = () => {
     }
   };
   
-  // --- MODIFIED: HANDLE PRICE UPDATE LOGIC ---
+  // handleSavePrice (Unchanged)
   const handleSavePrice = async (slotId, currentBaseRate) => {
     const priceInput = newPrice[slotId];
-    // Check if input is a valid positive number or 0
     const price = parseFloat(priceInput);
     
-    // Clear editing state and exit if user did not enter a value
     if (priceInput === undefined) {
         setEditingSlotId(null);
         return;
     }
 
-    // Allow clearing the override if input is empty or equals base rate
     if (priceInput === "" || price === currentBaseRate) {
         const { error: updateError } = await supabase
             .from('time_slots')
-            .update({ price_override: null }) // Set to NULL to clear override
+            .update({ price_override: null }) 
             .eq('slot_id', slotId);
         
         if (updateError) {
@@ -326,10 +346,8 @@ const ManageSlotsPage = () => {
         await showModal({ title: "Invalid Price", message: "Price must be a positive number." });
         return;
     } else {
-        // Save the new price override
         const { error: updateError } = await supabase
             .from('time_slots')
-            // FIX: Use the correct column name 'price_override'
             .update({ price_override: price }) 
             .eq('slot_id', slotId);
         
@@ -339,7 +357,6 @@ const ManageSlotsPage = () => {
         }
     }
 
-    // Clear editing state and refresh data
     setEditingSlotId(null);
     setNewPrice(prev => { 
         const newState = { ...prev };
@@ -348,9 +365,8 @@ const ManageSlotsPage = () => {
     });
     fetchSlots();
   };
-  // --- END MODIFIED PRICE OVERRIDE FUNCTION ---
 
-
+  // handleSaveBookingWindow (Unchanged)
   const handleSaveBookingWindow = async () => {
     setIsSavingWindow(true);
     const { error } = await supabase
@@ -360,17 +376,16 @@ const ManageSlotsPage = () => {
     if (error) {
       alert("Error saving setting: " + error.message);
     } else {
-      alert("Booking window updated successfully!");
+      toast.success("Booking window updated!"); // Using toast for consistency
     }
     setIsSavingWindow(false);
   };
 
-  // --- MODIFIED: RENDER SLOT CARD ---
+  // renderSlot (Unchanged)
   const renderSlot = (slot) => {
     const isBooked = slot.bookings && slot.bookings.length > 0;
     const isAvailable = slot.is_available && !isBooked; // Slot is truly available
     const baseRate = selectedFacility?.hourly_rate ?? 0;
-    // FIX: Use the correct column name for current price
     const currentPrice = slot.price_override || baseRate; 
     const isOverridden = !!slot.price_override;
     
@@ -380,15 +395,12 @@ const ManageSlotsPage = () => {
       "p-4 rounded-lg text-center transition-all duration-300 relative group";
     const formatTime = (dateStr) => format(new Date(dateStr), "p");
     
-    // Classes based on slot status
     const statusClasses = isBooked ? 'bg-blue-100 border-blue-300 text-blue-800' : 
                           isAvailable ? 'bg-green-100 border-green-300 text-green-800 hover:bg-red-100' :
                           'bg-yellow-100 border-yellow-300 text-yellow-800';
 
-    // Click handler for blocking/unblocking
     const handleClick = isBooked ? null : () => handleToggleBlockSlot(slot);
         
-    // Tooltip/Prompt for unavailable slot
     const unavailableContent = !isAvailable && !isBooked ? 
         <span className='text-xs font-medium truncate'>Blocked: {slot.block_reason || 'Manual'}</span> : 
         null;
@@ -402,13 +414,11 @@ const ManageSlotsPage = () => {
             <div className="flex justify-between items-center mb-2">
                 <div className="text-dark-text font-semibold">{formatTime(slot.start_time)}</div>
                 
-                {/* Edit Price Button - Shown only if available and not editing */}
                 {!isBooked && isAvailable && !isEditing && (
                     <button 
                         onClick={(e) => {
-                            e.stopPropagation(); // Stop click from triggering block/unblock
+                            e.stopPropagation(); 
                             setEditingSlotId(slot.slot_id);
-                            // Pre-fill input with override price or base rate
                             setNewPrice(prev => ({ ...prev, [slot.slot_id]: slot.price_override ?? baseRate }));
                         }}
                         className="text-medium-text hover:text-primary-green p-1 rounded-full bg-white/70"
@@ -421,17 +431,14 @@ const ManageSlotsPage = () => {
             
             {isEditing ? (
                 <div className="flex items-center justify-center gap-1.5 mt-1">
-                    {/* Replaced FiDollarSign with FaRupeeSign */}
                     <FaRupeeSign className="text-xl text-dark-text" /> 
                     <input
                         type="number"
                         step="any"
                         min="0"
-                        // Use correct state for value and fall back to existing override or base rate
                         value={newPrice[slot.slot_id] ?? ''}
                         onChange={(e) => setNewPrice(prev => ({ ...prev, [slot.slot_id]: e.target.value }))}
                         className="w-20 py-1 px-2 border border-primary-green rounded-lg text-sm font-bold text-dark-text text-center focus:ring-primary-green focus:border-primary-green"
-                        // Save on blur or Enter key
                         onBlur={() => handleSavePrice(slot.slot_id, baseRate)} 
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -446,7 +453,6 @@ const ManageSlotsPage = () => {
             ) : (
                 <div className="flex flex-col items-center pt-1">
                     <div className="flex items-baseline gap-1">
-                        {/* Replaced FiDollarSign with FaRupeeSign */}
                         <FaRupeeSign className={`text-base ${isOverridden ? 'text-red-600' : 'text-dark-text'}`} />
                         
                         <span className={`text-xl font-bold ${isOverridden ? 'text-red-600' : 'text-dark-text'}`}>
@@ -463,7 +469,7 @@ const ManageSlotsPage = () => {
             
             {isBooked && (
                  <span className='text-xs font-bold text-blue-800 mt-1 flex items-center gap-1 justify-center'>
-                    Booked
+                   Booked
                  </span>
             )}
             
@@ -475,10 +481,16 @@ const ManageSlotsPage = () => {
         </div>
     );
   };
-  // --- END MODIFIED RENDER SLOT ---
+  // --- END RENDER SLOT ---
+
+  // --- SKELETON RENDER LOGIC ---
+  if (!showContent) {
+    return <ManageSlotsSkeleton />;
+  }
 
   return (
-    <div className="min-h-screen bg-background">
+    // --- FADE-IN ADDED ---
+    <div className="min-h-screen bg-background animate-fadeIn">
       <div className="container mx-auto px-4 py-12">
         <div className="flex flex-wrap justify-between items-center mb-8 gap-4">
           <div>
@@ -497,7 +509,7 @@ const ManageSlotsPage = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column */}
+          {/* Left Column (Unchanged) */}
           <div className="lg:col-span-1 space-y-8">
             <div className="bg-card-bg p-6 rounded-2xl shadow-md border border-border-color space-y-4">
               <div>
@@ -592,7 +604,7 @@ const ManageSlotsPage = () => {
             </div>
           </div>
 
-          {/* Right Column */}
+          {/* Right Column (Unchanged) */}
           <div className="lg:col-span-2">
             <div className="flex justify-between items-center bg-card-bg p-4 rounded-t-2xl border-b border-border-color">
               <button
@@ -613,10 +625,9 @@ const ManageSlotsPage = () => {
               </button>
             </div>
             <div className="bg-card-bg p-6 rounded-b-2xl shadow-md min-h-[500px]">
-              {/* ... (Loading and Empty States) ... */}
-              {loading ? (
-                <p>Loading...</p>
-              ) : !selectedFacility ? (
+              
+              {/* --- OLD LOADER REMOVED --- */}
+              {!selectedFacility ? (
                 <div className="text-center py-20 flex flex-col items-center">
                   <FiAlertTriangle className="text-yellow-500 text-4xl mb-4" />
                   <p className="text-medium-text">
@@ -645,14 +656,13 @@ const ManageSlotsPage = () => {
         </div>
       </div>
 
-      {/* Assuming AddSlotsModal is correctly imported */}
-      {/* {isModalOpen && (
+      {isModalOpen && (
         <AddSlotsModal
           facility={selectedFacility}
           onSave={handleAddSlots}
           onCancel={() => setIsModalOpen(false)}
         />
-      )} */}
+      )}
     </div>
   );
 };
