@@ -6,18 +6,18 @@ This project is built with a database-centric architecture, moving complex busin
 
 ## Table of Contents
 
-  - [Core Features](https://www.google.com/search?q=%23core-features)
-  - [Architecture Overview](https://www.google.com/search?q=%23architecture-overview)
-  - [Tech Stack](https://www.google.com/search?q=%23tech-stack)
-  - [Getting Started](https://www.google.com/search?q=%23getting-started)
-      - [Prerequisites](https://www.google.com/search?q=%23prerequisites)
-      - [Local Development Setup](https://www.google.com/search?q=%23local-development-setup)
-  - [Project Structure](https://www.google.com/search?q=%23project-structure)
-  - [Available Scripts](https://www.google.com/search?q=%23available-scripts)
-  - [Backend Deep Dive](https://www.google.com/search?q=%23backend-deep-dive)
-      - [Database Schema & Logic](https://www.google.com/search?q=%23database-schema-logic)
-      - [Supabase Edge Functions](https://www.google.com/search?q=%23supabase-edge-functions)
-  - [Testing](https://www.google.com/search?q=%23testing)
+- [Core Features](#core-features)
+- [Architecture Overview](#architecture-overview)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Local Development Setup](#local-development-setup)
+- [Project Structure](#project-structure)
+- [Available Scripts](#available-scripts)
+- [Backend Deep Dive](#backend-deep-dive)
+  - [Database Schema & Logic](#database-schema--logic)
+  - [Supabase Edge Functions](#supabase-edge-functions)
+- [Testing](#testing)
 
 -----
 
@@ -25,7 +25,7 @@ This project is built with a database-centric architecture, moving complex busin
 
 The application is built around three distinct user roles with tailored experiences for each.
 
-### 1\. Player Portal (Default Role)
+### 1. Player Portal (Default Role)
 
   - **Explore Venues:** Search, filter, and browse sports venues by city, sport, and other amenities.
   - **View Venue Details:** See facility information, photos, location (via Leaflet map), and read reviews.
@@ -34,7 +34,7 @@ The application is built around three distinct user roles with tailored experien
   - **My Bookings:** A dedicated page to view and manage all past and upcoming bookings, with options to cancel.
   - **User Profile:** Manage personal information and change passwords.
 
-### 2\. Venue Owner Portal (`venue_owner` Role)
+### 2. Venue Owner Portal (`venue_owner` Role)
 
   - **Owner Dashboard:** An analytics dashboard with charts (via Recharts) for revenue, booking trends, and peak hours.
   - **Venue Management:** Create, edit, and manage multiple venue listings.
@@ -44,7 +44,7 @@ The application is built around three distinct user roles with tailored experien
   - **Booking Calendar:** A comprehensive calendar view of all bookings across all venues.
   - **Reporting:** Generate and download PDF reports (via `pdf-lib`) for revenue and booking data.
 
-### 3\. Admin Portal (`admin` Role)
+### 3. Admin Portal (`admin` Role)
 
   - **Admin Dashboard:** A high-level overview of the entire platform's health, including new users, total bookings, and venues pending approval.
   - **User Management:** View, search, and manage all users. Includes functionality to suspend or activate user accounts.
