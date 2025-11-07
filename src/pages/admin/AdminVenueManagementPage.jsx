@@ -17,13 +17,14 @@ import {
 import { useModal } from "../../ModalContext";
 import VenueDetailsModal from "../admin/VenueDetailsModal";
 import RejectVenueModal from "../admin/RejectVenueModal";
+import AdminVenueManagementPageSkeleton from "../../components/skeletons/admin/AdminVenueManagementPageSkeleton";
 import toast from "react-hot-toast";
 
 // --- No changes to ClickableStatsCard ---
 const ClickableStatsCard = ({
   title,
   count,
-  icon: Icon,
+  icon: Icon, // eslint-disable-line no-unused-vars
   color,
   isActive,
   onClick,
@@ -450,14 +451,7 @@ function AdminVenueManagementPage() {
   ];
 
   if (loading)
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <FaSpinner className="animate-spin text-4xl text-primary-green mx-auto mb-4" />
-          <p className="text-medium-text text-lg">Loading venues...</p>
-        </div>
-      </div>
-    );
+    return <AdminVenueManagementPageSkeleton />; 
 
   if (error)
     return (

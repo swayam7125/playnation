@@ -19,6 +19,7 @@ import {
   FaList,      // List Icon
 } from "react-icons/fa";
 import StatsCard from "../../components/common/StatsCard";
+import AdminUserManagementPageSkeleton from "../../components/skeletons/admin/AdminUserManagementPageSkeleton";
 import UserDetailsModal from "./UserDetailsModal";
 
 // --- NEW: User List Row Component ---
@@ -471,14 +472,7 @@ function AdminUserManagementPage() {
   );
 
   if (loading || !currentUser)
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading user data...</p>
-        </div>
-      </div>
-    );
+    return <AdminUserManagementPageSkeleton />; 
 
   if (error)
     return (
@@ -516,7 +510,7 @@ function AdminUserManagementPage() {
         {/* --- Stats Cards --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {statsData.map((stat) => (
-            <StatsCard key={stat.title} {...stat} />
+            <StatsCard key={stat.title} title={stat.title} count={stat.count} icon={stat.icon} bgColor={stat.color} />
           ))}
         </div>
         

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../supabaseClient";
+import AdminDashboardSkeleton from "../../components/skeletons/admin/AdminDashboardSkeleton";
 import { FaUsers, FaBuilding, FaCalendarCheck, FaRupeeSign, FaUserPlus, FaClock, FaChartLine, FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -55,13 +56,77 @@ const ActivityItem = ({ title, subtitle, icon }) => (
   </div>
 );
 
+import DownloadDropdown from '../../components/common/DownloadDropdown';
+
+
+
 function AdminDashboardPage() {
+
   const [stats, setStats] = useState(null);
+
   const [chartData, setChartData] = useState(null);
+
   const [recentActivity, setRecentActivity] = useState(null);
+
   const [loading, setLoading] = useState(true);
+
   const [error, setError] = useState(null);
+
   const [pendingVenuesList, setPendingVenuesList] = useState([]);
+
+  const [isDownloading, setIsDownloading] = useState(false);
+
+
+
+  const handleDownloadReport = async (format) => {
+
+    setIsDownloading(true);
+
+    try {
+
+      const { data, error } = await supabase.functions.invoke('generate-admin-report', {
+
+        body: { format },
+
+      });
+
+      if (error) throw error;
+
+
+
+      const blob = new Blob([data], { type: format === 'pdf' ? 'application/pdf' : 'text/csv' });
+
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+
+      a.href = url;
+
+      a.download = `playnation-report-${new Date().toISOString().split('T')[0]}.${format}`;
+
+      document.body.appendChild(a);
+
+      a.click();
+
+      document.body.removeChild(a);
+
+      window.URL.revokeObjectURL(url);
+
+
+
+    } catch (error) {
+
+      console.error('Error downloading report:', error);
+
+      alert('Failed to download report.');
+
+    } finally {
+
+      setIsDownloading(false);
+
+    }
+
+  };
 
   const handleApproveVenue = async (venueId) => {
     // Database logic remains unchanged
@@ -158,7 +223,13 @@ function AdminDashboardPage() {
       const { data: recentBookings, error: recentBookingsError } = await supabase.from('bookings').select('*, facilities(venues(name))').order('created_at', { ascending: false }).limit(5);
       if (recentBookingsError) throw recentBookingsError;
 
-      setRecentActivity({ recentUsers, recentVenues, recentBookings });
+      const { data: topVenuesData, error: topVenuesError } = await supabase.rpc('top_venues_by_booking');
+      if (topVenuesError) throw topVenuesError;
+
+      const { data: topUsersData, error: topUsersError } = await supabase.rpc('top_users_by_booking');
+      if (topUsersError) throw topUsersError;
+
+      setRecentActivity({ recentUsers, recentVenues, recentBookings, topVenues: topVenuesData, topUsers: topUsersData });
 
     } catch (error) {
       console.error("Error fetching admin dashboard data:", error);
@@ -173,14 +244,7 @@ function AdminDashboardPage() {
   }, [fetchAdminDashboardData]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-white to-light-green-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary-green border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-medium-text font-medium">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+    return <AdminDashboardSkeleton />;
   }
 
   if (error) {
@@ -209,9 +273,12 @@ function AdminDashboardPage() {
       <div className="container mx-auto px-4 sm:px-6 py-8 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-2 h-8 bg-gradient-to-b from-primary-green to-primary-green-dark rounded-full"></div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-dark-text">Admin Dashboard</h1>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-8 bg-gradient-to-b from-primary-green to-primary-green-dark rounded-full"></div>
+              <h1 className="text-3xl sm:text-4xl font-bold text-dark-text">Admin Dashboard</h1>
+            </div>
+                        <DownloadDropdown onSelect={handleDownloadReport} isDownloading={isDownloading} />
           </div>
           <p className="text-medium-text ml-5">Monitor and manage your platform's performance</p>
         </div>
@@ -328,27 +395,27 @@ function AdminDashboardPage() {
 
         {/* Recent Activity Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <SectionCard title="Recent Users">
+          <SectionCard title="Top Venues">
             <div className="space-y-2">
-              {recentActivity?.recentUsers.map(user => (
+              {recentActivity?.topVenues.map(venue => (
                 <ActivityItem
-                  key={user.id}
-                  title={user.username}
-                  subtitle={user.email}
-                  icon={<FaUsers className="text-sm" />}
+                  key={venue.venue_id}
+                  title={venue.name}
+                  subtitle={`${venue.booking_count} bookings`}
+                  icon={<FaBuilding className="text-sm" />}
                 />
               ))}
             </div>
           </SectionCard>
 
-          <SectionCard title="Recent Venues">
+          <SectionCard title="Top Users">
             <div className="space-y-2">
-              {recentActivity?.recentVenues.map(venue => (
+              {recentActivity?.topUsers.map(user => (
                 <ActivityItem
-                  key={venue.venue_id}
-                  title={venue.name}
-                  subtitle={venue.address}
-                  icon={<FaBuilding className="text-sm" />}
+                  key={user.user_id}
+                  title={user.username}
+                  subtitle={`${user.booking_count} bookings`}
+                  icon={<FaUsers className="text-sm" />}
                 />
               ))}
             </div>

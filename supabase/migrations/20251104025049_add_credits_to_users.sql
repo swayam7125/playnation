@@ -1,1 +1,0 @@
-ALTER TABLE public.users ADD COLUMN credits INTEGER DEFAULT 0;

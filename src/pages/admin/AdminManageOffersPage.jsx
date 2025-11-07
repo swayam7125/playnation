@@ -4,6 +4,7 @@ import { useModal } from "../../ModalContext";
 import toast from 'react-hot-toast';
 import OfferForm from "../../components/offers/OfferForm";
 import OwnerOfferCard from "../../components/offers/OwnerOfferCard";
+import AdminManageOffersPageSkeleton from "../../components/skeletons/admin/AdminManageOffersPageSkeleton";
 import { FaPlus, FaSearch } from "react-icons/fa";
 
 function AdminManageOffersPage() {
@@ -14,7 +15,7 @@ function AdminManageOffersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentOffer, setCurrentOffer] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const { showModal, hideModal } = useModal();
+  const { showModal } = useModal();
 
   const fetchOffersAndVenues = useCallback(async () => {
     setLoading(true);
@@ -109,14 +110,7 @@ function AdminManageOffersPage() {
   }, [offers, searchTerm]);
 
   if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-12 flex items-center justify-center min-h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-green mx-auto mb-4"></div>
-          <p className="text-medium-text">Loading offers...</p>
-        </div>
-      </div>
-    );
+    return <AdminManageOffersPageSkeleton />;
   }
 
   if (error) {

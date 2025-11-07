@@ -20,6 +20,7 @@ import {
 } from "react-icons/fa";
 import { useModal } from "../../ModalContext";
 // --- 1. ADD IMPORTS ---
+import AdminBookingsPageSkeleton from "../../components/skeletons/admin/AdminBookingsPageSkeleton";
 import BookingDetailModal from "../../components/admin/BookingDetailModal";
 import BookingRow from "../../components/admin/BookingRow";
 
@@ -122,18 +123,15 @@ function AdminBookingsPage() {
       confirmStyle: isApprove ? "success" : "warning",
       onConfirm: async () => {
         try {
-          let result;
-          if (isApprove) {
-            // Call the serverless function to process the refund
-            const { data, error } = await supabase.functions.invoke("create-refund", {
-              body: { booking_id: bookingId },
-            });
-
-            if (error) throw new Error(`Function error: ${error.message}`);
-            result = data;
-
-          } else {
-            // Directly update the status for reverting a refund
+                      if (isApprove) {
+                        // Call the serverless function to process the refund
+                        const { data, error } = await supabase.functions.invoke("create-refund", {
+                          body: { booking_id: bookingId },
+                        });
+          
+                        if (error) throw new Error(`Function error: ${error.message}`);
+          
+                      } else {            // Directly update the status for reverting a refund
             const { error } = await supabase
               .from("bookings")
               .update({ payment_status: "paid", updated_at: new Date().toISOString() })
@@ -288,14 +286,7 @@ function AdminBookingsPage() {
   }, [bookings]);
 
   if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-12 flex items-center justify-center min-h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-green mx-auto mb-4"></div>
-          <p className="text-medium-text">Loading bookings...</p>
-        </div>
-      </div>
-    );
+    return <AdminBookingsPageSkeleton />;
   }
 
   if (error) {
