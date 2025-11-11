@@ -4,20 +4,20 @@ import { FaQuoteLeft, FaStar } from "react-icons/fa";
 const Testimonials = () => {
   const testimonials = [
     {
-      name: "Rahul Sharma",
+      name: "Meet Patel",
       role: "Cricket Enthusiast",
       content: "PlayNation made booking our weekly cricket matches so much easier. No more calling around!",
       rating: 5,
     },
     {
-      name: "Priya Patel",
+      name: "Fenil Pastagia",
       role: "Badminton Player",
       content: "Love how I can see real-time availability and book instantly. The app is super user-friendly.",
       rating: 5,
     },
     {
-      name: "Amit Kumar",
-      role: "Football Coach",
+      name: "MS Dhoni",
+      role: "Captain Cool",
       content: "Managing team bookings has never been simpler. PlayNation is a game-changer for sports communities.",
       rating: 5,
     },
