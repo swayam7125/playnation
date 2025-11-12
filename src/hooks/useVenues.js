@@ -44,7 +44,7 @@ const useVenues = ({ limit, selectedSports = [], selectedAmenities = [], searchT
         // Client-side filtering by amenities
         if (selectedAmenities.length > 0) {
           processedVenues = processedVenues.filter(venue => {
-            return venue.amenities && selectedAmenities.every(
+            return venue.amenities && selectedAmenities.some(
               amenityId => venue.amenities.includes(amenityId)
             );
           });

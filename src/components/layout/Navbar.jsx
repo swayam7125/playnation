@@ -58,45 +58,47 @@ function Navbar() {
     "block px-4 py-3 text-medium-text font-medium transition-all duration-200 rounded-lg hover:text-primary-green hover:bg-light-green-bg/50";
 
   const getNavLinks = () => {
-    if (profile?.role !== "venue_owner" && profile?.role !== "admin") {
-      let links = [];
-      if (user) {
-        links = [
+    if (!user || !profile) {
+      return [
+        { to: "/", label: "Home" },
+        { to: "/explore", label: "Explore" },
+        { to: "/about", label: "About Us" },
+        { to: "/contact", label: "Contact Us" },
+      ];
+    }
+
+    switch (profile.role) {
+      case "venue_owner":
+        return [
+          { to: "/owner/dashboard", label: "Dashboard" },
+          { to: "/owner/my-venues", label: "My Venues" },
+          { to: "/owner/calendar", label: "Bookings" },
+          { to: "/owner/manage-slots", label: "Manage Slots" },
+          { to: "/owner/manage-offers", label: "Manage Offers" },
+          { to: "/owner/notify", label: "Notify" },
+        ];
+      case "admin":
+        return [
+          { to: "/admin/dashboard", label: "Dashboard" },
+          { to: "/admin/venues", label: "Manage Venues" },
+          { to: "/admin/users", label: "Manage Users" },
+          { to: "/admin/bookings", label: "Manage Bookings" },
+          { to: "/admin/manage-offers", label: "Manage Offers" },
+          { to: "/admin/notify", label: "Notify" },
+        ];
+      case "player":
+        return [
           { to: "/dashboard", label: "Dashboard" },
           { to: "/explore", label: "Explore" },
-          { to: "/my-bookings", label: "My Bookings" },
         ];
-      } else {
-        links = [
+      default:
+        return [
           { to: "/", label: "Home" },
           { to: "/explore", label: "Explore" },
           { to: "/about", label: "About Us" },
           { to: "/contact", label: "Contact Us" },
         ];
-      }
-      return links;
     }
-    if (profile?.role === "venue_owner") {
-      return [
-        { to: "/owner/dashboard", label: "Dashboard" },
-        { to: "/owner/my-venues", label: "My Venues" },
-        { to: "/owner/calendar", label: "Bookings" },
-        { to: "/owner/manage-slots", label: "Manage Slots" },
-        { to: "/owner/manage-offers", label: "Manage Offers" },
-        { to: "/owner/notify", label: "Notify" },
-      ];
-    }
-    if (profile?.role === "admin") {
-      return [
-        { to: "/admin/dashboard", label: "Dashboard" },
-        { to: "/admin/venues", label: "Manage Venues" },
-        { to: "/admin/users", label: "Manage Users" },
-        { to: "/admin/bookings", label: "Manage Bookings" },
-        { to: "/admin/manage-offers", label: "Manage Offers" },
-        { to: "/admin/notify", label: "Notify" },
-      ];
-    }
-    return [];
   };
 
   const navLinks = getNavLinks();
@@ -197,6 +199,32 @@ function Navbar() {
                     <p className="text-xs text-gray-500 truncate">{profile?.email || ""}</p>
                   </div>
                   <div className="py-1">
+                    {profile?.role === "player" && (
+                      <Link
+                        to="/my-bookings"
+                        onClick={() => {
+                          navigate("/my-bookings");
+                          setIsProfileDropdownOpen(false);
+                        }}
+                        className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary-green"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                        <span>My Bookings</span>
+                      </Link>
+                    )}
                     <Link
                       to="/profile"
                       onClick={handleProfileClick}

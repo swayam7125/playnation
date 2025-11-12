@@ -1,6 +1,7 @@
 // src/components/home/CategoryCard.test.jsx
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { describe, it, expect } from 'vitest';
 import CategoryCard from './CategoryCard';
 
 describe('CategoryCard Component', () => {
