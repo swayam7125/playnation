@@ -1,7 +1,7 @@
 // src/components/bookings/BookingCard.test.jsx
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import { vi } from 'vitest';
+import { vi, describe, it, expect } from 'vitest';
 import { BookingCard } from './BookingCard';
 
 // 👇 **MOCK THE FORMATTERS UTILITY** 👇

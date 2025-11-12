@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { supabase } from "../../supabaseClient";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 import toast from "react-hot-toast";
 
@@ -19,6 +19,7 @@ function RegisterForm() {
     role: "player",
   });
   const [loading, setLoading] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   const from = location.state?.from || null;
 
@@ -216,11 +217,32 @@ function RegisterForm() {
             <option value="venue_owner">Venue Owner</option>
           </select>
         </div>
+        <div className="md:col-span-2 flex items-center mt-2">
+          <input
+            id="agree"
+            name="agree"
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            className="h-4 w-4 text-primary-green focus:ring-primary-green border-gray-300 rounded"
+          />
+          <label htmlFor="agree" className="ml-2 block text-xs text-gray-900">
+            I agree to the{" "}
+            <Link to="/terms-of-service" className="text-primary-green hover:underline">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link to="/privacy-policy" className="text-primary-green hover:underline">
+              Privacy Policy
+            </Link>
+            .
+          </label>
+        </div>
       </div>
       <button
         type="submit"
         className="w-full bg-primary-green text-white py-1.5 rounded text-xs font-semibold transition-all duration-300 hover:bg-primary-green-dark disabled:opacity-50 shadow-md hover:shadow-lg mt-2"
-        disabled={loading}
+        disabled={loading || !agreed}
       >
         {loading ? "Creating Account..." : "Create Account"}
       </button>

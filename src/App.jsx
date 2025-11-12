@@ -19,6 +19,8 @@ const VenuePage = lazy(() => import("./pages/VenuePage"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const AboutUsPage = lazy(() => import("./pages/AboutUsPage"));
 const ContactUsPage = lazy(() => import("./pages/ContactUsPage"));
+const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
+const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
 
 // Player Pages
 const MyBookingsPage = lazy(() => import("./pages/player/MyBookingsPage"));
@@ -64,7 +66,7 @@ const AppLayout = () => {
   const { pathname } = location;
 
   // Define the paths where the footer should be displayed
-  const showFooterOnPaths = ["/", "/about", "/contact"];
+  const showFooterOnPaths = ["/", "/about", "/contact", "/privacy-policy", "/terms-of-service"];
 
   // Check for exact paths or if it's a dynamic venue page
   const shouldShowFooter = showFooterOnPaths.includes(pathname);
@@ -221,6 +223,8 @@ function App() {
                 <Route index element={<HomePage />} />
                 <Route path="about" element={<AboutUsPage />} />
                 <Route path="contact" element={<ContactUsPage />} />
+                <Route path="privacy-policy" element={<PrivacyPolicyPage />} />
+                <Route path="terms-of-service" element={<TermsOfServicePage />} />
                 <Route path="venue/:venueId" element={<VenuePage />} />
                 {/* Auth Routes */}
                 <Route path="auth" element={<AuthPage />} />

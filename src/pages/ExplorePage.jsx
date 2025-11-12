@@ -7,6 +7,7 @@ import useVenues from "../hooks/useVenues";
 import FilterDropdown from "../components/common/FilterDropdown";
 import SegmentedControl from "../components/common/SegmentedControl";
 import ExploreSkeleton from "../components/skeletons/ExploreSkeleton";
+import VenueCardSkeleton from "../components/skeletons/VenueCardSkeleton";
 
 function ExplorePage() {
   const [sports, setSports] = useState([]);
@@ -16,19 +17,38 @@ function ExplorePage() {
   const [amenities, setAmenities] = useState([]);
   const [amenitiesLoading, setAmenitiesLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("name");
   const [viewMode, setViewMode] = useState("grid");
   const [searchParams] = useSearchParams();
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   useEffect(() => {
-    const sportId = searchParams.get("sportId");
-    if (sportId) setSelectedSports([sportId]);
+    const sportIdsParam = searchParams.get("sportIds");
+    const amenityIdsParam = searchParams.get("amenityIds");
+
+    if (sportIdsParam) {
+      setSelectedSports(sportIdsParam.split(','));
+    }
+    if (amenityIdsParam) {
+      setSelectedAmenities(amenityIdsParam.split(','));
+    }
   }, [searchParams]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // 500ms delay
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm]);
 
   const { venues, loading: venuesLoading, error } = useVenues({
     selectedSports,
     selectedAmenities,
-    searchTerm,
+    searchTerm: debouncedSearchTerm,
     sortBy,
   });
 
@@ -56,19 +76,11 @@ function ExplorePage() {
     fetchData();
   }, []);
 
-  const filteredVenues = venues;
-  const isLoading = venuesLoading || sportsLoading || amenitiesLoading;
-
-  // 🎬 Handle smooth transition delay
-  const [showContent, setShowContent] = useState(false);
   useEffect(() => {
-    if (!isLoading) {
-      const timeout = setTimeout(() => setShowContent(true), 300);
-      return () => clearTimeout(timeout);
-    } else {
-      setShowContent(false);
+    if (!venuesLoading && isInitialLoading) {
+      setIsInitialLoading(false);
     }
-  }, [isLoading]);
+  }, [venuesLoading, isInitialLoading]);
 
   const clearFilters = () => {
     setSelectedSports([]);
@@ -77,7 +89,7 @@ function ExplorePage() {
     setSortBy("name");
   };
 
-  if (error) {
+  if (error && isInitialLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] text-red-600 font-semibold">
         Oops! Something went wrong while loading venues. Please try again.
@@ -88,8 +100,7 @@ function ExplorePage() {
   return (
     <div className="bg-gray-100 min-h-screen overflow-hidden">
       <AnimatePresence mode="wait">
-        {isLoading && !showContent ? (
-          // 🩶 Skeleton State
+        {isInitialLoading ? (
           <motion.div
             key="skeleton"
             initial={{ opacity: 0 }}
@@ -100,7 +111,6 @@ function ExplorePage() {
             <ExploreSkeleton />
           </motion.div>
         ) : (
-          // ✅ Real Page Content (Fades In)
           <motion.div
             key="content"
             initial={{ opacity: 0 }}
@@ -108,7 +118,6 @@ function ExplorePage() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6 }}
           >
-            {/* Hero Section */}
             <div className="bg-gradient-to-br from-primary-green to-green-600 text-white py-12 px-4">
               <div className="container mx-auto text-center">
                 <h1 className="text-4xl font-bold mb-2">Explore Amazing Venues</h1>
@@ -142,7 +151,6 @@ function ExplorePage() {
               </div>
             </div>
 
-            {/* Filters Section */}
             <div className="container mx-auto px-4 py-8">
               <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -154,6 +162,7 @@ function ExplorePage() {
                     selectedValues={selectedSports}
                     onChange={setSelectedSports}
                     placeholder="Filter by Sports"
+                    loading={sportsLoading}
                   />
                   <FilterDropdown
                     options={amenities.map((amenity) => ({
@@ -163,6 +172,7 @@ function ExplorePage() {
                     selectedValues={selectedAmenities}
                     onChange={setSelectedAmenities}
                     placeholder="Filter by Amenities"
+                    loading={amenitiesLoading}
                   />
                   <div className="flex items-center justify-between gap-4">
                     <select
@@ -219,8 +229,7 @@ function ExplorePage() {
                 </div>
               </div>
 
-              {/* Venues Grid */}
-              {filteredVenues.length > 0 ? (
+              {venuesLoading ? (
                 <div
                   className={
                     viewMode === "grid"
@@ -228,7 +237,24 @@ function ExplorePage() {
                       : "flex flex-col gap-6 max-w-4xl mx-auto"
                   }
                 >
-                  {filteredVenues.map((venue) => (
+                  {[...Array(8)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="transition-transform duration-300 hover:scale-105"
+                    >
+                      <VenueCardSkeleton viewMode={viewMode} />
+                    </div>
+                  ))}
+                </div>
+              ) : venues.length > 0 ? (
+                <div
+                  className={
+                    viewMode === "grid"
+                      ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
+                      : "flex flex-col gap-6 max-w-4xl mx-auto"
+                  }
+                >
+                  {venues.map((venue) => (
                     <div
                       key={venue.venue_id}
                       className="transition-transform duration-300 hover:scale-105"
