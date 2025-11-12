@@ -27,6 +27,7 @@ const BookingPage = lazy(() => import("./pages/player/BookingPage"));
 const PlayerDashboardPage = lazy(() => import("./pages/player/PlayerDashboardPage"));
 
 // Owner Pages
+const OwnerNotifyPage = lazy(() => import("./pages/owner/OwnerNotifyPage"));
 const OwnerDashboardPage = lazy(() => import("./pages/owner/OwnerDashboardPage"));
 const MyVenuesPage = lazy(() => import("./pages/owner/MyVenuesPage"));
 const AddVenuePage = lazy(() => import("./pages/owner/AddVenuePage"));
@@ -236,12 +237,7 @@ function App() {
                     </RequireAuth>
                   }
                 />
-                <Route
-                  path="venues/:venueId"
-                  element={
-                      <VenuePage />
-                  }
-                />
+                <Route path="venues/:venueId" element={<VenuePage />} />
                 <Route
                   path="my-bookings"
                   element={
@@ -279,12 +275,19 @@ function App() {
                   <Route path="dashboard" element={<OwnerDashboardPage />} />
                   <Route path="my-venues" element={<MyVenuesPage />} />
                   <Route path="add-venue" element={<AddVenuePage />} />
-                  <Route path="edit-venue/:venueId" element={<EditVenuePage />} />
-                  <Route path="add-facilities" element={<AddFacilitiesPage />} />
+                  <Route
+                    path="edit-venue/:venueId"
+                    element={<EditVenuePage />}
+                  />
+                  <Route
+                    path="add-facilities"
+                    element={<AddFacilitiesPage />}
+                  />
                   <Route path="reports" element={<ReportsPage />} />
                   <Route path="manage-slots" element={<ManageSlotsPage />} />
                   <Route path="manage-offers" element={<ManageOffersPage />} />
                   <Route path="calendar" element={<BookingCalendarPage />} />
+                  <Route path="notify" element={<OwnerNotifyPage />} />
                 </Route>
                 {/* Admin Routes */}
                 <Route

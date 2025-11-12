@@ -290,10 +290,9 @@ function AdminVenueManagementPage() {
     fetchAllVenues();
   }, [fetchAllVenues]);
 
-  // --- ⬇⬇⬇ LOGIC FIX IS HERE ⬇⬇⬇ ---
+  // --- ⬇⬇⬇ CODE FIX IS HERE ⬇⬇⬇ ---
 
-  // Step 1: Create a new function that contains the *actual* approval logic.
-  // This logic was moved from inside the `if (await showModal...` block.
+  // This function contains the logic to run AFTER the modal is confirmed
   const executeApproval = async (venue) => {
     const loadingToast = toast.loading("Approving venue...");
     try {
@@ -303,52 +302,58 @@ function AdminVenueManagementPage() {
         .eq("venue_id", venue.venue_id);
       if (error) throw error;
 
-      // Send notification
-      await supabase.from("notifications").insert({
-        user_id: venue.owner_id,
+      // FIX: Call the 'create_notification' RPC instead of inserting directly
+      const { error: notifyError } = await supabase.rpc("create_notification", {
         title: "Your venue has been approved! 🥳",
-        message: `Congratulations! Your venue "${venue.name}" is now live on PlayNation.`,
-        type: "success",
+        body: `Congratulations! Your venue "${venue.name}" is now live on PlayNation.`,
+        sender_type: "admin",
+        recipient_type: "owner", // Target type is 'owner' or 'player'
+        recipient_ids: [venue.owner_id], // Pass the owner's ID in an array
       });
 
-      toast.success("Venue approved!", { id: loadingToast });
+      if (notifyError) {
+        // Log the error but still count the approval as a success
+        console.error("Failed to send approval notification:", notifyError);
+        toast.error("Venue approved, but failed to send notification.", {
+          id: loadingToast,
+        });
+      } else {
+        toast.success("Venue approved and owner notified!", {
+          id: loadingToast,
+        });
+      }
+
       fetchAllVenues(); // Refresh list
     } catch (err) {
       toast.error(`Error: ${err.message}`, { id: loadingToast });
+      // Show a follow-up error modal
       showModal({
         title: "Error",
         message: `Failed to approve venue: ${err.message}`,
-        confirmText: "OK", // Use a simple confirm for the error
-        showCancel: false, // No cancel button needed for an error
+        confirmText: "OK",
+        showCancel: false,
       });
     }
   };
 
-  // Step 2: Change handleApproval to just *show* the modal.
-  // It is no longer `async`.
+  // FIX: This function now *only* shows the modal and passes the execute function
   const handleApproval = (venue) => {
-    // We call showModal, which just sets state and returns nothing.
     showModal({
       title: "Approve Venue",
       message: `Are you sure you want to approve "${venue.name}"?`,
       confirmText: "Approve",
-      // Pass our new function as the onConfirm callback.
-      // This will be executed when the user clicks "Approve" in the modal.
-      onConfirm: () => executeApproval(venue),
-      // We must explicitly tell the modal to show a "Cancel" button,
-      // as per your Modal.jsx props.
+      confirmStyle: "primary",
       showCancel: true,
       cancelText: "Cancel",
+      onConfirm: () => executeApproval(venue), // Pass the function to run on confirm
     });
   };
 
-  // --- ⬆⬆⬆ END OF LOGIC FIX ⬆⬆⬆ ---
+  // --- ⬆⬆⬆ END OF CODE FIX ⬆⬆⬆ ---
 
-  // --- No changes to handleDecline or handleConfirmDecline ---
-  const handleDecline = (venue) => {
-    setVenueToReject(venue); // Opens the modal
-  };
+  // --- ⬇⬇⬇ ANOTHER CODE FIX IS HERE ⬇⬇⬇ ---
 
+  // This logic was already correct, but we'll replace the insert with an RPC call
   const handleConfirmDecline = async (reason) => {
     if (!venueToReject) return;
 
@@ -363,16 +368,28 @@ function AdminVenueManagementPage() {
         .eq("venue_id", venueToReject.venue_id);
       if (error) throw error;
 
-      await supabase.from("notifications").insert({
-        user_id: venueToReject.owner_id,
-        title: "Your venue submission was restricted.",
-        message: `Your venue "${venueToReject.name}" was restricted. Reason: "${reason}"`,
-        type: "error",
+      // FIX: Call the 'create_notification' RPC
+      const { error: notifyError } = await supabase.rpc("create_notification", {
+        title: "Your venue submission was restricted",
+        body: `Your venue "${
+          venueToReject.name
+        }" was restricted. Reason: "${reason.trim()}"`,
+        sender_type: "admin",
+        recipient_type: "owner",
+        recipient_ids: [venueToReject.owner_id],
       });
 
-      toast.success("Venue restricted and owner notified.", {
-        id: loadingToast,
-      });
+      if (notifyError) {
+        console.error("Failed to send rejection notification:", notifyError);
+        toast.error("Venue restricted, but failed to send notification.", {
+          id: loadingToast,
+        });
+      } else {
+        toast.success("Venue restricted and owner notified.", {
+          id: loadingToast,
+        });
+      }
+
       fetchAllVenues(); // Refresh list
     } catch (err) {
       toast.error(`Error: ${err.message}`, { id: loadingToast });
@@ -383,6 +400,12 @@ function AdminVenueManagementPage() {
     } finally {
       setVenueToReject(null); // Close modal
     }
+  };
+
+  // --- ⬆⬆⬆ END OF CODE FIX ⬆⬆⬆ ---
+
+  const handleDecline = (venue) => {
+    setVenueToReject(venue); // Opens the reject modal
   };
 
   // --- No changes below this line ---
@@ -450,8 +473,7 @@ function AdminVenueManagementPage() {
     },
   ];
 
-  if (loading)
-    return <AdminVenueManagementPageSkeleton />; 
+  if (loading) return <AdminVenueManagementPageSkeleton />;
 
   if (error)
     return (

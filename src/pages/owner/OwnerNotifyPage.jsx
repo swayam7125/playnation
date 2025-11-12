@@ -1,112 +1,36 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react"; // Import useEffect
 import { supabase } from "../../supabaseClient";
+import { useAuth } from "../../AuthContext";
 import { useModal } from "../../ModalContext";
-import {
-  FaPaperPlane,
-  FaUsers,
-  FaUserTie,
-  FaBuilding,
-  FaSpinner,
-} from "react-icons/fa";
+import { FaPaperPlane, FaUsers, FaRunning, FaSpinner } from "react-icons/fa";
 import toast from "react-hot-toast";
-import Select from "react-select";
 import SegmentedControl from "../../components/common/SegmentedControl";
 
-// Custom styles for React-Select
-const selectStyles = {
-  control: (base, state) => ({
-    ...base,
-    backgroundColor: "var(--hover-bg)",
-    border: state.isFocused
-      ? "2px solid var(--primary-green)"
-      : "2px solid var(--border-color)",
-    borderRadius: "0.75rem",
-    padding: "0.35rem 0.25rem",
-    boxShadow: "none",
-    "&:hover": {
-      borderColor: "var(--primary-green)",
-    },
-  }),
-  option: (base, { isFocused, isSelected }) => ({
-    ...base,
-    backgroundColor: isSelected
-      ? "var(--primary-green)"
-      : isFocused
-      ? "var(--light-green-bg)"
-      : "var(--card-bg)",
-    color: isSelected ? "white" : "var(--dark-text)",
-    "&:active": {
-      backgroundColor: "var(--primary-green-dark)",
-    },
-  }),
-  multiValue: (base) => ({
-    ...base,
-    backgroundColor: "var(--light-green-bg)",
-    borderColor: "var(--primary-green-light)",
-    borderWidth: "1px",
-    borderRadius: "9999px",
-  }),
-  multiValueLabel: (base) => ({
-    ...base,
-    color: "var(--primary-green-dark)",
-    fontWeight: 500,
-  }),
-  multiValueRemove: (base) => ({
-    ...base,
-    color: "var(--primary-green)",
-    "&:hover": {
-      backgroundColor: "var(--primary-green)",
-      color: "white",
-    },
-  }),
-};
+function OwnerNotifyPage() {
+  const { user } = useAuth();
 
-function AdminNotifyPage() {
   // --- ⬇⬇⬇ UI/UX FIX: Load state from session storage ---
   const [subject, setSubject] = useState(
-    () => sessionStorage.getItem("adminNotifySubject") || ""
+    () => sessionStorage.getItem("ownerNotifySubject") || ""
   );
   const [message, setMessage] = useState(
-    () => sessionStorage.getItem("adminNotifyMessage") || ""
+    () => sessionStorage.getItem("ownerNotifyMessage") || ""
   );
   // --- ⬆⬆⬆ END OF FIX ---
 
   const [loading, setLoading] = useState(false);
-  const [ownerList, setOwnerList] = useState([]);
-  const [selectedOwners, setSelectedOwners] = useState([]);
   const [targetType, setTargetType] = useState("all_players");
   const { showModal } = useModal();
 
   // --- ⬇⬇⬇ UI/UX FIX: Save state to session storage on change ---
   useEffect(() => {
-    sessionStorage.setItem("adminNotifySubject", subject);
+    sessionStorage.setItem("ownerNotifySubject", subject);
   }, [subject]);
 
   useEffect(() => {
-    sessionStorage.setItem("adminNotifyMessage", message);
+    sessionStorage.setItem("ownerNotifyMessage", message);
   }, [message]);
   // --- ⬆⬆⬆ END OF FIX ---
-
-  useEffect(() => {
-    const fetchOwners = async () => {
-      const { data, error } = await supabase
-        .from("users")
-        .select("user_id, username, email")
-        .eq("role", "venue_owner");
-
-      if (error) {
-        toast.error("Could not fetch owner list: " + error.message);
-      } else {
-        const options = data.map((owner) => ({
-          value: owner.user_id,
-          label: `${owner.username} (${owner.email})`,
-        }));
-        setOwnerList(options);
-      }
-    };
-
-    fetchOwners();
-  }, []);
 
   const handleSendNotification = async (e) => {
     e.preventDefault();
@@ -120,22 +44,10 @@ function AdminNotifyPage() {
       return;
     }
 
-    if (targetType === "owner" && selectedOwners.length === 0) {
-      showModal({
-        title: "Error",
-        message: "Please select at least one owner.",
-        showCancel: false,
-        confirmText: "OK",
-      });
-      return;
-    }
-
-    let targetDescription = "all players";
-    if (targetType === "all_owners") {
-      targetDescription = "all venue owners";
-    } else if (targetType === "owner") {
-      targetDescription = `${selectedOwners.length} specific owner(s)`;
-    }
+    let targetDescription =
+      targetType === "all_players"
+        ? "all players on the platform"
+        : "players who have visited your venues";
 
     showModal({
       title: "Confirm Notification",
@@ -150,11 +62,10 @@ function AdminNotifyPage() {
         const payload = {
           title: subject,
           body: message,
-          sender_type: "admin",
-          recipient_type: targetType === "owner" ? "owner" : targetType,
-          recipient_ids:
-            targetType === "owner" ? selectedOwners.map((o) => o.value) : null,
-          owner_id: null,
+          sender_type: "owner",
+          recipient_type: targetType,
+          recipient_ids: null,
+          owner_id: targetType === "visitors" ? user.id : null,
         };
 
         try {
@@ -168,9 +79,8 @@ function AdminNotifyPage() {
           // --- ⬇⬇⬇ UI/UX FIX: Clear state and storage on success ---
           setSubject("");
           setMessage("");
-          setSelectedOwners([]);
-          sessionStorage.removeItem("adminNotifySubject");
-          sessionStorage.removeItem("adminNotifyMessage");
+          sessionStorage.removeItem("ownerNotifySubject");
+          sessionStorage.removeItem("ownerNotifyMessage");
           // --- ⬆⬆⬆ END OF FIX ---
         } catch (err) {
           console.error("Full notification error:", err);
@@ -192,8 +102,7 @@ function AdminNotifyPage() {
 
   const targetOptions = [
     { label: "All Players", value: "all_players", icon: <FaUsers /> },
-    { label: "All Owners", value: "all_owners", icon: <FaBuilding /> },
-    { label: "Specific Owners", value: "owner", icon: <FaUserTie /> },
+    { label: "My Visitors", value: "visitors", icon: <FaRunning /> },
   ];
 
   return (
@@ -202,10 +111,10 @@ function AdminNotifyPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-dark-text mb-3">
-            Broadcast Notifications
+            Notify Players
           </h1>
           <p className="text-lg text-medium-text">
-            Send targeted announcements to your user groups.
+            Engage with your player community.
           </p>
         </div>
 
@@ -223,38 +132,17 @@ function AdminNotifyPage() {
                   value={targetType}
                   onChange={setTargetType}
                 />
-
                 {targetType === "all_players" && (
                   <p className="text-sm text-medium-text p-3 bg-hover-bg rounded-lg border border-border-color-light">
-                    This will send a notification to every user with the
-                    'player' role.
+                    This will send a notification to **all players** on the
+                    platform.
                   </p>
                 )}
-                {targetType === "all_owners" && (
+                {targetType === "visitors" && (
                   <p className="text-sm text-medium-text p-3 bg-hover-bg rounded-lg border border-border-color-light">
-                    This will send a notification to every user with the
-                    'venue_owner' role.
+                    This will only send to players who have previously booked at
+                    one of **your venues**.
                   </p>
-                )}
-
-                {targetType === "owner" && (
-                  <div>
-                    <label
-                      htmlFor="owners"
-                      className="block text-sm font-medium text-medium-text mb-2"
-                    >
-                      Select Specific Owners
-                    </label>
-                    <Select
-                      id="owners"
-                      isMulti
-                      options={ownerList}
-                      value={selectedOwners}
-                      onChange={setSelectedOwners}
-                      placeholder="Search for owners by username or email..."
-                      styles={selectStyles} // Apply custom styles
-                    />
-                  </div>
                 )}
               </div>
             </fieldset>
@@ -269,6 +157,7 @@ function AdminNotifyPage() {
                   <label
                     htmlFor="subject"
                     className="block text-sm font-medium text-medium-text mb-2"
+                    S
                   >
                     Subject
                   </label>
@@ -277,7 +166,7 @@ function AdminNotifyPage() {
                     type="text"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    placeholder="e.g., New Weekend Offer!"
+                    placeholder="e.g., 20% Off This Weekend!"
                     className="w-full px-4 py-3 bg-hover-bg border border-border-color rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-green"
                     required
                   />
@@ -306,7 +195,7 @@ function AdminNotifyPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-6 rounded-xl font-semibold text-white bg-primary-green hover:bg-primary-green-dark transition-all duration-300 shadow-sm hover:shadow-lg disabled:bg-gray-400 disabled:opacity-70 flex items-center justify-center gap-2"
+              className="mt-6 w-full py-3 px-6 rounded-xl font-semibold text-white bg-primary-green hover:bg-primary-green-dark transition-all duration-300 shadow-sm hover:shadow-lg disabled:bg-gray-400 disabled:opacity-70 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <FaSpinner className="animate-spin" />
@@ -322,4 +211,4 @@ function AdminNotifyPage() {
   );
 }
 
-export default AdminNotifyPage;
+export default OwnerNotifyPage;

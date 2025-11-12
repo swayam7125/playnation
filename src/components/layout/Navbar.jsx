@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 import { useModal } from "../../ModalContext";
-import { FaUserCircle, FaSignOutAlt } from "react-icons/fa"; // Import new icons
+import { FaUserCircle, FaSignOutAlt, FaBell } from "react-icons/fa"; // Import new icons
+import NotificationsDropdown from "../notifications/NotificationsDropdown";
 
 function Navbar() {
   const { user, profile, logout } = useAuth();
@@ -67,6 +68,7 @@ function Navbar() {
         ];
       } else {
         links = [
+          { to: "/", label: "Home" },
           { to: "/explore", label: "Explore" },
           { to: "/about", label: "About Us" },
           { to: "/contact", label: "Contact Us" },
@@ -81,6 +83,7 @@ function Navbar() {
         { to: "/owner/calendar", label: "Bookings" },
         { to: "/owner/manage-slots", label: "Manage Slots" },
         { to: "/owner/manage-offers", label: "Manage Offers" },
+        { to: "/owner/notify", label: "Notify" },
       ];
     }
     if (profile?.role === "admin") {
@@ -90,7 +93,7 @@ function Navbar() {
         { to: "/admin/users", label: "Manage Users" },
         { to: "/admin/bookings", label: "Manage Bookings" },
         { to: "/admin/manage-offers", label: "Manage Offers" },
-        { to: "/admin/notify", label: "Notify Players" },
+        { to: "/admin/notify", label: "Notify" },
       ];
     }
     return [];
@@ -140,32 +143,35 @@ function Navbar() {
             {/* Desktop Auth - Profile Button with Dropdown */}
             <div className="hidden lg:flex items-center gap-4 relative" ref={dropdownRef}>
               {user ? (
-                <button
-                  onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                  aria-label={
-                    profile?.username
-                      ? `Open profile for ${profile.username}`
-                      : "Open profile"
-                  }
-                  className="w-10 h-10 p-0 rounded-full overflow-hidden transition-all duration-200 hover:scale-105 focus:outline-none"
-                >
-                  {profile?.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt={(profile?.username || "User") + " avatar"}
-                      className="w-full h-full object-cover block"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-primary-green to-primary-green-dark flex items-center justify-center">
-                      <span className="text-white font-semibold text-sm">
-                        {(profile?.username || "U").charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                </button>
+                <>
+                  <NotificationsDropdown />
+                  <button
+                    onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                    aria-label={
+                      profile?.username
+                        ? `Open profile for ${profile.username}`
+                        : "Open profile"
+                    }
+                    className="w-10 h-10 p-0 rounded-full overflow-hidden transition-all duration-200 hover:scale-105 focus:outline-none"
+                  >
+                    {profile?.avatar_url ? (
+                      <img
+                        src={profile.avatar_url}
+                        alt={(profile?.username || "User") + " avatar"}
+                        className="w-full h-full object-cover block"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-primary-green to-primary-green-dark flex items-center justify-center">
+                        <span className="text-white font-semibold text-sm">
+                          {(profile?.username || "U").charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                  </button>
+                </>
               ) : (
                 <>
                   <Link
@@ -212,7 +218,8 @@ function Navbar() {
             </div>
 
             {/* Mobile Menu Button - Always shows profile image */}
-            <div className="lg:hidden relative">
+            <div className="lg:hidden relative flex items-center gap-4">
+              {user && <NotificationsDropdown />}
               {user ? (
                 <button
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}

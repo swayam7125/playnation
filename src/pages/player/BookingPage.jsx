@@ -205,19 +205,19 @@ function BookingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4">
+    <div className="min-h-screen bg-gray-100 py-8 px-4">
       <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-800 mb-1">
             Confirm Your Booking
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 text-sm">
             Review details and complete your reservation
           </p>
         </div>
 
         {confirmError && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-200 rounded-lg">
+          <div className="mb-4 p-3 bg-red-100 border border-red-200 rounded-lg">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <FiXCircle className="h-5 w-5 text-red-500" />
@@ -230,50 +230,50 @@ function BookingPage() {
         )}
 
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-          <div className="bg-gradient-to-br from-primary-green to-green-600 text-white p-8">
+          <div className="bg-gradient-to-br from-primary-green to-green-600 text-white p-6">
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-3xl font-bold">{venue.name}</h2>
-                <p className="opacity-80 mt-1">
+                <h2 className="text-2xl font-bold">{venue.name}</h2>
+                <p className="opacity-80 mt-0.5 text-sm">
                   {facility.sports?.name || 'Sport'} • {facility.name}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-lg opacity-80">Total</p>
-                <p className="text-4xl font-bold">₹{finalTotalAmount.toFixed(2)}</p>
+                <p className="text-base opacity-80">Total</p>
+                <p className="text-3xl font-bold">₹{finalTotalAmount.toFixed(2)}</p>
               </div>
             </div>
           </div>
 
-          <div className="p-8 space-y-8">
-            <div className="grid md:grid-cols-2 gap-8">
-              <div className="bg-gray-50 rounded-lg p-6">
-                <div className="flex items-center mb-3">
-                  <svg className="h-6 w-6 text-primary-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                  <span className="text-lg font-semibold text-gray-800">Date</span>
+          <div className="p-6 space-y-6">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center mb-2">
+                  <svg className="h-5 w-5 text-primary-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  <span className="text-base font-semibold text-gray-800">Date</span>
                 </div>
-                <p className="text-gray-600 font-medium">{formatDate(slot.start_time)}</p>
+                <p className="text-gray-600 font-medium text-sm">{formatDate(slot.start_time)}</p>
               </div>
-              <div className="bg-gray-50 rounded-lg p-6">
-                <div className="flex items-center mb-3">
-                  <svg className="h-6 w-6 text-primary-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  <span className="text-lg font-semibold text-gray-800">Time</span>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center mb-2">
+                  <svg className="h-5 w-5 text-primary-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <span className="text-base font-semibold text-gray-800">Time</span>
                 </div>
-                <p className="text-gray-600 font-medium">{formatTime(slot.start_time)} - {formatTime(slot.end_time)}</p>
+                <p className="text-gray-600 font-medium text-sm">{formatTime(slot.start_time)} - {formatTime(slot.end_time)}</p>
               </div>
             </div>
 
-            <div className="border-t border-gray-200 pt-8">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Facility Details</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center py-3 px-5 bg-gray-50 rounded-lg">
-                  <span className="text-gray-600">Facility</span><span className="font-semibold text-gray-800">{facility.name}</span>
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-3">Facility Details</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center py-2 px-4 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Facility</span><span className="text-sm font-semibold text-gray-800">{facility.name}</span>
                 </div>
-                <div className="flex justify-between items-center py-3 px-5 bg-gray-50 rounded-lg">
-                  <span className="text-gray-600">Sport</span><span className="font-semibold text-gray-800">{facility.sports?.name || 'N/A'}</span>
+                <div className="flex justify-between items-center py-2 px-4 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Sport</span><span className="text-sm font-semibold text-gray-800">{facility.sports?.name || 'N/A'}</span>
                 </div>
-                <div className="flex justify-between items-center py-3 px-5 bg-gray-50 rounded-lg">
-                  <span className="text-gray-600">Venue</span><span className="font-semibold text-gray-800">{venue.name}</span>
+                <div className="flex justify-between items-center py-2 px-4 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Venue</span><span className="text-sm font-semibold text-gray-800">{venue.name}</span>
                 </div>
               </div>
             </div>
@@ -286,29 +286,29 @@ function BookingPage() {
               onOfferApplied={handleOfferUpdate}
             />
 
-            <div className="border-t border-gray-200 pt-8">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">Payment Summary</h3>
-              <div className="space-y-4">
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-lg font-bold text-gray-800 mb-3">Payment Summary</h3>
+              <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Booking Fee</span>
-                  <span className="text-gray-800 font-medium">₹{baseTotalAmount.toFixed(2)}</span>
+                  <span className="text-sm text-gray-600">Booking Fee</span>
+                  <span className="text-sm text-gray-800 font-medium">₹{baseTotalAmount.toFixed(2)}</span>
                 </div>
                 
                 {appliedOffer && discountAmount > 0 && (
                   <div className="flex justify-between items-center text-green-600">
-                    <span className="text-gray-600">Discount ({appliedOffer.title || 'Offer'})</span>
-                    <span className="font-semibold">- ₹{discountAmount.toFixed(2)}</span>
+                    <span className="text-sm text-gray-600">Discount ({appliedOffer.title || 'Offer'})</span>
+                    <span className="text-sm font-semibold">- ₹{discountAmount.toFixed(2)}</span>
                   </div>
                 )}
 
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Platform Fee</span>
-                  <span className="text-gray-800 font-medium">₹0.00</span>
+                  <span className="text-sm text-gray-600">Platform Fee</span>
+                  <span className="text-sm text-gray-800 font-medium">₹0.00</span>
                 </div>
-                <div className="border-t border-gray-200 pt-4 mt-4">
+                <div className="border-t border-gray-200 pt-3 mt-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-xl font-bold text-gray-800">Total Amount</span>
-                    <span className="text-2xl font-bold text-primary-green">₹{finalTotalAmount.toFixed(2)}</span>
+                    <span className="text-lg font-bold text-gray-800">Total Amount</span>
+                    <span className="text-xl font-bold text-primary-green">₹{finalTotalAmount.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -316,18 +316,18 @@ function BookingPage() {
 
           </div>
 
-          <div className="p-8 bg-gray-50 border-t border-gray-200">
-            <div className="flex gap-4">
+          <div className="p-6 bg-gray-50 border-t border-gray-200">
+            <div className="flex gap-3">
               <button
                 onClick={() => navigate(-1)}
-                className="flex-1 py-4 px-6 border-2 border-gray-300 text-gray-600 font-semibold rounded-lg hover:bg-gray-200 transition-all duration-300"
+                className="flex-1 py-3 px-5 border-2 border-gray-300 text-gray-600 font-semibold rounded-lg hover:bg-gray-200 transition-all duration-300"
               >
                 Go Back
               </button>
               <button
                 onClick={handleConfirmBooking}
                 disabled={confirmLoading}
-                className={`flex-1 py-4 px-6 font-bold text-lg rounded-lg transition-all duration-300 relative overflow-hidden shadow-lg transform hover:-translate-y-1 ${
+                className={`flex-1 py-3 px-5 font-bold text-base rounded-lg transition-all duration-300 relative overflow-hidden shadow-lg transform hover:-translate-y-1 ${
                   confirmLoading
                     ? "bg-gray-400 cursor-not-allowed text-white"
                     : "bg-primary-green text-white hover:bg-primary-green-dark"
@@ -351,8 +351,8 @@ function BookingPage() {
           </div>
         </div>
 
-        <div className="mt-8 text-center">
-          <p className="text-sm text-gray-500">
+        <div className="mt-6 text-center">
+          <p className="text-xs text-gray-500">
             🔒 Your payment information is secure and encrypted
           </p>
         </div>

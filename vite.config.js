@@ -1,22 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import viteImagemin from '@vheemstra/vite-plugin-imagemin';
-import imageminGifSicle from 'imagemin-gifsicle';
-import imageminJpegTran from 'imagemin-jpegtran';
-import imageminOptiPng from 'imagemin-optipng';
-import imageminSvgo from 'imagemin-svgo';
+import { ViteImageOptimizer } from 'vite-plugin-image-optimizer';
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
-    viteImagemin({
-      plugins: {
-        jpg: imageminJpegTran(),
-        png: imageminOptiPng(),
-        gif: imageminGifSicle(),
-        svg: imageminSvgo(),
-      },
+    ViteImageOptimizer({
+      /* pass your config */
     }),
   ],
   build: {
