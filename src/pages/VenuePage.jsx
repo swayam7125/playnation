@@ -11,7 +11,7 @@ import {
   FaShieldAlt
 } from "react-icons/fa";
 import StarRating from "../components/reviews/StarRating";
-import OfferCard from "../components/offers/OfferCard";
+// REMOVED: import OfferCard from "../components/offers/OfferCard";
 import DOMPurify from "dompurify";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -63,7 +63,7 @@ function VenuePage() {
 
   const [venue, setVenue] = useState(null);
   const [reviews, setReviews] = useState([]);
-  const [offers, setOffers] = useState([]);
+  // REMOVED: const [offers, setOffers] = useState([]);
   const [selectedFacilityId, setSelectedFacilityId] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -80,7 +80,7 @@ function VenuePage() {
       setError(null);
       setVenue(null);
       setReviews([]);
-      setOffers([]);
+      // REMOVED: setOffers([]);
       setSelectedFacilityId(null);
       setSlots([]);
       try {
@@ -112,6 +112,8 @@ function VenuePage() {
         if (reviewError) throw reviewError;
         setReviews(reviewData || []);
 
+        // REMOVED: Offer fetching logic
+        /*
         const { data: offerData, error: offerError } = await supabase
           .from("offers")
           .select("*")
@@ -121,6 +123,7 @@ function VenuePage() {
 
         if (offerError) throw offerError;
         setOffers(offerData || []);
+        */
 
       } catch (err) {
         console.error("Error fetching venue data:", err);
@@ -237,7 +240,7 @@ function VenuePage() {
        const lat = parseFloat(venue.latitude);
        const lng = parseFloat(venue.longitude);
        if (!isNaN(lat) && !isNaN(lng)) {
-          return `https://www.google.com/maps?q=${lat},${lng}`;
+          return `https://www.google.com/maps?q=$${lat},${lng}`;
        }
     }
     if (venue?.name && venue?.address && venue?.city) {
@@ -432,6 +435,8 @@ function VenuePage() {
               )}
             </div>
 
+             {/* REMOVED: Offer rendering block */}
+             {/*
              {offers.length > 0 && (
                 <div className="mb-8 border-t border-gray-200 pt-8">
                   <h2 className="text-3xl font-bold text-gray-800 mb-6">Special Offers</h2>
@@ -440,6 +445,7 @@ function VenuePage() {
                   </div>
                 </div>
               )}
+             */}
 
              <div className="border-t border-gray-200 pt-8 mb-8">
                 <h2 className="text-3xl font-bold text-gray-800 mb-6">Select Facility</h2>
