@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { FaBell, FaCheckDouble, FaSpinner, FaInbox } from "react-icons/fa";
-import { Link } from "react-router-dom";
+import { FaBell, FaSpinner, FaInbox } from "react-icons/fa"; // Removed FaCheckDouble
+import { Link, useNavigate } from "react-router-dom"; // Import useNavigate
 import { useNotifications } from "../../hooks/useNotifications";
 import toast from "react-hot-toast";
 
@@ -25,26 +25,23 @@ const formatTimeAgo = (dateString) => {
 
 function NotificationsDropdown() {
   const {
-    notifications,
+    notifications = [],
     unreadCount,
     loading,
     error,
     markAsRead,
-    markAllAsRead,
+    markAllAsRead, // Assuming you implemented markAllAsRead in your hook
   } = useNotifications();
+  
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const navigate = useNavigate(); // Hook for navigation
 
-  // --- ⬇⬇⬇ THIS IS THE FIX ⬇⬇⬇ ---
-  // We move the error toast into a useEffect hook.
-  // This hook will only run when the 'error' value changes,
-  // preventing the infinite loop.
   useEffect(() => {
     if (error) {
-      toast.error(`Error loading notifications: ${error}`);
+      toast.error(`Error loading notifications: ${error.message || 'Failed to fetch'}`);
     }
   }, [error]);
-  // --- ⬆⬆⬆ END OF FIX ⬆⬆⬆ ---
 
   // Click outside handler
   useEffect(() => {
@@ -59,75 +56,63 @@ function NotificationsDropdown() {
     };
   }, []);
 
-  // --- 🚨 The problematic code below has been removed ---
-  // if (error) {
-  //   toast.error(`Error loading notifications: ${error}`);
-  // }
-  // ---
-
   const handleToggle = () => {
     setIsOpen(!isOpen);
   };
 
-  const handleMarkAsRead = (e, notificationId) => {
-    e.stopPropagation();
-    e.preventDefault(); // Prevent link navigation
-    markAsRead(notificationId);
-  };
-
   const handleMarkAllAsRead = (e) => {
     e.stopPropagation();
-    if (notifications.length > 0 && unreadCount > 0) {
+    if (notifications.length > 0 && unreadCount > 0 && markAllAsRead) {
       markAllAsRead();
     }
   };
 
-  const NotificationItem = ({ notification }) => (
-    <Link
-      to={notification.link_to || "#"}
-      onClick={() => {
-        setIsOpen(false);
-        if (!notification.is_read) {
-          markAsRead(notification.notification_id);
-        }
-      }}
-      className={`block px-4 py-3 hover:bg-hover-bg ${
-        !notification.is_read ? "bg-light-green-bg" : "bg-card-bg"
-      }`}
-    >
-      <div className="flex items-start">
-        <div className="flex-shrink-0">
-          <div
-            className={`w-3 h-3 rounded-full mt-1.5 ${
-              !notification.is_read
-                ? "bg-primary-green"
-                : "bg-border-color-light"
-            }`}
-          ></div>
-        </div>
-        <div className="ml-3 w-0 flex-1">
-          <p className="text-sm font-medium text-dark-text truncate">
-            {notification.title}
-          </p>
-          <p className="text-sm text-medium-text">{notification.body}</p>
-          <p className="text-xs text-light-text mt-1">
-            {formatTimeAgo(notification.created_at)}
-          </p>
-        </div>
-        {!notification.is_read && (
-          <div className="ml-2 flex-shrink-0">
-            <button
-              onClick={(e) => handleMarkAsRead(e, notification.notification_id)}
-              className="text-primary-green hover:text-primary-green-dark"
-              title="Mark as read"
-            >
-              <FaCheckDouble />
-            </button>
+  // This item handles the click, navigation, and marking as read
+  const NotificationItem = ({ notification }) => {
+    
+    const handleClick = (e) => {
+      e.preventDefault(); // Prevent default link behavior
+      setIsOpen(false);
+      
+      // 1. Mark as read (this will optimistically remove it from the list)
+      if (markAsRead) {
+        // We assume 'notification.id' is the unique RECIPIENT_ID
+        // as setup in our 'useNotifications' hook
+        markAsRead(notification.id); 
+      }
+      
+      // 2. Navigate to the link
+      if (notification.link_to) {
+        navigate(notification.link_to);
+      }
+    };
+
+    return (
+      <a
+        href={notification.link_to || "#"} // Fallback href for semantics
+        onClick={handleClick}
+        className={`block px-4 py-3 hover:bg-hover-bg bg-card-bg cursor-pointer`}
+      >
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <div
+              className={`w-3 h-3 rounded-full mt-1.5 bg-primary-green`} // Always show green dot (all are unread)
+            ></div>
           </div>
-        )}
-      </div>
-    </Link>
-  );
+          <div className="ml-3 w-0 flex-1">
+            <p className="text-sm font-medium text-dark-text truncate">
+              {notification.title}
+            </p>
+            <p className="text-sm text-medium-text">{notification.body}</p>
+            <p className="text-xs text-light-text mt-1">
+              {formatTimeAgo(notification.created_at)}
+            </p>
+          </div>
+          {/* The checkmark button is removed, as the whole item is clickable */}
+        </div>
+      </a>
+    );
+  };
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -176,7 +161,8 @@ function NotificationsDropdown() {
               <div className="divide-y divide-border-color-light">
                 {notifications.map((notification) => (
                   <NotificationItem
-                    key={notification.notification_id}
+                    // We assume 'notification.id' is the unique RECIPIENT_ID
+                    key={notification.id} 
                     notification={notification}
                   />
                 ))}

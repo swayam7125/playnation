@@ -242,7 +242,7 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
         console.error(`${logPrefixMain} Authentication failed: Missing header.`);
-        return new Response(JSON.stringify({ error: 'Missing authorization header' }), { status: 401, /*...*/ });
+        return new Response(JSON.stringify({ error: 'Missing authorization header' }), { status: 401, headers: corsHeaders });
     }
     const supabaseUserClient = createClient(
       Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!,
@@ -251,7 +251,7 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseUserClient.auth.getUser();
     if (userError || !user) {
         console.error(`${logPrefixMain} Authentication failed:`, userError?.message || 'No user found.');
-        return new Response(JSON.stringify({ error: 'User not authenticated' }), { status: 401, /*...*/ });
+        return new Response(JSON.stringify({ error: 'User not authenticated' }), { status: 401, headers: corsHeaders });
     }
      console.log(`${logPrefixMain} User authenticated: ${user.id}`);
 
@@ -263,7 +263,7 @@ serve(async (req) => {
         requestBody = await req.json();
     } catch (parseError) {
         console.error(`${logPrefixMain} Failed to parse JSON body:`, parseError);
-        return new Response(JSON.stringify({ error: 'Invalid request body.' }), { status: 400, /*...*/ });
+        return new Response(JSON.stringify({ error: 'Invalid request body.' }), { status: 400, headers: corsHeaders });
     }
     const { facility_id, slot_id, total_amount, offer_id } = requestBody;
     console.log(`${logPrefixMain} Parsed body:`, { facility_id, slot_id, total_amount, offer_id });
@@ -271,7 +271,7 @@ serve(async (req) => {
 
     if (!facility_id || !slot_id || total_amount === undefined || total_amount < 0) {
         console.error(`${logPrefixMain} Invalid parameters:`, { facility_id, slot_id, total_amount });
-        return new Response(JSON.stringify({ error: 'Missing or invalid required booking parameters' }), { status: 400, /*...*/ });
+        return new Response(JSON.stringify({ error: 'Missing or invalid required booking parameters' }), { status: 400, headers: corsHeaders });
     }
 
     const supabaseAdmin = createClient(
@@ -290,16 +290,16 @@ serve(async (req) => {
 
     if (slotFetchError) {
         console.error(`${logPrefixMain} Slot fetch failed for ${slot_id}:`, slotFetchError.message);
-        return new Response(JSON.stringify({ error: 'Time slot not found or database error.' }), { status: 404, /*...*/ });
+        return new Response(JSON.stringify({ error: 'Time slot not found or database error.' }), { status: 404, headers: corsHeaders });
     }
     console.log(`${logPrefixMain} Slot fetched. ID: ${timeSlot.slot_id}, is_available: ${timeSlot.is_available}`);
     if (!timeSlot.is_available) {
         console.warn(`${logPrefixMain} Slot ${slot_id} is already unavailable (initial check).`);
-        return new Response(JSON.stringify({ error: 'This slot has just been taken. Please choose another one.' }), { status: 409, /*...*/ });
+        return new Response(JSON.stringify({ error: 'This slot has just been taken. Please choose another one.' }), { status: 409, headers: corsHeaders });
     }
     if (timeSlot.facility_id !== facility_id) {
          console.error(`${logPrefixMain} Slot ${slot_id} facility mismatch: expected ${facility_id}, got ${timeSlot.facility_id}`);
-         return new Response(JSON.stringify({ error: 'Booking data mismatch. Please try again.' }), { status: 400, /*...*/ });
+         return new Response(JSON.stringify({ error: 'Booking data mismatch. Please try again.' }), { status: 400, headers: corsHeaders });
     }
 
 
@@ -349,7 +349,7 @@ serve(async (req) => {
     if (updateError || !updatedSlotData) {
         if (updateError) { console.error(`${logPrefixMain} Failed to reserve slot ${slot_id} due to DB error:`, updateError.message); }
         else { console.warn(`${logPrefixMain} Failed to reserve slot ${slot_id}: Slot taken (race condition).`); }
-        return new Response(JSON.stringify({ error: 'This slot has just been taken. Please choose another one.' }), { status: 409, /*...*/ });
+        return new Response(JSON.stringify({ error: 'This slot has just been taken. Please choose another one.' }), { status: 409, headers: corsHeaders });
     }
      console.log(`${logPrefixMain} Slot ${slot_id} successfully reserved (marked as unavailable).`);
 
@@ -392,7 +392,7 @@ serve(async (req) => {
 
         // ... (return booking error response) ...
         const statusCode = bookingInsertError.code === '23505' ? 409 : 500;
-        return new Response(JSON.stringify({ error: `Failed to create booking: ${bookingInsertError.message}` }), { status: statusCode, /*...*/ });
+        return new Response(JSON.stringify({ error: `Failed to create booking: ${bookingInsertError.message}` }), { status: statusCode, headers: corsHeaders });
     }
 
     // --- Transaction Logic End ---
@@ -415,7 +415,71 @@ serve(async (req) => {
         }
     }
 
-    // 8. Return Success Response
+    // --- ⬇⬇ NEW CODE BLOCK FOR OWNER NOTIFICATION ⬇⬇ ---
+    // 8. Send Notification to Venue Owner
+    console.log(`${logPrefixMain} Attempting to send notification for booking ${bookingId}...`);
+    try {
+      // Get Player's Name and Facility/Owner Details
+      const [facilityDetails, playerDetails] = await Promise.all([
+        supabaseAdmin
+          .from('facilities')
+          .select('name, venues ( owner_id )') // Get facility name and nested owner_id
+          .eq('facility_id', facility_id)
+          .single(),
+        supabaseAdmin
+          .from('users') // Get player's username
+          .select('username')
+          .eq('user_id', user.id)
+          .single()
+      ]);
+
+      if (facilityDetails.error) throw new Error(`Failed to get facility details: ${facilityDetails.error.message}`);
+      if (playerDetails.error) throw new Error(`Failed to get player details: ${playerDetails.error.message}`);
+
+      // Extract data
+      const facilityName = facilityDetails.data?.name || 'Unknown Facility';
+      const playerName = playerDetails.data?.username || 'A player';
+      // deno-lint-ignore no-explicit-any
+      const ownerId = (facilityDetails.data?.venues as any)?.owner_id;
+
+
+      if (!ownerId) {
+        throw new Error(`Could not find owner for facility ${facility_id}`);
+      }
+
+      // Format the time
+      const formattedTime = new Date(timeSlot.start_time).toLocaleString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        month: 'short',
+        day: 'numeric'
+      });
+
+      // Call the create_notification function
+      const { error: notificationError } = await supabaseAdmin.rpc('create_notification', {
+        title: 'New Booking Confirmed',
+        body: `${playerName} has booked ${facilityName} for ${formattedTime}.`,
+        sender_type: 'system',      // Notification is from the system
+        recipient_type: 'owner',    // This must match your function's expected role type
+        recipient_ids: [ownerId],   // Pass the owner's ID in an array
+        link_to: '/owner/calendar'  // This is the new redirect link
+      });
+
+      if (notificationError) {
+        throw new Error(`Failed to create notification RPC: ${notificationError.message}`);
+      }
+
+      console.log(`${logPrefixMain} Successfully created notification for owner ${ownerId}.`);
+
+    } catch (notificationError) {
+      // IMPORTANT: Log the error but DO NOT fail the request.
+      // The booking succeeded, which is the most important part.
+      console.error(`${logPrefixMain} CRITICAL: Booking ${bookingId} succeeded, but notification FAILED:`, notificationError.message);
+    }
+    // --- ⬆⬆ END OF NEW CODE BLOCK ⬆⬆ ---
+
+
+    // 9. Return Success Response (was step 8)
     let message = 'Booking created successfully';
     if (offerValidationErrorMessage) { message += `. Note: The provided offer code could not be applied (${offerValidationErrorMessage})`; }
     else if (appliedDiscount > 0 && validatedOfferTitle) { message += ` with offer "${validatedOfferTitle}" applied.`; }

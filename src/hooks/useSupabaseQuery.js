@@ -1,13 +1,6 @@
 // src/hooks/useSupabaseQuery.js
 import { useState, useEffect, useCallback } from 'react';
 
-/**
- * A custom hook to execute a Supabase query.
- * @param {string} queryKey - A unique key for the query.
- * @param {Function} queryFn - An async function that returns a Supabase query.
- * @param {Object} options - Options for the query, e.g., { enabled: true }.
- * @returns {{data: any, loading: boolean, error: string|null, setData: Function}}
- */
 export default function useSupabaseQuery(queryKey, queryFn, { enabled = true } = {}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(enabled);
@@ -18,17 +11,13 @@ export default function useSupabaseQuery(queryKey, queryFn, { enabled = true } =
       setLoading(false);
       return;
     }
-
     setLoading(true);
     setError(null);
-
     try {
       const { data: resultData, error: queryError } = await queryFn();
-
       if (queryError) {
         throw queryError;
       }
-
       setData(resultData);
     } catch (err) {
       console.error(`Error fetching for query ${queryKey}:`, err);
@@ -42,5 +31,7 @@ export default function useSupabaseQuery(queryKey, queryFn, { enabled = true } =
     fetchData();
   }, [fetchData]);
 
-  return { data, loading, error, setData };
+  // --- V V V --- THIS IS THE CHANGE --- V V V ---
+  return { data, loading, error, setData, refetch: fetchData };
+  // --- ^ ^ ^ --- THIS IS THE CHANGE --- ^ ^ ^ ---
 }

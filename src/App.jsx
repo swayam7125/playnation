@@ -188,6 +188,27 @@ const RequireAuth = ({ children, allowedRoles = [] }) => {
   return children;
 };
 
+const NotificationRedirect = () => {
+  const { profile } = useAuth();
+
+  // Redirect to role-specific notification page
+  if (profile?.role === 'admin') {
+    return <Navigate to="/admin/notify" replace />;
+  }
+  if (profile?.role === 'venue_owner') {
+    return <Navigate to="/owner/notify" replace />;
+  }
+
+  // Players don't have a dedicated notify page,
+  // so redirect them to their dashboard
+  if (profile?.role === 'player') {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  // Default fallback
+  return <Navigate to="/" replace />;
+};
+
 function App() {
   return (
     <AuthProvider>
@@ -255,6 +276,15 @@ function App() {
                   element={
                     <RequireAuth allowedRoles={[]}>
                       <ProfilePage />
+                    </RequireAuth>
+                  }
+                />
+                {/* Notification Routes */}
+                <Route
+                  path="notifications"
+                  element={
+                    <RequireAuth allowedRoles={[]}>
+                      <NotificationRedirect />
                     </RequireAuth>
                   }
                 />
