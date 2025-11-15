@@ -1008,58 +1008,100 @@ END;$$;
 ALTER FUNCTION public.create_booking_for_user(p_user_id uuid, p_facility_id uuid, p_slot_id uuid, p_total_amount numeric) OWNER TO postgres;
 
 --
--- Name: create_notification(text, text, text, text, uuid[], uuid); Type: FUNCTION; Schema: public; Owner: postgres
+-- Name: create_booking_notifications(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.create_notification(title text, body text, sender_type text, recipient_type text, recipient_ids uuid[] DEFAULT NULL::uuid[], owner_id uuid DEFAULT NULL::uuid) RETURNS bigint
+CREATE FUNCTION public.create_booking_notifications() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'public'
+    AS $$
+DECLARE
+  v_owner_id UUID;
+  v_venue_name TEXT;
+  v_facility_name TEXT;
+  v_notification_id BIGINT;
+BEGIN
+  -- Get venue and facility details
+  SELECT v.owner_id, v.name, f.name
+  INTO v_owner_id, v_venue_name, v_facility_name
+  FROM public.facilities f
+  JOIN public.venues v ON f.venue_id = v.venue_id
+  WHERE f.facility_id = NEW.facility_id;
+
+  -- Insert notification record
+  INSERT INTO public.notifications (sender_id, title, message, type, link_to)
+  VALUES (NEW.user_id, 'New Booking!', 'You have a new booking for ' || v_facility_name || ' at ' || v_venue_name, 'booking_new', '/owner/bookings')
+  RETURNING id INTO v_notification_id;
+
+  -- Add recipient (venue owner)
+  -- THIS IS THE FIX:
+  INSERT INTO public.notification_recipients (notification_id, recipient_id, is_read)
+  VALUES (v_notification_id, v_owner_id, false); -- Changed 'owner' to false
+
+  -- Add recipient (player)
+  INSERT INTO public.notification_recipients (notification_id, recipient_id, is_read)
+  VALUES (v_notification_id, NEW.user_id, false);
+
+  RETURN NEW;
+
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE WARNING 'Error creating booking notification: %', SQLERRM;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.create_booking_notifications() OWNER TO postgres;
+
+--
+-- Name: create_notification(text, text, text, text, uuid[], uuid, text); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.create_notification(title text, body text, sender_type text, recipient_type text, recipient_ids uuid[] DEFAULT NULL::uuid[], owner_id uuid DEFAULT NULL::uuid, link_to text DEFAULT NULL::text) RETURNS bigint
+    LANGUAGE plpgsql SECURITY DEFINER
     AS $$
 DECLARE
     notification_id BIGINT;
-    current_user_id UUID := auth.uid();
+    current_user_id UUID := auth.uid(); 
     current_user_role TEXT;
     resolved_recipient_ids UUID[];
-    v_sender_type public.user_role_enum;
 BEGIN
-    -- Cast sender_type to the ENUM
-    v_sender_type := sender_type::public.user_role_enum;
+    -- Get the role of the current user
+    SELECT raw_user_meta_data->>'role' INTO current_user_role FROM auth.users WHERE id = current_user_id;
 
-    -- Get the role of the current user from public.users table
-    SELECT role INTO current_user_role FROM public.users WHERE user_id = current_user_id;
-
-    -- Permission checks (if sender is not system)
-    IF v_sender_type != 'system' THEN
-        IF current_user_role IS NULL THEN
-            RAISE EXCEPTION 'User role not found';
-        ELSIF current_user_role = 'admin' AND v_sender_type != 'admin' THEN
-            RAISE EXCEPTION 'Admins can only send notifications as admin';
-        ELSIF current_user_role = 'owner' AND v_sender_type != 'owner' THEN
-            RAISE EXCEPTION 'Owners can only send notifications as owner';
-        ELSIF current_user_role = 'player' THEN
-            RAISE EXCEPTION 'Players cannot send notifications';
-        END IF;
+    -- Permission checks
+    IF current_user_role = 'admin' AND sender_type != 'admin' THEN
+        RAISE EXCEPTION 'Admins can only send notifications as admin';
+    -- <<< FIX 2: Changed 'owner' to 'venue_owner'
+    ELSIF current_user_role = 'venue_owner' AND sender_type != 'owner' THEN
+        RAISE EXCEPTION 'Owners can only send notifications as owner';
+    ELSIF current_user_role IS NULL THEN
+        RAISE EXCEPTION 'User role not found';
     END IF;
 
     -- Recipient resolution
     CASE recipient_type
         WHEN 'all_owners' THEN
-            SELECT array_agg(user_id) INTO resolved_recipient_ids FROM public.users WHERE role = 'venue_owner';
-        WHEN 'all_players' THEN
-            SELECT array_agg(user_id) INTO resolved_recipient_ids FROM public.users WHERE role = 'player';
-        WHEN 'visitors' THEN
-            IF owner_id IS NULL THEN
-                RAISE EXCEPTION 'Owner ID must be provided for visitor notifications';
+            IF current_user_role != 'admin' THEN
+                RAISE EXCEPTION 'Only admins can send notifications to all owners';
             END IF;
-            -- Get all users who have booked at this owner's venues
-            SELECT array_agg(DISTINCT b.user_id)
-            INTO resolved_recipient_ids
-            FROM public.bookings b
-            JOIN public.facilities f ON b.facility_id = f.facility_id
-            JOIN public.venues v ON f.venue_id = v.venue_id
-            WHERE v.owner_id = owner_id;
-        WHEN 'admin' THEN
-            SELECT array_agg(user_id) INTO resolved_recipient_ids FROM public.users WHERE role = 'admin';
+            -- <<< FIX 2: Changed 'owner' to 'venue_owner'
+            SELECT array_agg(id) INTO resolved_recipient_ids FROM auth.users WHERE raw_user_meta_data->>'role' = 'venue_owner';
+        WHEN 'all_players' THEN
+             -- <<< FIX 2: Changed 'owner' to 'venue_owner'
+            IF current_user_role != 'venue_owner' THEN
+                RAISE EXCEPTION 'Only owners can send notifications to all players';
+            END IF;
+            SELECT array_agg(id) INTO resolved_recipient_ids FROM auth.users WHERE raw_user_meta_data->>'role' = 'player';
+        WHEN 'visitors' THEN
+             -- <<< FIX 2: Changed 'owner' to 'venue_owner'
+            IF current_user_role != 'venue_owner' THEN
+                RAISE EXCEPTION 'Only owners can send notifications to visitors';
+            END IF;
+            IF owner_id IS NULL OR owner_id != current_user_id THEN
+                RAISE EXCEPTION 'Owner can only send notifications to their own visitors';
+            END IF;
+            SELECT array_agg(DISTINCT player_id) INTO resolved_recipient_ids FROM visits WHERE visits.owner_id = owner_id;
         WHEN 'owner' OR 'player' THEN
             IF recipient_ids IS NULL OR array_length(recipient_ids, 1) = 0 THEN
                 RAISE EXCEPTION 'Recipient IDs must be provided for this recipient type';
@@ -1070,28 +1112,32 @@ BEGIN
     END CASE;
 
     -- Deduplicate recipients
-    IF resolved_recipient_ids IS NOT NULL THEN
-        SELECT array_agg(DISTINCT unnested) INTO resolved_recipient_ids FROM unnest(resolved_recipient_ids) as unnested;
-    END IF;
+    SELECT array_agg(DISTINCT unnested) INTO resolved_recipient_ids FROM unnest(resolved_recipient_ids) as unnested;
 
     -- Insert the notification
-    INSERT INTO notifications (title, body, sender_type, sender_id, recipient_type, recipient_ids, owner_id, status, sent_at)
-    VALUES (title, body, v_sender_type, current_user_id, recipient_type, recipient_ids, owner_id, 'sent', NOW())
+    INSERT INTO notifications (
+        title, body, sender_type, sender_id, 
+        recipient_type, recipient_ids, owner_id, 
+        status, sent_at, link_to  -- <<< FIX 3: Added 'link_to' column
+    )
+    VALUES (
+        title, body, sender_type, current_user_id, 
+        recipient_type, recipient_ids, owner_id, 
+        'sent', NOW(), link_to  -- <<< FIX 3: Added 'link_to' value
+    )
     RETURNING id INTO notification_id;
 
     -- Insert the recipients
-    IF resolved_recipient_ids IS NOT NULL THEN
-      INSERT INTO notification_recipients (notification_id, user_id, delivered_at)
-      SELECT notification_id, recipient_id, NOW()
-      FROM unnest(resolved_recipient_ids) AS recipient_id;
-    END IF;
+    INSERT INTO notification_recipients (notification_id, recipient_id, delivered_at)
+    SELECT notification_id, rid, NOW()
+    FROM unnest(resolved_recipient_ids) AS rid;
 
     RETURN notification_id;
 END;
 $$;
 
 
-ALTER FUNCTION public.create_notification(title text, body text, sender_type text, recipient_type text, recipient_ids uuid[], owner_id uuid) OWNER TO postgres;
+ALTER FUNCTION public.create_notification(title text, body text, sender_type text, recipient_type text, recipient_ids uuid[], owner_id uuid, link_to text) OWNER TO postgres;
 
 --
 -- Name: get_admin_dashboard_all_data(); Type: FUNCTION; Schema: public; Owner: postgres
@@ -2632,6 +2678,65 @@ $$;
 ALTER FUNCTION public.handle_new_user_username() OWNER TO postgres;
 
 --
+-- Name: handle_new_venue_owner(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.handle_new_venue_owner() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+DECLARE
+  admin_ids UUID[];
+  owner_name TEXT;
+  link_to_path TEXT;
+BEGIN
+  IF NEW.role = 'venue_owner' THEN
+    owner_name := NEW.username;
+    link_to_path := '/admin/users';
+    
+    SELECT array_agg(user_id) INTO admin_ids
+    FROM public.users
+    WHERE role = 'admin';
+
+    IF admin_ids IS NOT NULL THEN
+      PERFORM public.create_notification(
+        title := 'New Venue Owner',
+        body := 'A new venue owner, ' || owner_name || ', has registered.',
+        sender_type := 'system',
+        recipient_type := 'admin',
+        recipient_ids := admin_ids,
+        owner_id := NULL, -- <-- THIS WAS THE MISSING ARGUMENT
+        link_to := link_to_path
+      );
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.handle_new_venue_owner() OWNER TO postgres;
+
+--
+-- Name: mark_all_notifications_as_read(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.mark_all_notifications_as_read() RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  UPDATE public.notification_recipients
+  SET 
+    is_read = true,
+    read_at = NOW()
+  WHERE 
+    user_id = auth.uid() AND is_read = false;
+END;
+$$;
+
+
+ALTER FUNCTION public.mark_all_notifications_as_read() OWNER TO postgres;
+
+--
 -- Name: notify_admin_on_new_booking(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -2671,7 +2776,8 @@ BEGIN
             sender_type := 'system',
             recipient_type := 'admin',
             recipient_ids := v_admin_ids,
-            owner_id := NULL
+            owner_id := NULL,
+            link_to := '/admin/bookings'
           );
         END IF;
 
@@ -5324,7 +5430,10 @@ CREATE TABLE public.contact_messages (
     email character varying(255) NOT NULL,
     message text NOT NULL,
     is_read boolean DEFAULT false,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    status character varying(50) DEFAULT 'unread'::character varying,
+    read_at timestamp with time zone,
+    admin_notes text
 );
 
 
@@ -5441,11 +5550,19 @@ CREATE TABLE public.notifications (
     status text DEFAULT 'pending'::text,
     sent_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    link_to text
 );
 
 
 ALTER TABLE public.notifications OWNER TO postgres;
+
+--
+-- Name: COLUMN notifications.link_to; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.notifications.link_to IS 'A relative path to redirect to, e.g., /owner/calendar or /bookings/123';
+
 
 --
 -- Name: notifications_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -5704,6 +5821,114 @@ PARTITION BY RANGE (inserted_at);
 ALTER TABLE realtime.messages OWNER TO supabase_realtime_admin;
 
 --
+-- Name: messages_2025_11_13; Type: TABLE; Schema: realtime; Owner: supabase_admin
+--
+
+CREATE TABLE realtime.messages_2025_11_13 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL
+);
+
+
+ALTER TABLE realtime.messages_2025_11_13 OWNER TO supabase_admin;
+
+--
+-- Name: messages_2025_11_14; Type: TABLE; Schema: realtime; Owner: supabase_admin
+--
+
+CREATE TABLE realtime.messages_2025_11_14 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL
+);
+
+
+ALTER TABLE realtime.messages_2025_11_14 OWNER TO supabase_admin;
+
+--
+-- Name: messages_2025_11_15; Type: TABLE; Schema: realtime; Owner: supabase_admin
+--
+
+CREATE TABLE realtime.messages_2025_11_15 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL
+);
+
+
+ALTER TABLE realtime.messages_2025_11_15 OWNER TO supabase_admin;
+
+--
+-- Name: messages_2025_11_16; Type: TABLE; Schema: realtime; Owner: supabase_admin
+--
+
+CREATE TABLE realtime.messages_2025_11_16 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL
+);
+
+
+ALTER TABLE realtime.messages_2025_11_16 OWNER TO supabase_admin;
+
+--
+-- Name: messages_2025_11_17; Type: TABLE; Schema: realtime; Owner: supabase_admin
+--
+
+CREATE TABLE realtime.messages_2025_11_17 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL
+);
+
+
+ALTER TABLE realtime.messages_2025_11_17 OWNER TO supabase_admin;
+
+--
+-- Name: messages_2025_11_18; Type: TABLE; Schema: realtime; Owner: supabase_admin
+--
+
+CREATE TABLE realtime.messages_2025_11_18 (
+    topic text NOT NULL,
+    extension text NOT NULL,
+    payload jsonb,
+    event text,
+    private boolean DEFAULT false,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    inserted_at timestamp without time zone DEFAULT now() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL
+);
+
+
+ALTER TABLE realtime.messages_2025_11_18 OWNER TO supabase_admin;
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: realtime; Owner: supabase_admin
 --
 
@@ -5911,6 +6136,48 @@ CREATE TABLE supabase_migrations.seed_files (
 
 
 ALTER TABLE supabase_migrations.seed_files OWNER TO postgres;
+
+--
+-- Name: messages_2025_11_13; Type: TABLE ATTACH; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages ATTACH PARTITION realtime.messages_2025_11_13 FOR VALUES FROM ('2025-11-13 00:00:00') TO ('2025-11-14 00:00:00');
+
+
+--
+-- Name: messages_2025_11_14; Type: TABLE ATTACH; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages ATTACH PARTITION realtime.messages_2025_11_14 FOR VALUES FROM ('2025-11-14 00:00:00') TO ('2025-11-15 00:00:00');
+
+
+--
+-- Name: messages_2025_11_15; Type: TABLE ATTACH; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages ATTACH PARTITION realtime.messages_2025_11_15 FOR VALUES FROM ('2025-11-15 00:00:00') TO ('2025-11-16 00:00:00');
+
+
+--
+-- Name: messages_2025_11_16; Type: TABLE ATTACH; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages ATTACH PARTITION realtime.messages_2025_11_16 FOR VALUES FROM ('2025-11-16 00:00:00') TO ('2025-11-17 00:00:00');
+
+
+--
+-- Name: messages_2025_11_17; Type: TABLE ATTACH; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages ATTACH PARTITION realtime.messages_2025_11_17 FOR VALUES FROM ('2025-11-17 00:00:00') TO ('2025-11-18 00:00:00');
+
+
+--
+-- Name: messages_2025_11_18; Type: TABLE ATTACH; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages ATTACH PARTITION realtime.messages_2025_11_18 FOR VALUES FROM ('2025-11-18 00:00:00') TO ('2025-11-19 00:00:00');
+
 
 --
 -- Name: refresh_tokens id; Type: DEFAULT; Schema: auth; Owner: supabase_auth_admin
@@ -8173,6 +8440,148 @@ COPY auth.audit_log_entries (instance_id, id, payload, created_at, ip_address) F
 00000000-0000-0000-0000-000000000000	04c8ea70-7573-4851-a75a-1b4a82595f3c	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 06:21:19.876941+00	
 00000000-0000-0000-0000-000000000000	610b890e-8c1b-4416-99e4-2d7f4e697c28	{"action":"token_refreshed","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-14 07:23:41.35326+00	
 00000000-0000-0000-0000-000000000000	9bf5ffa1-7324-4801-99eb-8eb36773337f	{"action":"token_revoked","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-14 07:23:41.382718+00	
+00000000-0000-0000-0000-000000000000	154652ed-5f2a-42c9-80a1-354eeac65231	{"action":"token_refreshed","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-14 09:47:44.014494+00	
+00000000-0000-0000-0000-000000000000	06c56887-9aca-44f4-a4fe-6332c90af2c2	{"action":"token_revoked","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-14 09:47:44.024414+00	
+00000000-0000-0000-0000-000000000000	2652a565-a235-4a15-baab-ee8a92ebd97a	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 09:48:44.199233+00	
+00000000-0000-0000-0000-000000000000	4352ded8-c1ce-44be-b1dc-f645f0dd3232	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 09:48:50.996123+00	
+00000000-0000-0000-0000-000000000000	4bfd66dc-391b-46dc-a93f-15e0e2675aa2	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 09:52:11.608268+00	
+00000000-0000-0000-0000-000000000000	d3dd2188-b5a3-4bb3-b27e-9c0099226263	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 09:52:15.808921+00	
+00000000-0000-0000-0000-000000000000	9fa298b0-1465-4736-99a3-1f3faef506f2	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 09:57:16.587072+00	
+00000000-0000-0000-0000-000000000000	9cfcdb13-bd64-4445-89f0-ec659071c63d	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 09:57:21.352565+00	
+00000000-0000-0000-0000-000000000000	811e993d-13a3-4cd6-9973-a18c409a794f	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 10:06:42.050301+00	
+00000000-0000-0000-0000-000000000000	442a3f0e-459d-42da-a114-d69704a5d2b6	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 10:06:48.256476+00	
+00000000-0000-0000-0000-000000000000	2dd9194d-cf55-4a5a-a6f4-2163554957be	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 10:07:24.828102+00	
+00000000-0000-0000-0000-000000000000	481397f6-6d31-442e-af8d-83deed1374de	{"action":"login","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 10:07:33.322432+00	
+00000000-0000-0000-0000-000000000000	d6653fbf-7a02-40a8-8449-759134376216	{"action":"logout","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 10:09:49.229118+00	
+00000000-0000-0000-0000-000000000000	067a1946-7800-4ea6-9cfd-17484a9037cc	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 10:09:53.704223+00	
+00000000-0000-0000-0000-000000000000	3a838731-8f04-4dc8-9772-2375e7be10ee	{"action":"token_refreshed","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-14 11:08:28.371252+00	
+00000000-0000-0000-0000-000000000000	e54903ed-71a4-4c06-98e3-1ddb95a16ad7	{"action":"token_revoked","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-14 11:08:28.389658+00	
+00000000-0000-0000-0000-000000000000	3583006d-692e-4f6b-a56b-d7f044c21009	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 11:23:16.928637+00	
+00000000-0000-0000-0000-000000000000	15702444-3d5e-4179-9810-b132138b67e9	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 11:23:22.160637+00	
+00000000-0000-0000-0000-000000000000	cc025c6a-3eed-47a3-b58e-6c3ab6367131	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 11:31:54.37813+00	
+00000000-0000-0000-0000-000000000000	bb19d26f-3a91-4e04-b0a8-8454f3a59a58	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 11:32:00.460705+00	
+00000000-0000-0000-0000-000000000000	796ed2f4-48f5-480c-898d-816546feb6cd	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 11:34:36.356025+00	
+00000000-0000-0000-0000-000000000000	c1390fb2-208b-4e2a-ae80-ca696d837822	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 11:44:03.488759+00	
+00000000-0000-0000-0000-000000000000	5828c9d1-4be7-4d59-9ca0-f91f81f3a751	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 12:03:19.236053+00	
+00000000-0000-0000-0000-000000000000	d4d48946-43dd-4277-9ecd-3998aa788862	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 12:03:37.189607+00	
+00000000-0000-0000-0000-000000000000	02a989e0-3ba9-4e98-ad0c-a43273f97e3f	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 12:04:45.356744+00	
+00000000-0000-0000-0000-000000000000	c4dbb859-751c-47a7-b8cb-85d5a88bcf91	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 12:04:50.101255+00	
+00000000-0000-0000-0000-000000000000	72219bbf-06c2-468f-87d7-e592dc1185ad	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 12:06:31.060827+00	
+00000000-0000-0000-0000-000000000000	8b101b49-ed1c-42c1-a41d-d85079f13472	{"action":"login","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 12:06:36.106383+00	
+00000000-0000-0000-0000-000000000000	47f6a67e-0813-493b-a66a-12b7548dacda	{"action":"logout","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 12:14:05.631622+00	
+00000000-0000-0000-0000-000000000000	1c625085-ccaf-46e9-928c-aeaa7debe21e	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 12:14:33.044056+00	
+00000000-0000-0000-0000-000000000000	fb5df84f-afa5-4fcb-a2e4-1cf08833be90	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 12:15:19.436854+00	
+00000000-0000-0000-0000-000000000000	87da3887-4f2a-4121-87f5-b0904f0ac6c3	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 12:15:48.949127+00	
+00000000-0000-0000-0000-000000000000	bda4bdb7-3267-4454-a989-e0cf85739ccb	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 12:35:24.723807+00	
+00000000-0000-0000-0000-000000000000	bc6da455-8319-4ac4-97e7-54b578ee391e	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 12:52:46.044083+00	
+00000000-0000-0000-0000-000000000000	a5f390f0-a202-426d-bfbb-526bc7ee5651	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 12:53:58.642002+00	
+00000000-0000-0000-0000-000000000000	7d3c9d41-7253-4462-9b47-43e1cc2e6fba	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 12:59:38.779108+00	
+00000000-0000-0000-0000-000000000000	3721b3c7-6dc6-46ce-9063-af815b4bb9ba	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 13:00:23.499385+00	
+00000000-0000-0000-0000-000000000000	0eaa5b8f-9842-42d3-bf34-8213f48f14e8	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 13:01:36.484609+00	
+00000000-0000-0000-0000-000000000000	f8352b18-b1ae-4b8e-b039-81a8db5d2b54	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 13:07:19.673175+00	
+00000000-0000-0000-0000-000000000000	e07fad68-d30b-4668-ae4f-b2c4c8711cfb	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 13:08:33.086845+00	
+00000000-0000-0000-0000-000000000000	2d928e78-4f42-43fc-9be5-f51f729a9e3c	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 13:41:45.369709+00	
+00000000-0000-0000-0000-000000000000	ba74f719-afce-43ca-afd9-d638bdb843fa	{"action":"login","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 13:41:50.633839+00	
+00000000-0000-0000-0000-000000000000	ca279fc5-50d4-4198-97a8-6247b3c747b1	{"action":"logout","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 14:04:49.756158+00	
+00000000-0000-0000-0000-000000000000	3ec54e47-a9f6-45dd-9707-e17fd3d5d4dc	{"action":"user_signedup","actor_id":"ba58a10f-adf2-4268-82df-023de1c272a2","actor_username":"yash@gmail.com","actor_via_sso":false,"log_type":"team","traits":{"provider":"email"}}	2025-11-14 14:13:20.422804+00	
+00000000-0000-0000-0000-000000000000	58e54fee-ef89-4beb-88f8-95276b91ebeb	{"action":"login","actor_id":"ba58a10f-adf2-4268-82df-023de1c272a2","actor_username":"yash@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 14:13:20.447308+00	
+00000000-0000-0000-0000-000000000000	f5dd4e7e-082a-436a-8ec8-b9d4a195d847	{"action":"logout","actor_id":"ba58a10f-adf2-4268-82df-023de1c272a2","actor_username":"yash@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 14:13:27.116638+00	
+00000000-0000-0000-0000-000000000000	58ad162d-afa4-43b4-b554-e03bd8a61520	{"action":"login","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 14:13:34.586485+00	
+00000000-0000-0000-0000-000000000000	5cac9287-f998-4a52-bb4f-d5d56d8da40a	{"action":"logout","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 14:14:20.97689+00	
+00000000-0000-0000-0000-000000000000	6823d221-48cf-4a34-ae28-b00ef95e327b	{"action":"login","actor_id":"ba58a10f-adf2-4268-82df-023de1c272a2","actor_username":"yash@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 14:14:30.740906+00	
+00000000-0000-0000-0000-000000000000	cda3333f-8f03-4bad-8d42-4b1e86ec18e5	{"action":"logout","actor_id":"ba58a10f-adf2-4268-82df-023de1c272a2","actor_username":"yash@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 14:14:48.031704+00	
+00000000-0000-0000-0000-000000000000	f63b55b5-dd94-45eb-ab0e-a63978f70422	{"action":"login","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 14:15:56.956636+00	
+00000000-0000-0000-0000-000000000000	b404a8e0-a5f4-40f4-be12-50f491f0da03	{"action":"logout","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 14:17:09.171619+00	
+00000000-0000-0000-0000-000000000000	5a4c1e26-992f-41cf-8965-53879a0ff1aa	{"action":"login","actor_id":"ba58a10f-adf2-4268-82df-023de1c272a2","actor_username":"yash@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 14:17:20.497942+00	
+00000000-0000-0000-0000-000000000000	adb0a96e-3923-49c4-9fd3-399d93557248	{"action":"logout","actor_id":"ba58a10f-adf2-4268-82df-023de1c272a2","actor_username":"yash@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 14:41:06.990878+00	
+00000000-0000-0000-0000-000000000000	06c73431-edce-4a4c-90db-302ba952112d	{"action":"login","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 14:41:10.601487+00	
+00000000-0000-0000-0000-000000000000	d1dab9c5-7338-4964-9dba-b573c44a0302	{"action":"logout","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 15:13:18.740759+00	
+00000000-0000-0000-0000-000000000000	1db88372-b455-4d56-b78e-9651bcad20d9	{"action":"login","actor_id":"ba58a10f-adf2-4268-82df-023de1c272a2","actor_username":"yash@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 15:13:27.433975+00	
+00000000-0000-0000-0000-000000000000	c7d416ac-93c2-44bc-a3f3-4245c2585f14	{"action":"logout","actor_id":"ba58a10f-adf2-4268-82df-023de1c272a2","actor_username":"yash@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 15:40:19.97866+00	
+00000000-0000-0000-0000-000000000000	fc802acc-5f1d-4f30-a0f3-9f73e08110dd	{"action":"login","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 15:40:36.585225+00	
+00000000-0000-0000-0000-000000000000	37684016-2659-473c-8b79-d6fbae25d8a1	{"action":"logout","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 15:42:36.641172+00	
+00000000-0000-0000-0000-000000000000	03f5408a-8602-46bb-9797-8f4b5f293fe7	{"action":"login","actor_id":"ba58a10f-adf2-4268-82df-023de1c272a2","actor_username":"yash@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 15:43:10.594462+00	
+00000000-0000-0000-0000-000000000000	a33d75ca-06b7-4517-8a79-4194e625327e	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:00:27.62536+00	
+00000000-0000-0000-0000-000000000000	9518d370-4763-471e-aa4f-fd0a8690b087	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:09:42.718901+00	
+00000000-0000-0000-0000-000000000000	3096c089-9922-4b86-9fcd-40cc873d9198	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:09:48.498208+00	
+00000000-0000-0000-0000-000000000000	87558e12-894d-4938-b04d-cc06a8639a39	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:10:33.824936+00	
+00000000-0000-0000-0000-000000000000	8b109115-531e-4840-ac4b-907445bf466a	{"action":"login","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:10:42.674948+00	
+00000000-0000-0000-0000-000000000000	400d48ca-bf0f-43fd-a7a7-4bea23c0fbfb	{"action":"logout","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:10:57.694353+00	
+00000000-0000-0000-0000-000000000000	88cfb9c6-6aff-47e8-a5dd-592e9386660c	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:11:07.933199+00	
+00000000-0000-0000-0000-000000000000	a0571d92-a492-49c6-8d59-5c84f2e7d132	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:12:04.798195+00	
+00000000-0000-0000-0000-000000000000	c0b96288-79e9-4568-b669-0eccd488cb6c	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:12:12.909193+00	
+00000000-0000-0000-0000-000000000000	2eb3b459-99dc-4d3b-be86-ebd758086dde	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:14:07.40151+00	
+00000000-0000-0000-0000-000000000000	ae4435de-80b6-4067-ac07-1483d45c5cd9	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:14:13.97229+00	
+00000000-0000-0000-0000-000000000000	c1500fd3-fc3e-439f-b57d-26f572cd52f6	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:15:26.970561+00	
+00000000-0000-0000-0000-000000000000	5a8cd548-65dd-440c-b3a4-112c6444fa18	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:15:32.215092+00	
+00000000-0000-0000-0000-000000000000	c2dae1b7-2fd7-4467-a766-c5f8f67f7293	{"action":"logout","actor_id":"ba58a10f-adf2-4268-82df-023de1c272a2","actor_username":"yash@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:28:28.917909+00	
+00000000-0000-0000-0000-000000000000	bba20141-01cf-4cd6-8fee-b1d5eae62914	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:28:36.371421+00	
+00000000-0000-0000-0000-000000000000	ac71c16d-a85e-4f4d-9d1d-f643329460aa	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:29:30.249142+00	
+00000000-0000-0000-0000-000000000000	114033de-1789-4cf5-9400-d6f1b42f5b6b	{"action":"login","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:29:36.801021+00	
+00000000-0000-0000-0000-000000000000	74130659-d130-48c0-a367-3245c5a09ede	{"action":"logout","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:29:45.556341+00	
+00000000-0000-0000-0000-000000000000	6dec3476-6238-4932-8025-aeb391d2570c	{"action":"login","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:29:53.103418+00	
+00000000-0000-0000-0000-000000000000	b0627858-0475-4b2a-9d5c-6c7eb1392bfe	{"action":"logout","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:30:03.459821+00	
+00000000-0000-0000-0000-000000000000	d65ebc44-aef5-41fe-997d-bb9fa00f99ea	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:30:08.744703+00	
+00000000-0000-0000-0000-000000000000	cbe73f61-d103-4dd1-9770-c44ae4acfa06	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:30:57.849083+00	
+00000000-0000-0000-0000-000000000000	5cf23c90-b278-428f-af4f-1cae036bfc98	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:31:04.528967+00	
+00000000-0000-0000-0000-000000000000	b076c099-d365-4934-bee7-acf9d754b25e	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:31:09.941955+00	
+00000000-0000-0000-0000-000000000000	0510aebf-00db-4193-8da3-b46327440327	{"action":"login","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:31:15.612933+00	
+00000000-0000-0000-0000-000000000000	92f3baa8-8fd7-4dc4-9e42-7565eac4b705	{"action":"logout","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:31:20.971249+00	
+00000000-0000-0000-0000-000000000000	2d7901e7-aba5-4968-9808-40013d0e0fcd	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:31:25.418369+00	
+00000000-0000-0000-0000-000000000000	78f99877-b086-47ac-b344-0c60acc06cb9	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:31:44.617948+00	
+00000000-0000-0000-0000-000000000000	93b393df-20f8-49e6-83b6-9a66d29511dc	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:31:54.925126+00	
+00000000-0000-0000-0000-000000000000	706b01a3-8d4b-42c2-9af8-3b6ed7960542	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:32:22.953249+00	
+00000000-0000-0000-0000-000000000000	16ed12b4-5c3d-4e2d-a618-8f19044b2a89	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:32:26.793874+00	
+00000000-0000-0000-0000-000000000000	8006a10e-68a6-4d92-819c-3eef3cbeeb04	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:46:28.032653+00	
+00000000-0000-0000-0000-000000000000	c16eedae-f3cc-410c-934c-958a660a023c	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:46:31.598131+00	
+00000000-0000-0000-0000-000000000000	586413f0-3621-4859-9639-3e00cdc4fda5	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:46:51.101369+00	
+00000000-0000-0000-0000-000000000000	8394fa40-bd65-468b-9d94-086c4353c86e	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:47:14.710853+00	
+00000000-0000-0000-0000-000000000000	0bb57796-7027-459e-a59d-38575e8b18c1	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:47:26.227132+00	
+00000000-0000-0000-0000-000000000000	40295dff-ac8e-4ffd-ad0c-61dc12bc06bf	{"action":"login","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:47:33.573364+00	
+00000000-0000-0000-0000-000000000000	54492b01-bdc0-464c-8b3b-ad4c6e4c57f0	{"action":"logout","actor_id":"073c625c-eb02-45e8-9c67-50acbdc72cd6","actor_username":"harsh@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:47:44.022549+00	
+00000000-0000-0000-0000-000000000000	d9b3c53d-e1f8-4104-beee-a1e345f529ee	{"action":"login","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:47:50.075135+00	
+00000000-0000-0000-0000-000000000000	f991837a-b141-4914-96ac-f20bb23bbcf9	{"action":"logout","actor_id":"fcff5381-23de-4ea0-8e4c-c608171c703f","actor_username":"admin@playnation.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:48:07.389163+00	
+00000000-0000-0000-0000-000000000000	c75f5ae7-9bdc-4356-a29f-2dda83aaf415	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:49:24.858418+00	
+00000000-0000-0000-0000-000000000000	97c405c7-b327-41d8-b30a-c5be56e62f61	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 16:50:07.790168+00	
+00000000-0000-0000-0000-000000000000	ab6507eb-bb03-4e36-a202-2402bb168c29	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 16:50:17.764582+00	
+00000000-0000-0000-0000-000000000000	460af79d-615e-4f9e-af4f-3c8e898ed1e4	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 17:05:32.246454+00	
+00000000-0000-0000-0000-000000000000	02fefd04-0a96-4934-81ef-897ab8964c0e	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 17:19:18.560788+00	
+00000000-0000-0000-0000-000000000000	68db7573-461b-413d-a77e-a69b25cae3a3	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 17:19:39.727659+00	
+00000000-0000-0000-0000-000000000000	4f861b2f-3b79-40fa-ab3f-c2dfb7d7e863	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 17:20:10.904079+00	
+00000000-0000-0000-0000-000000000000	47a7e6ec-1941-4f33-86b8-779da3a7df10	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 17:20:17.224738+00	
+00000000-0000-0000-0000-000000000000	3642254d-a2f4-4488-95c2-5ef80ba81b02	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 17:23:27.579855+00	
+00000000-0000-0000-0000-000000000000	b8f62897-6076-4e15-a666-e2f9c17a12fd	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 17:23:32.877244+00	
+00000000-0000-0000-0000-000000000000	fd298bcb-13da-4665-81eb-0ca75e1af379	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 17:23:50.172743+00	
+00000000-0000-0000-0000-000000000000	1b33178a-0f81-4cff-96ee-3ad39691b433	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 17:23:55.861789+00	
+00000000-0000-0000-0000-000000000000	83e1cfae-8bc0-415c-93a6-a7200ea1544a	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 17:29:24.224498+00	
+00000000-0000-0000-0000-000000000000	768a1fca-8aa3-4a86-89c1-929956adf694	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 17:29:42.484824+00	
+00000000-0000-0000-0000-000000000000	db686b6a-a2a1-4b3c-910a-97d2ca7c65f4	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 17:31:17.49534+00	
+00000000-0000-0000-0000-000000000000	1c6db5d4-d704-48b7-b7a2-58a5d1423e94	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 17:31:23.582628+00	
+00000000-0000-0000-0000-000000000000	4a2e1fcd-051f-42c9-b1bd-9a4047fe9e94	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 17:43:29.652688+00	
+00000000-0000-0000-0000-000000000000	a1024931-e095-4a78-86c4-602c18f31370	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 17:43:53.019166+00	
+00000000-0000-0000-0000-000000000000	29722aff-c02f-4e58-b8d6-3623f7694dba	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 17:44:15.532728+00	
+00000000-0000-0000-0000-000000000000	bca5e949-3c71-4751-9975-c0690b504653	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 17:44:24.936381+00	
+00000000-0000-0000-0000-000000000000	4c1fd160-86ad-472a-9336-0ec49776bb90	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 17:52:28.357347+00	
+00000000-0000-0000-0000-000000000000	0ddf8097-4701-4c59-a992-d12316a2ea3f	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 17:52:35.681697+00	
+00000000-0000-0000-0000-000000000000	43da9311-772b-4fd9-b290-dee803107eb4	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 17:53:00.557387+00	
+00000000-0000-0000-0000-000000000000	ab742b35-cb1a-4ba3-b06c-7693759b7f16	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 17:53:04.950116+00	
+00000000-0000-0000-0000-000000000000	15012e8d-ca12-489a-9e5a-28606e89eeba	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 17:53:38.859306+00	
+00000000-0000-0000-0000-000000000000	a7855227-f073-4986-a35d-b0af299397f6	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 17:53:42.810866+00	
+00000000-0000-0000-0000-000000000000	c298c9ba-bbeb-4c45-98bb-320cc66a198a	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 17:54:36.079226+00	
+00000000-0000-0000-0000-000000000000	3313807f-249e-45d9-8aac-cb05bf68d9fa	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 17:54:39.458376+00	
+00000000-0000-0000-0000-000000000000	33d70861-e2c1-4e2b-9047-f96c11d6cab0	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-14 18:05:19.3719+00	
+00000000-0000-0000-0000-000000000000	170cbf74-a9e0-4fc0-840b-92fe52c7dc2b	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 18:05:26.479129+00	
+00000000-0000-0000-0000-000000000000	f55f87c0-7ae8-4ffd-940f-842e69331fb8	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 18:15:03.171218+00	
+00000000-0000-0000-0000-000000000000	73b8ffc9-c111-4839-87db-4060bbd89e1c	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-14 23:36:58.363028+00	
+00000000-0000-0000-0000-000000000000	94492092-0db5-4e74-b421-6d8a46dee5df	{"action":"logout","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-15 00:04:44.240573+00	
+00000000-0000-0000-0000-000000000000	568db125-4c51-45da-8c23-38948c2a74e8	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-15 00:04:51.519878+00	
+00000000-0000-0000-0000-000000000000	6467bc25-128a-4c6c-88b0-d28643918eff	{"action":"token_refreshed","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-15 00:07:20.391577+00	
+00000000-0000-0000-0000-000000000000	67e8e93c-c230-424f-ba9b-0275fccfd68d	{"action":"token_revoked","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"token"}	2025-11-15 00:07:20.392269+00	
+00000000-0000-0000-0000-000000000000	91cc5a47-9fc9-4f9e-bdf5-f5e5caad8124	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-15 00:10:00.913712+00	
+00000000-0000-0000-0000-000000000000	b5b0af60-eb01-42ae-8dc5-1a16f29bd9a2	{"action":"login","actor_id":"c90139a0-2de3-4237-89b8-032367f73a37","actor_username":"surbhiroy780@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-15 00:14:08.109888+00	
+00000000-0000-0000-0000-000000000000	2873e1a0-894b-49b2-a220-a096ed8a35c7	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-15 00:17:54.805346+00	
+00000000-0000-0000-0000-000000000000	1fa25074-5caf-4603-a865-b47751183d81	{"action":"logout","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account"}	2025-11-15 00:20:14.943603+00	
+00000000-0000-0000-0000-000000000000	a597620b-2b7f-4d86-95f0-c57764b49a10	{"action":"login","actor_id":"bb3e7bae-8aed-4e6c-bb71-bd644eff5402","actor_username":"otherswayam@gmail.com","actor_via_sso":false,"log_type":"account","traits":{"provider":"email"}}	2025-11-15 00:28:56.032054+00	
 \.
 
 
@@ -8202,6 +8611,7 @@ d1dd9ab7-e67f-4440-830a-f41889cc0388	d1dd9ab7-e67f-4440-830a-f41889cc0388	{"sub"
 ffaef875-be4c-4cc3-af20-ec6865aad7a2	ffaef875-be4c-4cc3-af20-ec6865aad7a2	{"sub": "ffaef875-be4c-4cc3-af20-ec6865aad7a2", "role": "venue_owner", "email": "shahswayam7125@gmail.com", "username": "swayam07", "last_name": "shah", "first_name": "swayam", "phone_number": "9575468520", "email_verified": false, "phone_verified": false}	email	2025-11-07 13:38:02.598766+00	2025-11-07 13:38:02.598818+00	2025-11-07 13:38:02.598818+00	7fda2fbe-648f-428f-b5bc-9648c723cedf
 fcff5381-23de-4ea0-8e4c-c608171c703f	fcff5381-23de-4ea0-8e4c-c608171c703f	{"sub": "fcff5381-23de-4ea0-8e4c-c608171c703f", "email": "admin@playnation.com", "email_verified": false, "phone_verified": false}	email	2025-11-08 04:43:19.919434+00	2025-11-08 04:43:19.920039+00	2025-11-08 04:43:19.920039+00	9adaf47f-ac69-4ad0-996f-9d71464e176b
 bff589e7-8ea0-4f67-af97-0d11c36f4967	bff589e7-8ea0-4f67-af97-0d11c36f4967	{"sub": "bff589e7-8ea0-4f67-af97-0d11c36f4967", "role": "player", "email": "ritumano@asciibinder.net", "username": "tushar20", "last_name": "shah", "first_name": "Tushar", "phone_number": "8140631419", "email_verified": false, "phone_verified": false}	email	2025-11-09 13:21:30.771345+00	2025-11-09 13:21:30.771396+00	2025-11-09 13:21:30.771396+00	ad7e3ea5-47bc-4302-9790-b60ee769fa04
+ba58a10f-adf2-4268-82df-023de1c272a2	ba58a10f-adf2-4268-82df-023de1c272a2	{"sub": "ba58a10f-adf2-4268-82df-023de1c272a2", "role": "venue_owner", "email": "yash@gmail.com", "username": "yash", "last_name": "Gandhi", "first_name": "Yash", "phone_number": "9856325874", "email_verified": false, "phone_verified": false}	email	2025-11-14 14:13:20.414228+00	2025-11-14 14:13:20.414298+00	2025-11-14 14:13:20.414298+00	88f87aed-3997-43d3-b0a0-81d633cd4fc1
 \.
 
 
@@ -8221,8 +8631,8 @@ COPY auth.mfa_amr_claims (session_id, created_at, updated_at, authentication_met
 55477ad7-df17-4491-b802-2a9c75180ff6	2025-11-04 10:38:21.579462+00	2025-11-04 10:38:21.579462+00	password	4d9d4f64-5384-404b-af35-5598c22e05b1
 736300dd-f9e9-4c34-a2d7-576029e8d342	2025-11-09 13:21:30.911317+00	2025-11-09 13:21:30.911317+00	password	0c1f1e69-8c96-4aea-acec-1eebf517a52a
 16fc0f07-8a9f-4978-8332-0c7662041beb	2025-11-07 11:30:54.835664+00	2025-11-07 11:30:54.835664+00	password	39736253-13a7-45ae-abb2-5ea927efb060
-42c3f62e-f49d-4fff-b275-1d18a4ad1236	2025-11-14 06:11:52.974159+00	2025-11-14 06:11:52.974159+00	password	b62ba49e-0a4a-4054-a1a2-a7464070c49e
-11c6472c-f42a-4ce2-ae02-98667666adf4	2025-11-14 06:21:19.908411+00	2025-11-14 06:21:19.908411+00	password	1bc09144-e5b1-4a8f-95a0-670d00be2de0
+168e50a9-ae80-4e54-99d6-9024a876e014	2025-11-15 00:14:08.182236+00	2025-11-15 00:14:08.182236+00	password	703399ab-1e22-4343-a936-2c5353289624
+cd13222d-e505-4800-a155-6c85b649f681	2025-11-15 00:28:56.102208+00	2025-11-15 00:28:56.102208+00	password	ec1df88b-c0e6-4f3e-8a08-be119cb71247
 b3b2f7ba-a681-4b11-a231-7da00d6b6c7b	2025-11-04 07:39:32.63513+00	2025-11-04 07:39:32.63513+00	password	ef124ae3-96d2-4b3c-8231-7f114f797233
 21146abb-202e-40d6-883f-3b753ad01ffc	2025-11-04 07:44:15.985962+00	2025-11-04 07:44:15.985962+00	password	84eac673-97e7-4684-b168-de9c317f6fff
 \.
@@ -8281,15 +8691,14 @@ COPY auth.one_time_tokens (id, user_id, token_type, token_hash, relates_to, crea
 --
 
 COPY auth.refresh_tokens (instance_id, id, token, user_id, revoked, created_at, updated_at, parent, session_id) FROM stdin;
+00000000-0000-0000-0000-000000000000	1215	vvyg4z37xawe	c90139a0-2de3-4237-89b8-032367f73a37	f	2025-11-15 00:14:08.151852+00	2025-11-15 00:14:08.151852+00	\N	168e50a9-ae80-4e54-99d6-9024a876e014
 00000000-0000-0000-0000-000000000000	1070	2uugazcojqbb	988544a8-bb69-4187-802e-47f45a9ecceb	f	2025-11-07 11:30:54.823546+00	2025-11-07 11:30:54.823546+00	\N	16fc0f07-8a9f-4978-8332-0c7662041beb
+00000000-0000-0000-0000-000000000000	1217	ksjwh4smzjcs	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f	2025-11-15 00:28:56.070601+00	2025-11-15 00:28:56.070601+00	\N	cd13222d-e505-4800-a155-6c85b649f681
 00000000-0000-0000-0000-000000000000	1126	vhxqnrt22j5z	bff589e7-8ea0-4f67-af97-0d11c36f4967	t	2025-11-09 13:21:30.880232+00	2025-11-09 14:19:48.86985+00	\N	736300dd-f9e9-4c34-a2d7-576029e8d342
 00000000-0000-0000-0000-000000000000	1127	f4z6276hkotr	bff589e7-8ea0-4f67-af97-0d11c36f4967	f	2025-11-09 14:19:48.890958+00	2025-11-09 14:19:48.890958+00	vhxqnrt22j5z	736300dd-f9e9-4c34-a2d7-576029e8d342
 00000000-0000-0000-0000-000000000000	989	46i6vzggp66f	8445e8b1-719d-438b-a533-bbf251d5744e	f	2025-11-04 07:39:32.610195+00	2025-11-04 07:39:32.610195+00	\N	b3b2f7ba-a681-4b11-a231-7da00d6b6c7b
 00000000-0000-0000-0000-000000000000	990	4qrd2rwejesr	2f0354fd-905b-4cea-9f87-0b66457b20e7	f	2025-11-04 07:44:15.977412+00	2025-11-04 07:44:15.977412+00	\N	21146abb-202e-40d6-883f-3b753ad01ffc
 00000000-0000-0000-0000-000000000000	997	5lrrijrisxw2	8b676db1-a2e8-416e-bda7-1aba0f8c1125	f	2025-11-04 10:38:21.570449+00	2025-11-04 10:38:21.570449+00	\N	55477ad7-df17-4491-b802-2a9c75180ff6
-00000000-0000-0000-0000-000000000000	1143	3s3lh5mrarns	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f	2025-11-14 06:21:19.89174+00	2025-11-14 06:21:19.89174+00	\N	11c6472c-f42a-4ce2-ae02-98667666adf4
-00000000-0000-0000-0000-000000000000	1142	uk32wceurh7a	c90139a0-2de3-4237-89b8-032367f73a37	t	2025-11-14 06:11:52.963511+00	2025-11-14 07:23:41.385665+00	\N	42c3f62e-f49d-4fff-b275-1d18a4ad1236
-00000000-0000-0000-0000-000000000000	1144	6iwkg5a7qs7n	c90139a0-2de3-4237-89b8-032367f73a37	f	2025-11-14 07:23:41.408948+00	2025-11-14 07:23:41.408948+00	uk32wceurh7a	42c3f62e-f49d-4fff-b275-1d18a4ad1236
 \.
 
 
@@ -8393,8 +8802,8 @@ COPY auth.schema_migrations (version) FROM stdin;
 COPY auth.sessions (id, user_id, created_at, updated_at, factor_id, aal, not_after, refreshed_at, user_agent, ip, tag, oauth_client_id, refresh_token_hmac_key, refresh_token_counter) FROM stdin;
 16fc0f07-8a9f-4978-8332-0c7662041beb	988544a8-bb69-4187-802e-47f45a9ecceb	2025-11-07 11:30:54.817068+00	2025-11-07 11:30:54.817068+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36	103.240.76.250	\N	\N	\N	\N
 736300dd-f9e9-4c34-a2d7-576029e8d342	bff589e7-8ea0-4f67-af97-0d11c36f4967	2025-11-09 13:21:30.845497+00	2025-11-09 14:19:48.916663+00	\N	aal1	\N	2025-11-09 14:19:48.916553	Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36	42.108.196.74	\N	\N	\N	\N
-11c6472c-f42a-4ce2-ae02-98667666adf4	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2025-11-14 06:21:19.887616+00	2025-11-14 06:21:19.887616+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	152.59.35.12	\N	\N	\N	\N
-42c3f62e-f49d-4fff-b275-1d18a4ad1236	c90139a0-2de3-4237-89b8-032367f73a37	2025-11-14 06:11:52.948225+00	2025-11-14 07:23:41.440581+00	\N	aal1	\N	2025-11-14 07:23:41.439918	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	152.58.37.234	\N	\N	\N	\N
+168e50a9-ae80-4e54-99d6-9024a876e014	c90139a0-2de3-4237-89b8-032367f73a37	2025-11-15 00:14:08.133325+00	2025-11-15 00:14:08.133325+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	152.58.34.37	\N	\N	\N	\N
+cd13222d-e505-4800-a155-6c85b649f681	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	2025-11-15 00:28:56.054396+00	2025-11-15 00:28:56.054396+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	49.36.116.151	\N	\N	\N	\N
 b3b2f7ba-a681-4b11-a231-7da00d6b6c7b	8445e8b1-719d-438b-a533-bbf251d5744e	2025-11-04 07:39:32.584547+00	2025-11-04 07:39:32.584547+00	\N	aal1	\N	\N	Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1	103.178.47.172	\N	\N	\N	\N
 21146abb-202e-40d6-883f-3b753ad01ffc	2f0354fd-905b-4cea-9f87-0b66457b20e7	2025-11-04 07:44:15.973038+00	2025-11-04 07:44:15.973038+00	\N	aal1	\N	\N	Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1	103.178.47.172	\N	\N	\N	\N
 55477ad7-df17-4491-b802-2a9c75180ff6	8b676db1-a2e8-416e-bda7-1aba0f8c1125	2025-11-04 10:38:21.56205+00	2025-11-04 10:38:21.56205+00	\N	aal1	\N	\N	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0	49.36.89.80	\N	\N	\N	\N
@@ -8422,19 +8831,20 @@ COPY auth.sso_providers (id, resource_id, created_at, updated_at, disabled) FROM
 --
 
 COPY auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, invited_at, confirmation_token, confirmation_sent_at, recovery_token, recovery_sent_at, email_change_token_new, email_change, email_change_sent_at, last_sign_in_at, raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at, phone, phone_confirmed_at, phone_change, phone_change_token, phone_change_sent_at, email_change_token_current, email_change_confirm_status, banned_until, reauthentication_token, reauthentication_sent_at, is_sso_user, deleted_at, is_anonymous) FROM stdin;
-00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-11-14 06:11:52.948107+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-11-14 07:23:41.429136+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	073c625c-eb02-45e8-9c67-50acbdc72cd6	authenticated	authenticated	harsh@gmail.com	$2a$10$4KK/J4ROUoG4YacY/9oQluMayEemAbAWOSoXzXwIOg53cosk3zCLm	2025-08-10 08:14:37.525903+00	\N		\N		\N			\N	2025-11-08 04:56:55.475716+00	{"provider": "email", "providers": ["email"]}	{"sub": "073c625c-eb02-45e8-9c67-50acbdc72cd6", "email": "harsh@gmail.com", "last_name": "shah", "first_name": "harsh", "email_verified": true, "phone_verified": false}	\N	2025-08-10 08:14:37.499555+00	2025-11-08 04:56:55.482015+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	073c625c-eb02-45e8-9c67-50acbdc72cd6	authenticated	authenticated	harsh@gmail.com	$2a$10$4KK/J4ROUoG4YacY/9oQluMayEemAbAWOSoXzXwIOg53cosk3zCLm	2025-08-10 08:14:37.525903+00	\N		\N		\N			\N	2025-11-14 16:47:33.575555+00	{"provider": "email", "providers": ["email"]}	{"sub": "073c625c-eb02-45e8-9c67-50acbdc72cd6", "email": "harsh@gmail.com", "last_name": "shah", "first_name": "harsh", "email_verified": true, "phone_verified": false}	\N	2025-08-10 08:14:37.499555+00	2025-11-14 16:47:33.577335+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	c90139a0-2de3-4237-89b8-032367f73a37	authenticated	authenticated	surbhiroy780@gmail.com	$2a$10$rzcB77Trm6WgTT34mHyQ4u1o9.O6X9p1STGBcV9ru.jCBQ97mPntW	2025-08-09 05:56:52.519796+00	\N		\N		\N			\N	2025-11-15 00:14:08.133221+00	{"provider": "email", "providers": ["email"]}	{"sub": "c90139a0-2de3-4237-89b8-032367f73a37", "email": "surbhiroy780@gmail.com", "last_name": "roy", "first_name": "srubhi", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:56:52.503913+00	2025-11-15 00:14:08.173328+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	d1dd9ab7-e67f-4440-830a-f41889cc0388	authenticated	authenticated	tatvamehta1317@gmail.com	$2a$10$qJVfuRUIj4sKGZAcPvI/m.D1tDGHNIT8.xrXyJJV5C2Yf/H6e56Vq	2025-11-07 10:40:29.182541+00	\N		\N		\N			\N	2025-11-07 11:16:31.649267+00	{"provider": "email", "providers": ["email"]}	{"sub": "d1dd9ab7-e67f-4440-830a-f41889cc0388", "role": "venue_owner", "email": "tatvamehta1317@gmail.com", "username": "tatvamehta", "last_name": "Mehta", "first_name": "Tatva", "phone_number": "7874628315", "email_verified": true, "phone_verified": false}	\N	2025-11-07 10:40:29.132091+00	2025-11-07 11:16:31.65234+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$IAvXmD9RhMUIQWJlFk8BY.MkX1opB5IqVu4w7nJ63C/TMcq0aH66i	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-11-15 00:28:56.053645+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-11-15 00:28:56.09685+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	8445e8b1-719d-438b-a533-bbf251d5744e	authenticated	authenticated	mish@gmail.com	$2a$10$W42G7EBz5qeCmmdUecB7pOcunvmhyJBir2J6iru9lLrXBA6VsOYWy	2025-11-04 07:39:32.552636+00	\N		\N		\N			\N	2025-11-04 07:39:32.583901+00	{"provider": "email", "providers": ["email"]}	{"sub": "8445e8b1-719d-438b-a533-bbf251d5744e", "role": "player", "email": "mish@gmail.com", "username": "Mish", "last_name": "Shah", "first_name": "Mishwa", "phone_number": "7990807001", "email_verified": true, "phone_verified": false}	\N	2025-11-04 07:39:32.445139+00	2025-11-04 07:39:32.633982+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	ffaef875-be4c-4cc3-af20-ec6865aad7a2	authenticated	authenticated	shahswayam7125@gmail.com	$2a$10$Dd5QzZkGPPj/UoDl1/t1W.TqVOgOvfk8EvtYeLorTAXNciIbmqgIm	2025-11-07 13:38:02.610275+00	\N		\N		\N			\N	2025-11-12 10:56:12.57026+00	{"provider": "email", "providers": ["email"]}	{"sub": "ffaef875-be4c-4cc3-af20-ec6865aad7a2", "role": "venue_owner", "email": "shahswayam7125@gmail.com", "username": "swayam07", "last_name": "shah", "first_name": "swayam", "phone_number": "9575468520", "email_verified": true, "phone_verified": false}	\N	2025-11-07 13:38:02.584064+00	2025-11-12 10:56:12.57622+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	0fb362ba-7463-4462-a136-4692a0d3e41c	authenticated	authenticated	meet@gmail.com	$2a$10$W3.a18XfQvpVJeCKbkSLgOrQ2rJCn/mq2RkMrouUKdoVaJWLzrS56	2025-11-04 09:46:40.70979+00	\N		\N		\N			\N	2025-11-04 09:46:40.721056+00	{"provider": "email", "providers": ["email"]}	{"sub": "0fb362ba-7463-4462-a136-4692a0d3e41c", "role": "player", "email": "meet@gmail.com", "username": "meet", "last_name": "patel", "first_name": "meet ", "phone_number": "8520459852", "email_verified": true, "phone_verified": false}	\N	2025-11-04 09:46:40.604335+00	2025-11-04 09:46:40.73614+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	authenticated	authenticated	otherswayam@gmail.com	$2a$10$IAvXmD9RhMUIQWJlFk8BY.MkX1opB5IqVu4w7nJ63C/TMcq0aH66i	2025-08-09 05:53:37.131872+00	\N		\N		\N			\N	2025-11-14 06:21:19.88581+00	{"provider": "email", "providers": ["email"]}	{"sub": "bb3e7bae-8aed-4e6c-bb71-bd644eff5402", "email": "otherswayam@gmail.com", "last_name": "shah", "first_name": "swayam", "email_verified": true, "phone_verified": false}	\N	2025-08-09 05:53:37.123654+00	2025-11-14 06:21:19.907706+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	bff589e7-8ea0-4f67-af97-0d11c36f4967	authenticated	authenticated	ritumano@asciibinder.net	$2a$10$GkJSHjTDGbkFjJKYtSbrsefFqEtxqy39E1c7vjBKNDk7yAUbimGcG	2025-11-09 13:21:30.808738+00	\N		\N		\N			\N	2025-11-09 13:21:30.844688+00	{"provider": "email", "providers": ["email"]}	{"sub": "bff589e7-8ea0-4f67-af97-0d11c36f4967", "role": "player", "email": "ritumano@asciibinder.net", "username": "tushar20", "last_name": "shah", "first_name": "Tushar", "phone_number": "8140631419", "email_verified": true, "phone_verified": false}	\N	2025-11-09 13:21:30.649758+00	2025-11-09 14:19:48.905119+00	\N	\N			\N		0	\N		\N	f	\N	f
-00000000-0000-0000-0000-000000000000	fcff5381-23de-4ea0-8e4c-c608171c703f	authenticated	authenticated	admin@playnation.com	$2a$10$tvRELPAHJf0PitFciCEDOuinKsSJWqN2.5ZUfSb54lv.qCXvLoPya	2025-11-08 04:43:19.932479+00	\N		\N		\N			\N	2025-11-14 06:06:36.888035+00	{"provider": "email", "providers": ["email"]}	{"role": "admin", "email_verified": true}	\N	2025-11-08 04:43:19.894103+00	2025-11-14 06:06:36.894466+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	ba58a10f-adf2-4268-82df-023de1c272a2	authenticated	authenticated	yash@gmail.com	$2a$10$zD2mGjq1ZxwmpLwL/bpgkujT61nHQsp8vDEKLk5hOhXINjs.4ZSyK	2025-11-14 14:13:20.433115+00	\N		\N		\N			\N	2025-11-14 15:43:10.597052+00	{"provider": "email", "providers": ["email"]}	{"sub": "ba58a10f-adf2-4268-82df-023de1c272a2", "role": "venue_owner", "email": "yash@gmail.com", "username": "yash", "last_name": "Gandhi", "first_name": "Yash", "phone_number": "9856325874", "email_verified": true, "phone_verified": false}	\N	2025-11-14 14:13:20.398703+00	2025-11-14 15:43:10.621621+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	2f0354fd-905b-4cea-9f87-0b66457b20e7	authenticated	authenticated	mi124@gmail.com	$2a$10$cGbOuVGe.jV/ByPwuh/7c.5zJe6bUEIFR9FSWq/NRi11baGm61WM.	2025-11-04 07:44:15.964968+00	\N		\N		\N			\N	2025-11-04 07:44:15.972943+00	{"provider": "email", "providers": ["email"]}	{"sub": "2f0354fd-905b-4cea-9f87-0b66457b20e7", "role": "venue_owner", "email": "mi124@gmail.com", "username": "Mi123", "last_name": "Shah", "first_name": "Mi", "phone_number": "7965355232", "email_verified": true, "phone_verified": false}	\N	2025-11-04 07:44:15.911844+00	2025-11-04 07:44:15.985406+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	988544a8-bb69-4187-802e-47f45a9ecceb	authenticated	authenticated	mehtakomal246@gmail.com	$2a$10$46hjw6QBBlFxEN/pP2WCUuEONLYH4NSTxnJYWQ0emHXu7BdPdZjyO	2025-11-07 11:30:54.805447+00	\N		\N		\N			\N	2025-11-07 11:30:54.816963+00	{"provider": "email", "providers": ["email"]}	{"sub": "988544a8-bb69-4187-802e-47f45a9ecceb", "role": "player", "email": "mehtakomal246@gmail.com", "username": "7990284922", "last_name": "Mehta", "first_name": "Tatva", "phone_number": "7990284922", "email_verified": true, "phone_verified": false}	\N	2025-11-07 11:30:54.741643+00	2025-11-07 11:30:54.835181+00	\N	\N			\N		0	\N		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	38f0c23d-4d25-42cd-8ec0-426d6636eecd	authenticated	authenticated	fenil@gmail.com	$2a$10$wC5LDx6u5k8FTIHrKPOEwOm1f21cVE8.SfhPAjB.W6wxEek7Ig9ZC	2025-10-12 09:33:09.062174+00	\N		\N		\N			\N	2025-11-01 18:34:17.408664+00	{"provider": "email", "providers": ["email"]}	{"sub": "38f0c23d-4d25-42cd-8ec0-426d6636eecd", "role": "player", "email": "fenil@gmail.com", "username": "fenill", "last_name": "pastagia", "first_name": "fenil", "phone_number": "7586214860", "email_verified": true, "phone_verified": false}	\N	2025-10-12 09:33:09.015285+00	2025-11-03 18:16:20.961791+00	\N	\N			\N		0	2026-12-25 09:16:20.960986+00		\N	f	\N	f
 00000000-0000-0000-0000-000000000000	8b676db1-a2e8-416e-bda7-1aba0f8c1125	authenticated	authenticated	het@gmail.com	$2a$10$xAGuiqQb3lMINNBhD3JpDeEaigAvzWyPS2jMFQoQnzxfi0bnzwF9W	2025-11-04 10:38:21.552571+00	\N		\N		\N			\N	2025-11-04 10:38:21.561964+00	{"provider": "email", "providers": ["email"]}	{"sub": "8b676db1-a2e8-416e-bda7-1aba0f8c1125", "role": "player", "email": "het@gmail.com", "username": "het", "last_name": "desai", "first_name": "het", "phone_number": "9514785365", "email_verified": true, "phone_verified": false}	\N	2025-11-04 10:38:21.510933+00	2025-11-04 10:38:21.578968+00	\N	\N			\N		0	\N		\N	f	\N	f
+00000000-0000-0000-0000-000000000000	fcff5381-23de-4ea0-8e4c-c608171c703f	authenticated	authenticated	admin@playnation.com	$2a$10$tvRELPAHJf0PitFciCEDOuinKsSJWqN2.5ZUfSb54lv.qCXvLoPya	2025-11-08 04:43:19.932479+00	\N		\N		\N			\N	2025-11-14 16:47:50.076873+00	{"provider": "email", "providers": ["email"]}	{"role": "admin", "email_verified": true}	\N	2025-11-08 04:43:19.894103+00	2025-11-14 16:47:50.079839+00	\N	\N			\N		0	\N		\N	f	\N	f
 \.
 
 
@@ -8578,12 +8988,41 @@ b9452b89-3d15-462d-903a-eef77cc3f632	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f74bf6
 f92663ac-e165-499d-99ce-69be241b9bba	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9566ee54-1213-482b-b766-6d0f87c88776	93906bb5-5e7d-4a63-bae9-f3311a7d232f	2025-11-08 06:30:00+00	2025-11-08 07:30:00+00	1500	confirmed	paid	\N	\N	2025-11-08 04:58:26.836191+00	f	\N	\N	\N	\N	0.00	\N
 13b045e1-3e4a-42cb-a0a7-9f030663ebd1	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f74bf641-e013-4d27-98c8-acb768db209c	35adc3f7-24d0-443a-ba7e-0f92bbedaef4	2025-11-08 07:30:00+00	2025-11-08 08:30:00+00	1500	confirmed	paid	\N	\N	2025-11-08 04:58:57.042757+00	f	\N	\N	\N	\N	0.00	\N
 a35a416c-9fef-4305-9689-ddf5edf1f5a1	bff589e7-8ea0-4f67-af97-0d11c36f4967	b9991a34-9cee-49ed-bce7-07b42893a23d	1604902d-fd7b-4667-8924-0017ef66eb6f	2025-11-09 13:30:00+00	2025-11-09 14:30:00+00	1500	confirmed	paid	\N	\N	2025-11-09 13:22:26.132747+00	f	\N	\N	\N	\N	0.00	\N
-ba66e091-be20-47f8-85b4-c09bcf4d5b7c	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	fa806342-a846-460b-94c8-0a2f408f2668	2025-11-15 13:30:00+00	2025-11-15 14:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 05:39:09.787786+00	f	\N	\N	\N	\N	0.00	\N
 dc69544d-11bc-4206-bc1f-fbff6710201b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	589b7c9f-b28b-477b-9fd7-465fd359116d	2025-11-15 14:30:00+00	2025-11-15 15:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 05:40:16.335591+00	f	\N	\N	\N	\N	0.00	\N
-7d12d9ec-33da-4e77-98ea-c72882785aee	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	6a622f5e-7de8-4c30-a570-f4395775aba9	2025-11-15 12:30:00+00	2025-11-15 13:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 05:43:06.390193+00	f	\N	\N	\N	\N	0.00	\N
 cb2ffde0-7a20-4fac-8817-c05f8b19b6b2	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	434b5867-2512-47ea-a2b7-cd57bc051bb1	2025-11-14 09:30:00+00	2025-11-14 10:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 05:46:30.83169+00	f	\N	\N	\N	\N	0.00	\N
 1eba87da-c830-4512-a4a4-7089ba8d80e9	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	b688e35c-d398-46da-a16d-7888d8568343	2025-11-14 11:30:00+00	2025-11-14 12:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 05:46:50.780014+00	f	\N	\N	\N	\N	0.00	\N
 af0f296f-056e-45da-b5d8-eae35d7764de	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	cae63134-1dea-4d57-bbb9-663ab9152002	2025-11-14 13:30:00+00	2025-11-14 14:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 05:47:12.407246+00	f	\N	\N	\N	\N	0.00	\N
+9cf7790c-68d3-4b6d-9439-62301f536acc	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	db608dfd-bc04-43a1-94b6-517ef57e72db	2025-11-14 14:30:00+00	2025-11-14 15:30:00+00	1050	confirmed	paid	\N	\N	2025-11-14 11:22:51.163738+00	f	\N	\N	\N	c30d7b8a-3b88-487a-9dc8-eed371e4e805	450.00	\N
+66f1e9af-f4fd-4122-b324-b40531bbe34a	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	1a350523-4d35-4335-8c30-f2162902ccf9	2025-11-14 12:30:00+00	2025-11-14 13:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 11:34:25.214185+00	f	\N	\N	\N	\N	0.00	\N
+ce8a1aec-634f-411e-b863-5de9118e8a4c	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	bb0d5508-e835-4815-aed4-7ae85f330174	2025-11-15 05:30:00+00	2025-11-15 06:30:00+00	1050	confirmed	paid	\N	\N	2025-11-14 13:18:21.380516+00	f	\N	\N	\N	c30d7b8a-3b88-487a-9dc8-eed371e4e805	450.00	\N
+325c5e9c-b7a8-4d49-818e-3d6aca5c3fe3	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	b20c2cc0-866e-4df7-9ab7-87781b6f93d9	2025-11-15 06:30:00+00	2025-11-15 07:30:00+00	1050	confirmed	paid	\N	\N	2025-11-14 13:38:23.180116+00	f	\N	\N	\N	c30d7b8a-3b88-487a-9dc8-eed371e4e805	450.00	\N
+14ba54ab-108f-491e-a890-3753caa80198	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	55465e22-93a0-446b-a4f6-76cf397d38c2	447bc594-1ca1-42cd-a3fb-446fb5981ae5	2025-11-15 13:30:00+00	2025-11-15 14:30:00+00	1600	confirmed	paid	\N	\N	2025-11-14 16:14:40.735588+00	f	\N	\N	\N	\N	0.00	\N
+7d12d9ec-33da-4e77-98ea-c72882785aee	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	6a622f5e-7de8-4c30-a570-f4395775aba9	2025-11-15 12:30:00+00	2025-11-15 13:30:00+00	1500	cancelled	paid	\N	\N	2025-11-14 05:43:06.390193+00	f	2025-11-14 16:14:57.22178+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	hguhijojk	\N	0.00	\N
+ba66e091-be20-47f8-85b4-c09bcf4d5b7c	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	fa806342-a846-460b-94c8-0a2f408f2668	2025-11-15 13:30:00+00	2025-11-15 14:30:00+00	1500	cancelled	paid	\N	\N	2025-11-14 05:39:09.787786+00	f	2025-11-14 16:15:06.277209+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	cuyiuokk\n	\N	0.00	\N
+df346cd4-4aae-4d87-82ae-9b18b65b13e8	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	d42e765f-732a-4a30-b9ea-ea4a6d166606	2025-11-15 04:30:00+00	2025-11-15 05:30:00+00	1500	cancelled	paid	\N	\N	2025-11-14 12:15:11.23078+00	f	2025-11-14 16:15:17.524024+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	no time	\N	0.00	\N
+8314839f-6b77-4cf5-9207-12feb69f833a	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	968fd415-da98-4243-8895-5da62a1d968d	2025-11-15 03:30:00+00	2025-11-15 04:30:00+00	1500	cancelled	paid	\N	\N	2025-11-14 12:04:03.675507+00	f	2025-11-14 16:28:58.030053+00	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	i can not attend	\N	0.00	\N
+2d3bed41-a0fe-408d-8507-6e4a9ea0f87d	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	17bdeaa1-4e02-40d4-836f-c424880c8503	2025-11-15 11:30:00+00	2025-11-15 12:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 16:30:36.208991+00	f	\N	\N	\N	\N	0.00	\N
+4f335634-a1b9-4236-b1c2-174e5dd8dd9b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	7a284168-ccfe-4549-845a-62ed806bd8bc	2025-11-16 03:30:00+00	2025-11-16 04:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 16:32:13.937077+00	f	\N	\N	\N	\N	0.00	\N
+30680dbd-dc4c-49d2-9737-9f74f1a9e4ab	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	8ebcb42d-0eb1-4e66-baa8-0c3577d20904	2025-11-15 07:30:00+00	2025-11-15 08:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 16:46:45.299285+00	f	\N	\N	\N	\N	0.00	\N
+10be0b21-bed5-425f-a45b-f704a77ccea6	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	55465e22-93a0-446b-a4f6-76cf397d38c2	c8ddebd4-0cf3-45b1-9e0a-0659a2e41b5b	2025-11-15 14:30:00+00	2025-11-15 15:30:00+00	1600	confirmed	paid	\N	\N	2025-11-14 16:49:58.915872+00	f	\N	\N	\N	\N	0.00	\N
+b864298d-4862-49ee-9f92-68d2140184d9	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	31fd92ed-9f09-4abd-bfce-314cbb5cbc7d	2025-11-15 08:30:00+00	2025-11-15 09:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 17:19:58.45349+00	f	\N	\N	\N	\N	0.00	\N
+7ccc7916-d635-48a4-b9bb-c9aec9ee5710	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	29b5bb0c-aba3-402b-ac61-ef58b19760ea	2025-11-15 10:30:00+00	2025-11-15 11:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 17:23:45.399497+00	f	\N	\N	\N	\N	0.00	\N
+e5dfe321-80fb-4236-947b-94901c980664	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	a1fad37e-4aa9-479e-942f-a07f36f3c183	2025-11-15 09:30:00+00	2025-11-15 10:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 17:30:57.227277+00	f	\N	\N	\N	\N	0.00	\N
+66a9b102-241e-4fa6-b84a-eacb2bbfaa2d	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	f651a534-69e6-4215-942f-52002fc722ba	2025-11-16 04:30:00+00	2025-11-16 05:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 17:44:11.060487+00	f	\N	\N	\N	\N	0.00	\N
+f01f5ea3-f70b-4a83-a9a5-b2564fdd260f	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	36eb913d-4d44-46f1-8ec9-077209803ba7	2025-11-16 05:30:00+00	2025-11-16 06:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 17:52:54.377569+00	f	\N	\N	\N	\N	0.00	\N
+57f0480d-cdd3-4dfc-9ca0-0a1b20c86cca	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	60e98131-bf24-47b6-abb6-89c21d0717b5	2025-11-16 06:30:00+00	2025-11-16 07:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 17:54:01.244138+00	f	\N	\N	\N	\N	0.00	\N
+a0153bad-b5b1-4ff2-a18a-80db04d17e0a	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	7cba308e-f4fa-42e4-a356-2acf9ff01692	2025-11-16 07:30:00+00	2025-11-16 08:30:00+00	1500	confirmed	paid	\N	\N	2025-11-14 18:05:47.207784+00	f	\N	\N	\N	\N	0.00	\N
+acbf26ef-8f16-46dd-8e1d-f05e4005644b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	914c66f3-0548-4dd8-9dc4-20416fd706ef	2025-11-16 08:30:00+00	2025-11-16 09:30:00+00	1050	confirmed	paid	\N	\N	2025-11-14 18:16:06.247762+00	f	\N	\N	\N	c30d7b8a-3b88-487a-9dc8-eed371e4e805	450.00	\N
+d7906db6-f8cb-4179-be79-67de7c99747d	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	961ae635-18b2-4d21-9dbc-0b6792c450d6	2025-11-16 14:30:00+00	2025-11-16 15:30:00+00	1500	confirmed	paid	\N	\N	2025-11-15 00:05:26.323467+00	f	\N	\N	\N	\N	0.00	\N
+0fd3934d-8774-48aa-9e8e-070fb4974576	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	55465e22-93a0-446b-a4f6-76cf397d38c2	966f1062-07c8-4551-b669-2431a081564d	2025-11-15 12:30:00+00	2025-11-15 13:30:00+00	1600	confirmed	paid	\N	\N	2025-11-15 00:06:11.457397+00	f	\N	\N	\N	\N	0.00	\N
+6ee25230-7ee5-42eb-806c-fc82b5a34aa6	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	55465e22-93a0-446b-a4f6-76cf397d38c2	b588e555-f70b-499c-b114-59506f6bc71c	2025-11-15 11:30:00+00	2025-11-15 12:30:00+00	1600	confirmed	paid	\N	\N	2025-11-15 00:07:23.598229+00	f	\N	\N	\N	\N	0.00	\N
+e9e066e4-b201-417e-821f-0f445f40162b	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	d6388e9a-8801-4795-9f6c-9255b3af71c1	2025-11-16 09:30:00+00	2025-11-16 10:30:00+00	1500	confirmed	paid	\N	\N	2025-11-15 00:18:18.55481+00	f	\N	\N	\N	\N	0.00	\N
+a688be4b-6932-45a7-bbee-53ea0d7e76eb	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	dd045b93-2578-4065-864f-23ebb7d8e1e8	2025-11-16 10:30:00+00	2025-11-16 11:30:00+00	1000	confirmed	paid	\N	\N	2025-11-15 00:18:43.298842+00	f	\N	\N	\N	5e11f61e-c41b-4b99-9f6e-36bb46f1a811	500.00	\N
+87959a08-0e79-44bf-948e-163c10da3b41	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	5eb94d2a-c39f-4743-8599-898a139589f0	2025-11-16 11:30:00+00	2025-11-16 12:30:00+00	1500	confirmed	paid	\N	\N	2025-11-15 00:29:13.457504+00	f	\N	\N	\N	\N	0.00	\N
+74b7de7f-1133-47a6-b177-468c2dda1e23	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	0280b302-2e22-45ab-8a42-fb84afc11acf	2025-11-16 12:30:00+00	2025-11-16 13:30:00+00	1500	confirmed	paid	\N	\N	2025-11-15 00:33:43.849471+00	f	\N	\N	\N	\N	0.00	\N
+850ac83a-b7e6-4413-8b2a-cf721bed3afa	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	75829f37-d136-47e7-b544-dbc65b093dbc	2025-11-16 13:30:00+00	2025-11-16 14:30:00+00	1500	confirmed	paid	\N	\N	2025-11-15 00:37:56.134788+00	f	\N	\N	\N	\N	0.00	\N
+c2e31156-cd7f-4cb3-a03c-5208607e749c	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	cb9d326f-6c20-41d4-bed7-c670d4435af0	2025-11-17 03:30:00+00	2025-11-17 04:30:00+00	1500	confirmed	paid	\N	\N	2025-11-15 00:41:03.760818+00	f	\N	\N	\N	\N	0.00	\N
+6da4c18d-4714-4541-ada0-9bed72624726	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd248-c766-4bb7-b7dd-866d99d5b1ba	c36b73b6-de20-45dd-9fe2-2f205c553e0b	2025-11-17 04:30:00+00	2025-11-17 05:30:00+00	1500	confirmed	paid	\N	\N	2025-11-15 00:41:48.424227+00	f	\N	\N	\N	\N	0.00	\N
 \.
 
 
@@ -8591,7 +9030,7 @@ af0f296f-056e-45da-b5d8-eae35d7764de	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	737bd2
 -- Data for Name: contact_messages; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.contact_messages (id, name, email, message, is_read, created_at) FROM stdin;
+COPY public.contact_messages (id, name, email, message, is_read, created_at, status, read_at, admin_notes) FROM stdin;
 \.
 
 
@@ -8612,6 +9051,7 @@ COPY public.facilities (facility_id, venue_id, sport_id, name, description, capa
 5b9e2c62-4330-4321-b65f-444b5e076974	f427b361-e8bb-46d7-b3a1-b460afe596b7	550e8400-e29b-41d4-a716-446655440004	Tennis Court	\N	4	1200.00	t
 f74bf641-e013-4d27-98c8-acb768db209c	845ec790-6f2e-4533-9d7e-9de4bf4da65f	550e8400-e29b-41d4-a716-446655440007	Court 1	\N	16	1500.00	t
 31264a16-836b-4493-9fec-9d142b214813	35191a12-a23f-4508-a308-8b921d45d237	550e8400-e29b-41d4-a716-446655440007	Table 1	\N	4	500.00	t
+806148c1-61e6-418b-80e2-e6944469bf14	e6619c58-298a-40e7-a22c-0c5dc3f57e37	550e8400-e29b-41d4-a716-446655440007	table 1	\N	4	500.00	t
 857b3a73-e640-4cfd-b886-a96815b6e562	0a5d58bf-2471-4e36-9a5d-3485be962dee	550e8400-e29b-41d4-a716-446655440001	Box	\N	20	10000.00	t
 fb028c96-667c-4fd0-be9f-ffbfb413c8cd	0a5d58bf-2471-4e36-9a5d-3485be962dee	550e8400-e29b-41d4-a716-446655440008	VolleyCourt	\N	12	1000.00	t
 ab9fba0e-c266-41e7-9327-2a2dcdd2f5e9	0a5d58bf-2471-4e36-9a5d-3485be962dee	550e8400-e29b-41d4-a716-446655440006	Golden Racing Pool	\N	15	20000.00	t
@@ -8706,6 +9146,9 @@ f74bf641-e013-4d27-98c8-acb768db209c	660e8400-e29b-41d4-a716-446655440002	2025-1
 31264a16-836b-4493-9fec-9d142b214813	660e8400-e29b-41d4-a716-446655440002	2025-11-07 13:51:50.910781	2025-11-07 13:51:50.910781
 31264a16-836b-4493-9fec-9d142b214813	660e8400-e29b-41d4-a716-446655440008	2025-11-07 13:51:50.910781	2025-11-07 13:51:50.910781
 31264a16-836b-4493-9fec-9d142b214813	660e8400-e29b-41d4-a716-446655440009	2025-11-07 13:51:50.910781	2025-11-07 13:51:50.910781
+806148c1-61e6-418b-80e2-e6944469bf14	660e8400-e29b-41d4-a716-446655440008	2025-11-14 16:25:03.314159	2025-11-14 16:25:03.314159
+806148c1-61e6-418b-80e2-e6944469bf14	660e8400-e29b-41d4-a716-446655440002	2025-11-14 16:25:03.314159	2025-11-14 16:25:03.314159
+806148c1-61e6-418b-80e2-e6944469bf14	660e8400-e29b-41d4-a716-446655440007	2025-11-14 16:25:03.314159	2025-11-14 16:25:03.314159
 \.
 
 
@@ -8722,37 +9165,28 @@ COPY public.favorites (user_id, venue_id, created_at) FROM stdin;
 --
 
 COPY public.notification_recipients (id, notification_id, user_id, is_read, read_at, delivered_at) FROM stdin;
-1	1	0fb362ba-7463-4462-a136-4692a0d3e41c	f	\N	2025-11-07 20:25:40.15436+00
-2	1	38f0c23d-4d25-42cd-8ec0-426d6636eecd	f	\N	2025-11-07 20:25:40.15436+00
-3	1	8445e8b1-719d-438b-a533-bbf251d5744e	f	\N	2025-11-07 20:25:40.15436+00
-4	1	8b676db1-a2e8-416e-bda7-1aba0f8c1125	f	\N	2025-11-07 20:25:40.15436+00
-5	1	988544a8-bb69-4187-802e-47f45a9ecceb	f	\N	2025-11-07 20:25:40.15436+00
-6	1	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f	\N	2025-11-07 20:25:40.15436+00
-7	2	073c625c-eb02-45e8-9c67-50acbdc72cd6	f	\N	2025-11-07 20:25:53.451405+00
-8	2	2f0354fd-905b-4cea-9f87-0b66457b20e7	f	\N	2025-11-07 20:25:53.451405+00
-9	2	c90139a0-2de3-4237-89b8-032367f73a37	f	\N	2025-11-07 20:25:53.451405+00
-10	2	d1dd9ab7-e67f-4440-830a-f41889cc0388	f	\N	2025-11-07 20:25:53.451405+00
-11	2	ffaef875-be4c-4cc3-af20-ec6865aad7a2	f	\N	2025-11-07 20:25:53.451405+00
-12	3	0fb362ba-7463-4462-a136-4692a0d3e41c	f	\N	2025-11-07 20:39:14.830661+00
-13	3	38f0c23d-4d25-42cd-8ec0-426d6636eecd	f	\N	2025-11-07 20:39:14.830661+00
-14	3	8445e8b1-719d-438b-a533-bbf251d5744e	f	\N	2025-11-07 20:39:14.830661+00
-15	3	8b676db1-a2e8-416e-bda7-1aba0f8c1125	f	\N	2025-11-07 20:39:14.830661+00
-16	3	988544a8-bb69-4187-802e-47f45a9ecceb	f	\N	2025-11-07 20:39:14.830661+00
-17	3	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	f	\N	2025-11-07 20:39:14.830661+00
-18	4	073c625c-eb02-45e8-9c67-50acbdc72cd6	f	\N	2025-11-07 20:39:32.666498+00
-19	4	2f0354fd-905b-4cea-9f87-0b66457b20e7	f	\N	2025-11-07 20:39:32.666498+00
-20	4	c90139a0-2de3-4237-89b8-032367f73a37	f	\N	2025-11-07 20:39:32.666498+00
-21	4	d1dd9ab7-e67f-4440-830a-f41889cc0388	f	\N	2025-11-07 20:39:32.666498+00
-22	4	ffaef875-be4c-4cc3-af20-ec6865aad7a2	f	\N	2025-11-07 20:39:32.666498+00
-23	5	fcff5381-23de-4ea0-8e4c-c608171c703f	f	\N	2025-11-08 04:58:26.836191+00
-24	6	fcff5381-23de-4ea0-8e4c-c608171c703f	f	\N	2025-11-08 04:58:57.042757+00
-25	7	fcff5381-23de-4ea0-8e4c-c608171c703f	f	\N	2025-11-09 13:22:26.132747+00
-26	8	fcff5381-23de-4ea0-8e4c-c608171c703f	f	\N	2025-11-14 05:39:09.787786+00
-27	9	fcff5381-23de-4ea0-8e4c-c608171c703f	f	\N	2025-11-14 05:40:16.335591+00
-28	10	fcff5381-23de-4ea0-8e4c-c608171c703f	f	\N	2025-11-14 05:43:06.390193+00
-29	11	fcff5381-23de-4ea0-8e4c-c608171c703f	f	\N	2025-11-14 05:46:30.83169+00
-30	12	fcff5381-23de-4ea0-8e4c-c608171c703f	f	\N	2025-11-14 05:46:50.780014+00
-31	13	fcff5381-23de-4ea0-8e4c-c608171c703f	f	\N	2025-11-14 05:47:12.407246+00
+33	16	0fb362ba-7463-4462-a136-4692a0d3e41c	f	\N	2025-11-14 10:06:20.750872+00
+34	16	38f0c23d-4d25-42cd-8ec0-426d6636eecd	f	\N	2025-11-14 10:06:20.750872+00
+35	16	8445e8b1-719d-438b-a533-bbf251d5744e	f	\N	2025-11-14 10:06:20.750872+00
+36	16	8b676db1-a2e8-416e-bda7-1aba0f8c1125	f	\N	2025-11-14 10:06:20.750872+00
+37	16	988544a8-bb69-4187-802e-47f45a9ecceb	f	\N	2025-11-14 10:06:20.750872+00
+39	16	bff589e7-8ea0-4f67-af97-0d11c36f4967	f	\N	2025-11-14 10:06:20.750872+00
+44	21	c90139a0-2de3-4237-89b8-032367f73a37	t	2025-11-14 13:03:10.753+00	2025-11-14 12:15:11.367073+00
+38	16	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	t	2025-11-14 13:08:33.7+00	2025-11-14 10:06:20.750872+00
+32	15	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	t	2025-11-14 13:08:36.032+00	2025-11-14 09:44:18.73931+00
+23	5	fcff5381-23de-4ea0-8e4c-c608171c703f	t	2025-11-14 13:45:06.242786+00	2025-11-08 04:58:26.836191+00
+24	6	fcff5381-23de-4ea0-8e4c-c608171c703f	t	2025-11-14 13:45:06.242786+00	2025-11-08 04:58:57.042757+00
+25	7	fcff5381-23de-4ea0-8e4c-c608171c703f	t	2025-11-14 13:45:06.242786+00	2025-11-09 13:22:26.132747+00
+26	8	fcff5381-23de-4ea0-8e4c-c608171c703f	t	2025-11-14 13:45:06.242786+00	2025-11-14 05:39:09.787786+00
+27	9	fcff5381-23de-4ea0-8e4c-c608171c703f	t	2025-11-14 13:45:06.242786+00	2025-11-14 05:40:16.335591+00
+28	10	fcff5381-23de-4ea0-8e4c-c608171c703f	t	2025-11-14 13:45:06.242786+00	2025-11-14 05:43:06.390193+00
+29	11	fcff5381-23de-4ea0-8e4c-c608171c703f	t	2025-11-14 13:45:06.242786+00	2025-11-14 05:46:30.83169+00
+30	12	fcff5381-23de-4ea0-8e4c-c608171c703f	t	2025-11-14 13:45:06.242786+00	2025-11-14 05:46:50.780014+00
+31	13	fcff5381-23de-4ea0-8e4c-c608171c703f	t	2025-11-14 13:45:06.242786+00	2025-11-14 05:47:12.407246+00
+40	17	fcff5381-23de-4ea0-8e4c-c608171c703f	t	2025-11-14 13:45:06.242786+00	2025-11-14 11:22:51.163738+00
+41	18	fcff5381-23de-4ea0-8e4c-c608171c703f	t	2025-11-14 13:45:06.242786+00	2025-11-14 11:34:25.214185+00
+42	19	fcff5381-23de-4ea0-8e4c-c608171c703f	t	2025-11-14 13:45:06.242786+00	2025-11-14 12:04:03.675507+00
+43	20	fcff5381-23de-4ea0-8e4c-c608171c703f	t	2025-11-14 13:45:06.242786+00	2025-11-14 12:15:11.23078+00
 \.
 
 
@@ -8760,20 +9194,23 @@ COPY public.notification_recipients (id, notification_id, user_id, is_read, read
 -- Data for Name: notifications; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.notifications (id, title, body, sender_type, sender_id, recipient_type, recipient_ids, owner_id, venue_id, status, sent_at, created_at, updated_at) FROM stdin;
-1	Stark	hii\n	admin	\N	all_players	\N	\N	\N	sent	2025-11-07 20:25:40.15436+00	2025-11-07 20:25:40.15436+00	2025-11-07 20:25:40.15436+00
-2	Stark	huii	admin	\N	all_owners	\N	\N	\N	sent	2025-11-07 20:25:53.451405+00	2025-11-07 20:25:53.451405+00	2025-11-07 20:25:53.451405+00
-3	Stark	fwwd	admin	\N	all_players	\N	\N	\N	sent	2025-11-07 20:39:14.830661+00	2025-11-07 20:39:14.830661+00	2025-11-07 20:39:14.830661+00
-4	Stark	huii	admin	\N	all_owners	\N	\N	\N	sent	2025-11-07 20:39:32.666498+00	2025-11-07 20:39:32.666498+00	2025-11-07 20:39:32.666498+00
-5	New Booking Confirmed	swayam booked Table 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-08 04:58:26.836191+00	2025-11-08 04:58:26.836191+00	2025-11-08 04:58:26.836191+00
-6	New Booking Confirmed	swayam booked Court 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-08 04:58:57.042757+00	2025-11-08 04:58:57.042757+00	2025-11-08 04:58:57.042757+00
-7	New Booking Confirmed	tushar20 booked Court 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-09 13:22:26.132747+00	2025-11-09 13:22:26.132747+00	2025-11-09 13:22:26.132747+00
-8	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 05:39:09.787786+00	2025-11-14 05:39:09.787786+00	2025-11-14 05:39:09.787786+00
-9	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 05:40:16.335591+00	2025-11-14 05:40:16.335591+00	2025-11-14 05:40:16.335591+00
-10	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 05:43:06.390193+00	2025-11-14 05:43:06.390193+00	2025-11-14 05:43:06.390193+00
-11	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 05:46:30.83169+00	2025-11-14 05:46:30.83169+00	2025-11-14 05:46:30.83169+00
-12	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 05:46:50.780014+00	2025-11-14 05:46:50.780014+00	2025-11-14 05:46:50.780014+00
-13	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 05:47:12.407246+00	2025-11-14 05:47:12.407246+00	2025-11-14 05:47:12.407246+00
+COPY public.notifications (id, title, body, sender_type, sender_id, recipient_type, recipient_ids, owner_id, venue_id, status, sent_at, created_at, updated_at, link_to) FROM stdin;
+5	New Booking Confirmed	swayam booked Table 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-08 04:58:26.836191+00	2025-11-08 04:58:26.836191+00	2025-11-08 04:58:26.836191+00	\N
+6	New Booking Confirmed	swayam booked Court 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-08 04:58:57.042757+00	2025-11-08 04:58:57.042757+00	2025-11-08 04:58:57.042757+00	\N
+7	New Booking Confirmed	tushar20 booked Court 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-09 13:22:26.132747+00	2025-11-09 13:22:26.132747+00	2025-11-09 13:22:26.132747+00	\N
+8	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 05:39:09.787786+00	2025-11-14 05:39:09.787786+00	2025-11-14 05:39:09.787786+00	\N
+9	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 05:40:16.335591+00	2025-11-14 05:40:16.335591+00	2025-11-14 05:40:16.335591+00	\N
+10	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 05:43:06.390193+00	2025-11-14 05:43:06.390193+00	2025-11-14 05:43:06.390193+00	\N
+11	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 05:46:30.83169+00	2025-11-14 05:46:30.83169+00	2025-11-14 05:46:30.83169+00	\N
+12	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 05:46:50.780014+00	2025-11-14 05:46:50.780014+00	2025-11-14 05:46:50.780014+00	\N
+13	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 05:47:12.407246+00	2025-11-14 05:47:12.407246+00	2025-11-14 05:47:12.407246+00	\N
+15	Test From Admin	This is a test notification.	admin	fcff5381-23de-4ea0-8e4c-c608171c703f	player	{bb3e7bae-8aed-4e6c-bb71-bd644eff5402}	\N	\N	sent	2025-11-14 09:44:18.73931+00	2025-11-14 09:44:18.73931+00	2025-11-14 09:44:18.73931+00	\N
+16	30% off on this weekend 	30% off on this weekend HURRY and book now	owner	c90139a0-2de3-4237-89b8-032367f73a37	all_players	\N	\N	\N	sent	2025-11-14 10:06:20.750872+00	2025-11-14 10:06:20.750872+00	2025-11-14 10:06:20.750872+00	\N
+17	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 11:22:51.163738+00	2025-11-14 11:22:51.163738+00	2025-11-14 11:22:51.163738+00	\N
+18	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 11:34:25.214185+00	2025-11-14 11:34:25.214185+00	2025-11-14 11:34:25.214185+00	\N
+19	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 12:04:03.675507+00	2025-11-14 12:04:03.675507+00	2025-11-14 12:04:03.675507+00	\N
+20	New Booking Confirmed	swayam booked box 1.	system	\N	admin	{fcff5381-23de-4ea0-8e4c-c608171c703f}	\N	\N	sent	2025-11-14 12:15:11.23078+00	2025-11-14 12:15:11.23078+00	2025-11-14 12:15:11.23078+00	\N
+21	New Booking Confirmed	swayam has booked box 1 for Nov 15, 4:30 AM.	system	\N	owner	{c90139a0-2de3-4237-89b8-032367f73a37}	\N	\N	sent	2025-11-14 12:15:11.367073+00	2025-11-14 12:15:11.367073+00	2025-11-14 12:15:11.367073+00	\N
 \.
 
 
@@ -8782,6 +9219,11 @@ COPY public.notifications (id, title, body, sender_type, sender_id, recipient_ty
 --
 
 COPY public.offer_redemptions (redemption_id, offer_id, user_id, booking_id, redeemed_at, discount_amount) FROM stdin;
+25e68b2e-9b52-401c-8e99-0ca9d3247d55	c30d7b8a-3b88-487a-9dc8-eed371e4e805	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	9cf7790c-68d3-4b6d-9439-62301f536acc	2025-11-14 11:22:51.282385+00	450.00
+711ca216-6ce0-4b88-9983-7cb95df109ad	c30d7b8a-3b88-487a-9dc8-eed371e4e805	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	ce8a1aec-634f-411e-b863-5de9118e8a4c	2025-11-14 13:18:21.419567+00	450.00
+341422db-2e9d-44fc-876f-86179cee97c8	c30d7b8a-3b88-487a-9dc8-eed371e4e805	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	325c5e9c-b7a8-4d49-818e-3d6aca5c3fe3	2025-11-14 13:38:23.209276+00	450.00
+9354c9fd-c4cf-45f0-a50d-bf87cb3486d0	c30d7b8a-3b88-487a-9dc8-eed371e4e805	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	acbf26ef-8f16-46dd-8e1d-f05e4005644b	2025-11-14 18:16:06.276426+00	450.00
+9b0765cc-4b0e-4955-921c-666a213734df	5e11f61e-c41b-4b99-9f6e-36bb46f1a811	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	a688be4b-6932-45a7-bbee-53ea0d7e76eb	2025-11-15 00:18:43.342411+00	500.00
 \.
 
 
@@ -8801,7 +9243,8 @@ COPY public.offers (offer_id, venue_id, title, description, discount_percentage,
 05cf0b53-de46-42df-97ff-63cd70240ba2	f427b361-e8bb-46d7-b3a1-b460afe596b7	First 		30.00	t	2025-11-07 00:00:00+00	2025-12-07 00:00:00+00	2025-11-07 11:02:52.812104+00	f	\N	New 30	t	percentage_discount	\N	500	100	1200.00
 38f350dc-db0a-4756-a880-9272055a8038	9c97f78b-319c-44ec-bc74-d44193b7e484	Get FLAT 50% off on all sports.		50.00	t	2025-11-08 00:00:00+00	2025-11-09 00:00:00+00	2025-11-07 19:01:47.334469+00	f	\N	FLAT50	t	percentage_discount	\N	\N	\N	500.00
 7517255c-671a-45cb-9da5-94a0da8ec9ba	845ec790-6f2e-4533-9d7e-9de4bf4da65f	get 20%off	get 20% off on weekend	20.00	t	\N	\N	2025-11-08 06:41:24.542562+00	f	\N	WEEKEND20	t	percentage_discount	\N	\N	1	\N
-68245ace-11b5-42ae-a887-914e16dae786	13db2497-2be8-4849-a762-bf7749f82652	asdfghefgn		20.00	t	2025-11-15 00:00:00+00	2025-11-24 00:00:00+00	2025-11-14 06:06:39.007045+00	f	\N	WEEKEND0	t	percentage_discount	\N	\N	1	\N
+c30d7b8a-3b88-487a-9dc8-eed371e4e805	13db2497-2be8-4849-a762-bf7749f82652	Get 30% off	Get 30% off	30.00	t	2025-11-14 00:00:00+00	2025-11-21 00:00:00+00	2025-11-14 09:50:11.64194+00	f	\N	HAPPY30	t	percentage_discount	\N	\N	\N	\N
+5e11f61e-c41b-4b99-9f6e-36bb46f1a811	13db2497-2be8-4849-a762-bf7749f82652	get flat 500 off	get flat 500 off	\N	t	2025-11-14 00:00:00+00	2025-11-22 00:00:00+00	2025-11-14 17:55:26.275084+00	f	\N	Flat500	t	fixed_amount_discount	500.00	\N	\N	\N
 \.
 
 
@@ -8829,6 +9272,11 @@ COPY public.reviews (review_id, user_id, venue_id, rating, comment, created_at, 
 e35e0c6f-3126-4f19-9192-f47833dc36eb	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	1f72fb3d-916d-477a-9e2e-5abd9e21c4da	5	nice place to enjoy	\N	\N
 24ff04f9-031b-4678-a345-49927952e54c	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	8534d12f-5f7b-43fd-80ac-82e6c59ba9ad	4	nice place 	\N	00d6b9c6-17c2-4c82-9d11-9dabe149b647
 27613dd3-21b3-469d-b8e4-ecb73a2d578f	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	0a5d58bf-2471-4e36-9a5d-3485be962dee	5	great place to play	\N	4611aeb7-9173-4401-a08d-530b292db1b3
+9757d7fb-d86c-4645-a24f-017d2bed28dc	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	13db2497-2be8-4849-a762-bf7749f82652	5		\N	d2dd1a8a-e6c9-4580-98ea-0c7f5e1c8149
+731e3ce8-311b-40a6-af41-1c4bcf2cbf3c	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	1f72fb3d-916d-477a-9e2e-5abd9e21c4da	4	Good sport facilities	\N	f92663ac-e165-499d-99ce-69be241b9bba
+bfc43603-c118-4c1b-bcac-2522b7f45d88	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	13db2497-2be8-4849-a762-bf7749f82652	4	amezing venule	\N	9cf7790c-68d3-4b6d-9439-62301f536acc
+06db057c-06b2-420a-a523-3f4e7863b61c	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	13db2497-2be8-4849-a762-bf7749f82652	5	great experience	\N	af0f296f-056e-45da-b5d8-eae35d7764de
+b8f9683d-9dc0-4711-94ef-5a538bb89226	bb3e7bae-8aed-4e6c-bb71-bd644eff5402	1f72fb3d-916d-477a-9e2e-5abd9e21c4da	5	nice place and great experience	\N	09b0c859-6ffa-4cb6-a21d-90688e5c2ae3
 \.
 
 
@@ -10179,36 +10627,24 @@ bf9f5639-dce2-4146-b097-68b20cbdab76	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-1
 4fe8ba5e-a66b-4e8b-b1e3-0bd40d743c76	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-14 06:30:00+00	2025-11-14 07:30:00+00	t	\N	\N
 b4d8f310-e22a-4537-908b-3ec9aab69702	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-14 07:30:00+00	2025-11-14 08:30:00+00	t	\N	\N
 47e97801-a7a5-410c-b4f8-b3240bf38009	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-14 10:30:00+00	2025-11-14 11:30:00+00	t	\N	\N
-1a350523-4d35-4335-8c30-f2162902ccf9	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-14 12:30:00+00	2025-11-14 13:30:00+00	t	\N	\N
-db608dfd-bc04-43a1-94b6-517ef57e72db	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-14 14:30:00+00	2025-11-14 15:30:00+00	t	\N	\N
-968fd415-da98-4243-8895-5da62a1d968d	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 03:30:00+00	2025-11-15 04:30:00+00	t	\N	\N
-d42e765f-732a-4a30-b9ea-ea4a6d166606	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 04:30:00+00	2025-11-15 05:30:00+00	t	\N	\N
-bb0d5508-e835-4815-aed4-7ae85f330174	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 05:30:00+00	2025-11-15 06:30:00+00	t	\N	\N
-b20c2cc0-866e-4df7-9ab7-87781b6f93d9	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 06:30:00+00	2025-11-15 07:30:00+00	t	\N	\N
-8ebcb42d-0eb1-4e66-baa8-0c3577d20904	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 07:30:00+00	2025-11-15 08:30:00+00	t	\N	\N
-31fd92ed-9f09-4abd-bfce-314cbb5cbc7d	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 08:30:00+00	2025-11-15 09:30:00+00	t	\N	\N
-a1fad37e-4aa9-479e-942f-a07f36f3c183	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 09:30:00+00	2025-11-15 10:30:00+00	t	\N	\N
-29b5bb0c-aba3-402b-ac61-ef58b19760ea	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 10:30:00+00	2025-11-15 11:30:00+00	t	\N	\N
-17bdeaa1-4e02-40d4-836f-c424880c8503	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 11:30:00+00	2025-11-15 12:30:00+00	t	\N	\N
-7a284168-ccfe-4549-845a-62ed806bd8bc	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 03:30:00+00	2025-11-16 04:30:00+00	t	\N	\N
-f651a534-69e6-4215-942f-52002fc722ba	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 04:30:00+00	2025-11-16 05:30:00+00	t	\N	\N
 589b7c9f-b28b-477b-9fd7-465fd359116d	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 14:30:00+00	2025-11-15 15:30:00+00	f	\N	\N
 6a622f5e-7de8-4c30-a570-f4395775aba9	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 12:30:00+00	2025-11-15 13:30:00+00	f	\N	\N
 f850139c-01bb-4a57-8379-62ac8c5eba4a	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-14 08:30:00+00	2025-11-14 09:30:00+00	t	\N	\N
 b688e35c-d398-46da-a16d-7888d8568343	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-14 11:30:00+00	2025-11-14 12:30:00+00	f	\N	\N
 cae63134-1dea-4d57-bbb9-663ab9152002	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-14 13:30:00+00	2025-11-14 14:30:00+00	f	\N	\N
-36eb913d-4d44-46f1-8ec9-077209803ba7	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 05:30:00+00	2025-11-16 06:30:00+00	t	\N	\N
-60e98131-bf24-47b6-abb6-89c21d0717b5	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 06:30:00+00	2025-11-16 07:30:00+00	t	\N	\N
-7cba308e-f4fa-42e4-a356-2acf9ff01692	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 07:30:00+00	2025-11-16 08:30:00+00	t	\N	\N
-914c66f3-0548-4dd8-9dc4-20416fd706ef	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 08:30:00+00	2025-11-16 09:30:00+00	t	\N	\N
-d6388e9a-8801-4795-9f6c-9255b3af71c1	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 09:30:00+00	2025-11-16 10:30:00+00	t	\N	\N
-dd045b93-2578-4065-864f-23ebb7d8e1e8	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 10:30:00+00	2025-11-16 11:30:00+00	t	\N	\N
-5eb94d2a-c39f-4743-8599-898a139589f0	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 11:30:00+00	2025-11-16 12:30:00+00	t	\N	\N
-0280b302-2e22-45ab-8a42-fb84afc11acf	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 12:30:00+00	2025-11-16 13:30:00+00	t	\N	\N
-75829f37-d136-47e7-b544-dbc65b093dbc	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 13:30:00+00	2025-11-16 14:30:00+00	t	\N	\N
-961ae635-18b2-4d21-9dbc-0b6792c450d6	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 14:30:00+00	2025-11-16 15:30:00+00	t	\N	\N
-cb9d326f-6c20-41d4-bed7-c670d4435af0	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-17 03:30:00+00	2025-11-17 04:30:00+00	t	\N	\N
-c36b73b6-de20-45dd-9fe2-2f205c553e0b	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-17 04:30:00+00	2025-11-17 05:30:00+00	t	\N	\N
+db608dfd-bc04-43a1-94b6-517ef57e72db	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-14 14:30:00+00	2025-11-14 15:30:00+00	f	\N	\N
+1a350523-4d35-4335-8c30-f2162902ccf9	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-14 12:30:00+00	2025-11-14 13:30:00+00	f	\N	\N
+968fd415-da98-4243-8895-5da62a1d968d	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 03:30:00+00	2025-11-15 04:30:00+00	f	\N	\N
+d42e765f-732a-4a30-b9ea-ea4a6d166606	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 04:30:00+00	2025-11-15 05:30:00+00	f	\N	\N
+bb0d5508-e835-4815-aed4-7ae85f330174	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 05:30:00+00	2025-11-15 06:30:00+00	f	\N	\N
+b20c2cc0-866e-4df7-9ab7-87781b6f93d9	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 06:30:00+00	2025-11-15 07:30:00+00	f	\N	\N
+17bdeaa1-4e02-40d4-836f-c424880c8503	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 11:30:00+00	2025-11-15 12:30:00+00	f	\N	\N
+7a284168-ccfe-4549-845a-62ed806bd8bc	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 03:30:00+00	2025-11-16 04:30:00+00	f	\N	\N
+8ebcb42d-0eb1-4e66-baa8-0c3577d20904	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 07:30:00+00	2025-11-15 08:30:00+00	f	\N	\N
+31fd92ed-9f09-4abd-bfce-314cbb5cbc7d	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 08:30:00+00	2025-11-15 09:30:00+00	f	\N	\N
+29b5bb0c-aba3-402b-ac61-ef58b19760ea	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 10:30:00+00	2025-11-15 11:30:00+00	f	\N	\N
+a1fad37e-4aa9-479e-942f-a07f36f3c183	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 09:30:00+00	2025-11-15 10:30:00+00	f	\N	\N
+f651a534-69e6-4215-942f-52002fc722ba	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 04:30:00+00	2025-11-16 05:30:00+00	f	\N	\N
 090c7014-7a31-4e1c-96f5-35d9fdb88ce1	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-17 05:30:00+00	2025-11-17 06:30:00+00	t	\N	\N
 1ba5a76d-a3c3-4737-88d2-c92317366858	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-17 06:30:00+00	2025-11-17 07:30:00+00	t	\N	\N
 656e1831-5530-445e-a4d5-ea6fd952fcd7	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-17 07:30:00+00	2025-11-17 08:30:00+00	t	\N	\N
@@ -10294,6 +10730,16 @@ c41fc004-65a7-4150-8eb2-4316b95790a0	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-1
 80f6b075-a127-4820-ac4e-59364b2bbe7b	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-12 03:30:00+00	2025-11-12 04:30:00+00	t	\N	\N
 d1ea2d77-6b08-4f7b-a025-db966b56e8a1	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-12 04:30:00+00	2025-11-12 05:30:00+00	t	\N	\N
 e5eed173-41ff-469e-8a7d-9b995a0e844a	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-12 05:30:00+00	2025-11-12 06:30:00+00	t	\N	\N
+60e98131-bf24-47b6-abb6-89c21d0717b5	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 06:30:00+00	2025-11-16 07:30:00+00	f	\N	\N
+7cba308e-f4fa-42e4-a356-2acf9ff01692	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 07:30:00+00	2025-11-16 08:30:00+00	f	\N	\N
+914c66f3-0548-4dd8-9dc4-20416fd706ef	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 08:30:00+00	2025-11-16 09:30:00+00	f	\N	\N
+961ae635-18b2-4d21-9dbc-0b6792c450d6	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 14:30:00+00	2025-11-16 15:30:00+00	f	\N	\N
+d6388e9a-8801-4795-9f6c-9255b3af71c1	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 09:30:00+00	2025-11-16 10:30:00+00	f	\N	\N
+5eb94d2a-c39f-4743-8599-898a139589f0	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 11:30:00+00	2025-11-16 12:30:00+00	f	\N	\N
+0280b302-2e22-45ab-8a42-fb84afc11acf	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 12:30:00+00	2025-11-16 13:30:00+00	f	\N	\N
+75829f37-d136-47e7-b544-dbc65b093dbc	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 13:30:00+00	2025-11-16 14:30:00+00	f	\N	\N
+cb9d326f-6c20-41d4-bed7-c670d4435af0	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-17 03:30:00+00	2025-11-17 04:30:00+00	f	\N	\N
+c36b73b6-de20-45dd-9fe2-2f205c553e0b	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-17 04:30:00+00	2025-11-17 05:30:00+00	f	\N	\N
 822fd707-950d-4786-a418-ab59f9ad9614	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-12 06:30:00+00	2025-11-12 07:30:00+00	t	\N	\N
 ca6f9316-eff5-43a3-90c3-c088c6633fac	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-12 07:30:00+00	2025-11-12 08:30:00+00	t	\N	\N
 0cef489c-3ddf-44fb-8583-872436961b6f	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-12 08:30:00+00	2025-11-12 09:30:00+00	t	\N	\N
@@ -10335,10 +10781,6 @@ d9374464-3b72-42c5-9224-70f1a06f66bc	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-1
 6a9fefcb-cf2b-459e-a464-37940a6fe940	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-15 08:30:00+00	2025-11-15 09:30:00+00	t	\N	\N
 d840b7e2-d0a5-435a-8e62-62deb4100882	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-15 09:30:00+00	2025-11-15 10:30:00+00	t	\N	\N
 58a839f1-78cc-400e-9588-b2bdbc13d84d	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-15 10:30:00+00	2025-11-15 11:30:00+00	t	\N	\N
-b588e555-f70b-499c-b114-59506f6bc71c	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-15 11:30:00+00	2025-11-15 12:30:00+00	t	\N	\N
-966f1062-07c8-4551-b669-2431a081564d	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-15 12:30:00+00	2025-11-15 13:30:00+00	t	\N	\N
-447bc594-1ca1-42cd-a3fb-446fb5981ae5	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-15 13:30:00+00	2025-11-15 14:30:00+00	t	\N	\N
-c8ddebd4-0cf3-45b1-9e0a-0659a2e41b5b	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-15 14:30:00+00	2025-11-15 15:30:00+00	t	\N	\N
 df8a4d09-c5f9-4a3f-bc26-58397b5c185e	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-16 03:30:00+00	2025-11-16 04:30:00+00	t	\N	\N
 778b2e2b-a987-4439-b739-5e0ce2c0b250	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-16 04:30:00+00	2025-11-16 05:30:00+00	t	\N	\N
 685748f1-61e6-4116-b996-89768789a4a7	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-16 05:30:00+00	2025-11-16 06:30:00+00	t	\N	\N
@@ -10391,6 +10833,9 @@ deedb2fc-a288-4f76-a55a-f949179c28cf	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-1
 03ed74bd-389c-4b36-845a-79dbb6d11790	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-20 04:30:00+00	2025-11-20 05:30:00+00	t	\N	\N
 daef0e47-f8c0-4df2-a50c-09fa173da400	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-20 05:30:00+00	2025-11-20 06:30:00+00	t	\N	\N
 a1061e83-8ed8-4165-b594-d46359308900	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-20 06:30:00+00	2025-11-20 07:30:00+00	t	\N	\N
+c8ddebd4-0cf3-45b1-9e0a-0659a2e41b5b	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-15 14:30:00+00	2025-11-15 15:30:00+00	f	\N	\N
+966f1062-07c8-4551-b669-2431a081564d	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-15 12:30:00+00	2025-11-15 13:30:00+00	f	\N	\N
+b588e555-f70b-499c-b114-59506f6bc71c	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-15 11:30:00+00	2025-11-15 12:30:00+00	f	\N	\N
 2554918a-7dac-4a53-ad57-c30be9e74257	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-20 07:30:00+00	2025-11-20 08:30:00+00	t	\N	\N
 68d46b90-6585-4573-9a0e-51ed9e201311	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-20 08:30:00+00	2025-11-20 09:30:00+00	t	\N	\N
 80984624-e635-45c4-b04d-1377b4339b76	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-20 09:30:00+00	2025-11-20 10:30:00+00	t	\N	\N
@@ -10761,6 +11206,9 @@ d60da6aa-22bf-46b3-9e91-ad0caa1ac1c9	b9991a34-9cee-49ed-bce7-07b42893a23d	2025-1
 1604902d-fd7b-4667-8924-0017ef66eb6f	b9991a34-9cee-49ed-bce7-07b42893a23d	2025-11-09 13:30:00+00	2025-11-09 14:30:00+00	f	\N	\N
 fa806342-a846-460b-94c8-0a2f408f2668	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-15 13:30:00+00	2025-11-15 14:30:00+00	f	\N	\N
 434b5867-2512-47ea-a2b7-cd57bc051bb1	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-14 09:30:00+00	2025-11-14 10:30:00+00	t	\N	\N
+447bc594-1ca1-42cd-a3fb-446fb5981ae5	55465e22-93a0-446b-a4f6-76cf397d38c2	2025-11-15 13:30:00+00	2025-11-15 14:30:00+00	f	\N	\N
+36eb913d-4d44-46f1-8ec9-077209803ba7	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 05:30:00+00	2025-11-16 06:30:00+00	f	\N	\N
+dd045b93-2578-4065-864f-23ebb7d8e1e8	737bd248-c766-4bb7-b7dd-866d99d5b1ba	2025-11-16 10:30:00+00	2025-11-16 11:30:00+00	f	\N	\N
 \.
 
 
@@ -10782,6 +11230,7 @@ ffaef875-be4c-4cc3-af20-ec6865aad7a2	swayam07	shahswayam7125@gmail.com	swayam	sh
 c90139a0-2de3-4237-89b8-032367f73a37	surbhi	surbhiroy780@gmail.com	srubhi	roy		venue_owner	0.00	0.00	2025-08-09 05:56:52.503913+00	active	https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/avatars/c90139a0-2de3-4237-89b8-032367f73a37/avatar.avif?t=1762535658359	2025-11-07 17:14:18.359+00	0
 fcff5381-23de-4ea0-8e4c-c608171c703f	admin	admin@playnation.com	\N	\N	\N	admin	0.00	0.00	2025-11-08 04:43:19.894103+00	active	\N	2025-11-08 04:43:19.894103+00	0
 bff589e7-8ea0-4f67-af97-0d11c36f4967	tushar20	ritumano@asciibinder.net	Tushar	shah	8140631419	player	0.00	0.00	2025-11-09 13:21:30.649758+00	active	\N	2025-11-09 13:23:00.068+00	0
+ba58a10f-adf2-4268-82df-023de1c272a2	yash	yash@gmail.com	Yash	Gandhi	9856325874	venue_owner	0.00	0.00	2025-11-14 14:13:20.398703+00	active	\N	2025-11-14 14:13:20.398703+00	0
 \.
 
 
@@ -10790,6 +11239,7 @@ bff589e7-8ea0-4f67-af97-0d11c36f4967	tushar20	ritumano@asciibinder.net	Tushar	sh
 --
 
 COPY public.venues (venue_id, owner_id, name, address, city, state, zip_code, description, contact_email, contact_phone, latitude, longitude, opening_time, closing_time, is_approved, created_at, updated_at, image_url, rejection_reason, booking_window_days, google_maps_url, cancellation_cutoff_hours, cancellation_fee_percentage) FROM stdin;
+e6619c58-298a-40e7-a22c-0c5dc3f57e37	ba58a10f-adf2-4268-82df-023de1c272a2	Assgaurd	3000 street, 7th avenue	surat	gujarat	395007	nice	yash@gmail.com	09156787656	21.159888	72.795944	06:00:00	23:00:00	f	2025-11-14 16:25:02.119842+00	2025-11-14 16:25:02.119842+00	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/40ea2320-e680-4ad2-9677-974f3fa98ac9.jpg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/9546b9ba-07a0-40d9-98ee-7cb1fe158263.jpg}	\N	7		24	0.00
 13db2497-2be8-4849-a762-bf7749f82652	c90139a0-2de3-4237-89b8-032367f73a37	Play more	Gaurav path road , pal	Surat	Gujarat	395007	play more and more	playmore@gmail.com	8535401258	21.186212	72.777016	10:00:00	23:00:00	t	2025-10-30 10:53:09.208708+00	2025-11-04 11:14:26.652128+00	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1761812605364-20240516_212249.jpg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/1761812605364-20240517_174046.jpg}	\N	7		4	0.00
 d72502bb-7a2d-47c9-ae33-8a90044f0202	c90139a0-2de3-4237-89b8-032367f73a37	Rebounce	Vesu	Surat	Gujarat	395005	nice place	rebounce@gmail.com	8650489065	21.146593	72.767866	10:00:00	23:00:00	t	2025-10-29 10:53:09.208708+00	2025-11-04 11:14:44.801085+00	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/bfe2af20-e67a-4893-9a21-f8b05d03b596.jpg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/c90139a0-2de3-4237-89b8-032367f73a37/69f43746-4679-4d21-a204-0236e8f7463a.jpg}	\N	7		9	0.00
 845ec790-6f2e-4533-9d7e-9de4bf4da65f	ffaef875-be4c-4cc3-af20-ec6865aad7a2	Urban Turf	12/A, Canal Road, near Star Galaxy, Vesu, Surat, Gujarat 395007	surat	gujarat	395007	Welcome to Urban Turf, Piplod's premier rooftop sporting destination. We've redefined the game with our FIFA-quality astro-turf, perfect for high-intensity 5-a-side football and box cricket. Enjoy stunning city views, pro-grade LED lighting, and a vibrant atmosphere. It's more than just a game; it's an experience.	shh.260105@gmail.com	09156787656	21.139548	72.770270	07:00:00	23:00:00	t	2025-11-07 13:45:48.304302+00	2025-11-07 13:46:13.750981+00	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/ffaef875-be4c-4cc3-af20-ec6865aad7a2/113c0ced-f987-4c2a-b586-de234e2368f5.webp}	\N	7		2	0.00
@@ -10800,6 +11250,54 @@ d72502bb-7a2d-47c9-ae33-8a90044f0202	c90139a0-2de3-4237-89b8-032367f73a37	Reboun
 f427b361-e8bb-46d7-b3a1-b460afe596b7	d1dd9ab7-e67f-4440-830a-f41889cc0388	Malibu Club	Plot no 3, Bag Ban Road, Road, Near Pal RTO, Pal	Surat	Gujarat	395009		tatvamehta1317@gmail.com	7874628315	21.201857	72.767258	07:00:00	23:00:00	t	2025-11-07 10:56:18.534676+00	2025-11-07 11:05:02.361191+00	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/d1dd9ab7-e67f-4440-830a-f41889cc0388/ebc8ebd0-624a-4450-b806-650b2fa5c609.jpg}	\N	7		6	0.00
 35191a12-a23f-4508-a308-8b921d45d237	ffaef875-be4c-4cc3-af20-ec6865aad7a2	The Endzone	Opp. VR Mall, Dumas Road, Magdalla	surat	gujarat	395007		shahswayam7125@gmail.com	8560478502	21.144171	72.758655	09:00:00	23:00:00	f	2025-11-07 13:51:50.508881+00	2025-11-07 13:51:50.508881+00	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/ffaef875-be4c-4cc3-af20-ec6865aad7a2/c403a9d0-7526-4a9d-bd27-95df65410ca5.webp}	\N	7		24	0.00
 9c97f78b-319c-44ec-bc74-d44193b7e484	073c625c-eb02-45e8-9c67-50acbdc72cd6	Aqua Fun	Green city road, pal	surat	gujarat	395009	Enjoy and fun	aquafun@gmail.com	9842014589	21.189974	72.775619	08:00:00	23:00:00	t	2025-11-04 10:53:09.208708+00	2025-11-07 22:54:09.812581+00	{https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/073c625c-eb02-45e8-9c67-50acbdc72cd6/e971ae3a-6a00-42bb-8ba9-785c3eea038f.jpg,https://okgeuiooqfqdxxqxjeod.supabase.co/storage/v1/object/public/venue-images/venue-images/073c625c-eb02-45e8-9c67-50acbdc72cd6/1acc134c-60c1-4368-88b4-7357010fe37f.jpg}	\N	7		24	0.00
+\.
+
+
+--
+-- Data for Name: messages_2025_11_13; Type: TABLE DATA; Schema: realtime; Owner: supabase_admin
+--
+
+COPY realtime.messages_2025_11_13 (topic, extension, payload, event, private, updated_at, inserted_at, id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: messages_2025_11_14; Type: TABLE DATA; Schema: realtime; Owner: supabase_admin
+--
+
+COPY realtime.messages_2025_11_14 (topic, extension, payload, event, private, updated_at, inserted_at, id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: messages_2025_11_15; Type: TABLE DATA; Schema: realtime; Owner: supabase_admin
+--
+
+COPY realtime.messages_2025_11_15 (topic, extension, payload, event, private, updated_at, inserted_at, id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: messages_2025_11_16; Type: TABLE DATA; Schema: realtime; Owner: supabase_admin
+--
+
+COPY realtime.messages_2025_11_16 (topic, extension, payload, event, private, updated_at, inserted_at, id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: messages_2025_11_17; Type: TABLE DATA; Schema: realtime; Owner: supabase_admin
+--
+
+COPY realtime.messages_2025_11_17 (topic, extension, payload, event, private, updated_at, inserted_at, id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: messages_2025_11_18; Type: TABLE DATA; Schema: realtime; Owner: supabase_admin
+--
+
+COPY realtime.messages_2025_11_18 (topic, extension, payload, event, private, updated_at, inserted_at, id) FROM stdin;
 \.
 
 
@@ -10974,6 +11472,7 @@ e8102975-ac0c-4727-83c9-9d32bd741aa4	venue-images	c90139a0-2de3-4237-89b8-032367
 0a8cd284-215b-4e58-855c-2d3b152c032e	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758647651536-20240518_163002.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:14:23.05169+00	2025-09-23 17:14:23.05169+00	2025-09-23 17:14:23.05169+00	{"eTag": "\\"7a6832f1dc453e72bdc724d130c0812b-2\\"", "size": 6730830, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:14:23.000Z", "contentLength": 6730830, "httpStatusCode": 200}	3eccdcb0-98af-48b9-ad24-d1c6b5fa202e	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
 f63cfca0-3ff9-4524-9a75-f9589b403f11	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758647726252-20240520_185020.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:15:36.507403+00	2025-09-23 17:15:36.507403+00	2025-09-23 17:15:36.507403+00	{"eTag": "\\"7c49175ba688474c28d481addf3bfbfa\\"", "size": 3585772, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:15:37.000Z", "contentLength": 3585772, "httpStatusCode": 200}	a43449e1-d23d-4e85-bc0e-df46236bb1eb	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
 702cdfca-e97b-4fe0-91e5-1bb205294993	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758647728267-20240522_212442.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:15:38.839386+00	2025-09-23 17:15:38.839386+00	2025-09-23 17:15:38.839386+00	{"eTag": "\\"fe7f85a475821a19dda45e296d2fe778\\"", "size": 3972225, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:15:39.000Z", "contentLength": 3972225, "httpStatusCode": 200}	38be3f4a-e0ac-4006-baac-4e809166ab09	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+fa65906e-43a7-4106-94cc-7bb0fb120420	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/40ea2320-e680-4ad2-9677-974f3fa98ac9.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 16:25:01.43168+00	2025-11-14 16:25:01.43168+00	2025-11-14 16:25:01.43168+00	{"eTag": "\\"8da2850df4b5ecea7355f23e1c92c0e1\\"", "size": 3870552, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T16:25:02.000Z", "contentLength": 3870552, "httpStatusCode": 200}	cd35f5fe-606d-4c79-bbeb-0544431b6158	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
 8a687f37-aae0-4d04-8db6-77ce26ed450b	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1757949218183-20240511_112006.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-15 15:13:49.956205+00	2025-09-15 15:13:49.956205+00	2025-09-15 15:13:49.956205+00	{"eTag": "\\"295e3920bbafda00fe134f6d2b3b65be\\"", "size": 3686349, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-15T15:13:50.000Z", "contentLength": 3686349, "httpStatusCode": 200}	27947250-0e79-4735-af7e-6fa3f47b2f0f	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
 5baa4251-4710-4e41-ba70-45d12286ddc1	offer-backgrounds	default-offer-bg.png	\N	2025-09-21 13:01:18.419984+00	2025-09-21 13:01:18.419984+00	2025-09-21 13:01:18.419984+00	{"eTag": "\\"973aaf46ed35975fd5696ab469260f0b-1\\"", "size": 912705, "mimetype": "image/png", "cacheControl": "max-age=3600", "lastModified": "2025-09-21T13:01:18.000Z", "contentLength": 912705, "httpStatusCode": 200}	0fc88769-0132-4726-9ce1-3007aaae339a	\N	\N	1
 9ae2e349-4225-42f6-ba8e-c9d667e9e087	venue-images	c90139a0-2de3-4237-89b8-032367f73a37/1758623153873-tt-1716560931882.webp	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 10:24:46.599581+00	2025-09-23 10:24:46.599581+00	2025-09-23 10:24:46.599581+00	{"eTag": "\\"938d55498e8f993a73312c6464665fd6\\"", "size": 226292, "mimetype": "image/webp", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T10:24:47.000Z", "contentLength": 226292, "httpStatusCode": 200}	dc2873c0-2f74-4336-8d29-04497b702331	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
@@ -10995,6 +11494,7 @@ ab9b2ecc-cea5-4f50-8175-4777af564b22	venue-images	venue-images/c90139a0-2de3-423
 8a87ad86-2e23-4743-a6ca-04362961ee2b	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/116b175f-40dd-489c-be35-a7c653011308.webp	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:18:33.724428+00	2025-09-23 17:18:33.724428+00	2025-09-23 17:18:33.724428+00	{"eTag": "\\"4747b8de5ac3e7d28890165fb462fc3c\\"", "size": 30170, "mimetype": "image/webp", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:18:34.000Z", "contentLength": 30170, "httpStatusCode": 200}	565ea021-6ba7-4b1c-b58f-f021ca1afc25	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
 952783ec-efbe-45d6-9ef4-e85bc7880fc1	venue-images	073c625c-eb02-45e8-9c67-50acbdc72cd6/1759381445949-founder group.jpg.png	073c625c-eb02-45e8-9c67-50acbdc72cd6	2025-10-02 05:04:13.719385+00	2025-10-02 05:04:13.719385+00	2025-10-02 05:04:13.719385+00	{"eTag": "\\"bc54dcf85963527c96ecb0126924edd3\\"", "size": 191315, "mimetype": "image/png", "cacheControl": "max-age=3600", "lastModified": "2025-10-02T05:04:14.000Z", "contentLength": 191315, "httpStatusCode": 200}	9babf342-17d9-479d-8c79-e4edcd27e49a	073c625c-eb02-45e8-9c67-50acbdc72cd6	{}	2
 0cf5bd64-a7d9-4757-a080-b7702f946b99	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/6523caf1-0779-4379-a3a4-780673f9a781.jpeg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:18:34.028845+00	2025-09-23 17:18:34.028845+00	2025-09-23 17:18:34.028845+00	{"eTag": "\\"1373c4e2dd3f46791c40daec552c9a58\\"", "size": 4838, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:18:34.000Z", "contentLength": 4838, "httpStatusCode": 200}	e7c11c7b-c978-4ed5-bffd-fcf4c17708ce	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
+d05e0aa2-a993-43f8-bef8-752f513ea6a5	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/9546b9ba-07a0-40d9-98ee-7cb1fe158263.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 16:25:01.843271+00	2025-11-14 16:25:01.843271+00	2025-11-14 16:25:01.843271+00	{"eTag": "\\"5f5fb411bb6cad7fbde27d72d4bb5f12\\"", "size": 4330275, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T16:25:02.000Z", "contentLength": 4330275, "httpStatusCode": 200}	1f395477-9746-44ef-8e23-48a383a579d1	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
 fcabc56a-0b92-4693-9357-a873357ba01c	venue-images	073c625c-eb02-45e8-9c67-50acbdc72cd6/1759537452338-iron-man.jpg	073c625c-eb02-45e8-9c67-50acbdc72cd6	2025-10-04 00:24:13.89035+00	2025-10-04 00:24:13.89035+00	2025-10-04 00:24:13.89035+00	{"eTag": "\\"90c8b186cb74ecf23c35809a877ca21d\\"", "size": 1313142, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-10-04T00:24:14.000Z", "contentLength": 1313142, "httpStatusCode": 200}	d2ff9e2d-4185-4506-8cf1-1bf65b8d30ad	073c625c-eb02-45e8-9c67-50acbdc72cd6	{}	2
 f602ea1e-7c74-4548-b27f-740151a7fb50	venue-images	073c625c-eb02-45e8-9c67-50acbdc72cd6/1759537696839-fast-and-furious-v11raaj1ea90khx1.jpg	073c625c-eb02-45e8-9c67-50acbdc72cd6	2025-10-04 00:28:17.648881+00	2025-10-04 00:28:17.648881+00	2025-10-04 00:28:17.648881+00	{"eTag": "\\"84fb2ceaf2dd48a2e7170f4d532d6944\\"", "size": 337609, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-10-04T00:28:18.000Z", "contentLength": 337609, "httpStatusCode": 200}	5b2093c0-1a71-4ded-a04f-e48cb3dffece	073c625c-eb02-45e8-9c67-50acbdc72cd6	{}	2
 a9c23803-fc28-464d-9939-504b9bfd6a69	venue-images	venue-images/c90139a0-2de3-4237-89b8-032367f73a37/b12cf2e8-c90b-4349-b71f-4419e3a9c411.jpg	c90139a0-2de3-4237-89b8-032367f73a37	2025-09-23 17:24:30.501488+00	2025-09-23 17:24:30.501488+00	2025-09-23 17:24:30.501488+00	{"eTag": "\\"9b848aac94588568d3dcf1a47afbb600\\"", "size": 9889, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-09-23T17:24:31.000Z", "contentLength": 9889, "httpStatusCode": 200}	1c57b5f7-dc56-4e95-9800-8ac80618867c	c90139a0-2de3-4237-89b8-032367f73a37	{}	3
@@ -11048,6 +11548,32 @@ cd3ef34b-6d2a-4cc8-9d10-4914a4fbe2e6	sports-icons	volleyball.png	\N	2025-11-02 2
 0066630c-df09-4d7f-9e19-0b716d394b4e	venue-images	venue-images/ffaef875-be4c-4cc3-af20-ec6865aad7a2/113c0ced-f987-4c2a-b586-de234e2368f5.webp	ffaef875-be4c-4cc3-af20-ec6865aad7a2	2025-11-07 13:45:47.837901+00	2025-11-07 13:45:47.837901+00	2025-11-07 13:45:47.837901+00	{"eTag": "\\"e738e77f9765266c8cd7aea20da2d2dd\\"", "size": 13164, "mimetype": "image/webp", "cacheControl": "max-age=3600", "lastModified": "2025-11-07T13:45:48.000Z", "contentLength": 13164, "httpStatusCode": 200}	616e8a45-d26c-4c39-8fe2-7f38e77056fc	ffaef875-be4c-4cc3-af20-ec6865aad7a2	{}	3
 5bcc9f76-23c5-4325-a1c0-7ba1b38d19cc	venue-images	venue-images/ffaef875-be4c-4cc3-af20-ec6865aad7a2/c403a9d0-7526-4a9d-bd27-95df65410ca5.webp	ffaef875-be4c-4cc3-af20-ec6865aad7a2	2025-11-07 13:51:50.357094+00	2025-11-07 13:51:50.357094+00	2025-11-07 13:51:50.357094+00	{"eTag": "\\"ceab475fb009afa373c3fd5f568a59b2\\"", "size": 14438, "mimetype": "image/webp", "cacheControl": "max-age=3600", "lastModified": "2025-11-07T13:51:51.000Z", "contentLength": 14438, "httpStatusCode": 200}	451b1add-eeb3-4ab2-a65f-e821d7a02cdb	ffaef875-be4c-4cc3-af20-ec6865aad7a2	{}	3
 c3026051-2fa5-4795-b103-16753e2a69be	avatars	c90139a0-2de3-4237-89b8-032367f73a37/avatar.avif	c90139a0-2de3-4237-89b8-032367f73a37	2025-11-07 17:13:28.810622+00	2025-11-07 17:13:28.810622+00	2025-11-07 17:13:28.810622+00	{"eTag": "\\"c1070481bec58b0e4db6455e87805930\\"", "size": 9775, "mimetype": "image/avif", "cacheControl": "max-age=3600", "lastModified": "2025-11-07T17:13:29.000Z", "contentLength": 9775, "httpStatusCode": 200}	f937c2af-1276-40fe-957b-d34bdcb53c8d	c90139a0-2de3-4237-89b8-032367f73a37	{}	2
+e95024b4-fe64-4524-bd30-79e846b3cdd7	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/561f8ee1-27c0-45ab-bcf7-b88d89f1d3d7.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 14:23:35.241973+00	2025-11-14 14:23:35.241973+00	2025-11-14 14:23:35.241973+00	{"eTag": "\\"8da2850df4b5ecea7355f23e1c92c0e1\\"", "size": 3870552, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T14:23:36.000Z", "contentLength": 3870552, "httpStatusCode": 200}	31fdfdcd-4529-4fe3-81fd-9acb1c0437d5	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+97354ca8-cd8a-4747-b1e2-ce93b2533aa1	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/d5cf9f92-a9db-46f4-80f4-65bdd1aa76d8.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 14:23:35.283807+00	2025-11-14 14:23:35.283807+00	2025-11-14 14:23:35.283807+00	{"eTag": "\\"90a5b10a6da32a2c6b9aaabc5cda7b75\\"", "size": 3684181, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T14:23:36.000Z", "contentLength": 3684181, "httpStatusCode": 200}	f18edb9d-4f4e-4553-b536-fb7254817a90	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+f820e9d3-d190-42f4-82d5-a3e189c2d448	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/e6d81fc6-e6c0-4393-9515-b76d3640c881.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 14:28:24.726018+00	2025-11-14 14:28:24.726018+00	2025-11-14 14:28:24.726018+00	{"eTag": "\\"7e64863093e0afbca82641e2bdfdf42f\\"", "size": 1899073, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T14:28:25.000Z", "contentLength": 1899073, "httpStatusCode": 200}	013adb3c-967c-4e87-86f7-9fb8dd5cd54e	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+a485a9d3-1dbf-4207-a042-15be7bc558b4	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/92dc4775-3fd6-413e-a9c4-4c34f7d02ca1.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 14:28:25.637352+00	2025-11-14 14:28:25.637352+00	2025-11-14 14:28:25.637352+00	{"eTag": "\\"06020d28e138b1acbac97e34fb2c4bc5\\"", "size": 4297325, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T14:28:26.000Z", "contentLength": 4297325, "httpStatusCode": 200}	1807abdf-e32f-4c4d-a00e-c50d0926fd23	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+ab378b4f-dfc4-4466-b1c1-93d353e375ee	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/eea5ed88-ae5a-46c4-b24f-df45101ce492.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:14:34.8887+00	2025-11-14 15:14:34.8887+00	2025-11-14 15:14:34.8887+00	{"eTag": "\\"64065f171a0b98869a3f73243f7bc055\\"", "size": 1050905, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:14:35.000Z", "contentLength": 1050905, "httpStatusCode": 200}	cda04c9e-461e-495c-a256-456e7ad6c13d	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+f99234bb-0ca3-4dad-93c7-3916423a39f9	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/108fe9c6-4177-4e14-8297-9609698bf945.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:14:36.019945+00	2025-11-14 15:14:36.019945+00	2025-11-14 15:14:36.019945+00	{"eTag": "\\"38a0147099c68df72b54c0aff366db28\\"", "size": 3540167, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:14:36.000Z", "contentLength": 3540167, "httpStatusCode": 200}	03ee4dc6-e937-4dc3-ba9d-ac939c50164f	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+17594a2e-2379-496a-bd46-9f9b320a5f56	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/954ede2a-5208-4711-8b10-3c6831e9922c.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:18:27.415542+00	2025-11-14 15:18:27.415542+00	2025-11-14 15:18:27.415542+00	{"eTag": "\\"64065f171a0b98869a3f73243f7bc055\\"", "size": 1050905, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:18:28.000Z", "contentLength": 1050905, "httpStatusCode": 200}	9b1f35f4-af42-4863-8c6a-771095971e70	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+619585c6-cc06-402c-a3d7-243adb776c59	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/716c7353-fc0c-47e1-a23e-125b4e663a6b.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:18:29.379387+00	2025-11-14 15:18:29.379387+00	2025-11-14 15:18:29.379387+00	{"eTag": "\\"38a0147099c68df72b54c0aff366db28\\"", "size": 3540167, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:18:30.000Z", "contentLength": 3540167, "httpStatusCode": 200}	d9b4abfc-699e-430f-ad53-4bad9eaf1647	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+f2511302-60f6-46b7-8558-7686b3313ac9	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/fb2fec09-c535-4508-8e39-01af4af7df54.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:25:22.916051+00	2025-11-14 15:25:22.916051+00	2025-11-14 15:25:22.916051+00	{"eTag": "\\"64065f171a0b98869a3f73243f7bc055\\"", "size": 1050905, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:25:23.000Z", "contentLength": 1050905, "httpStatusCode": 200}	2b0740f9-efb5-4afa-a638-f17bd7966431	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+f6d443f4-48a5-4793-9126-f74a59bb1a19	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/4a6b783b-79d0-4b37-b85f-0d254ead2363.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:25:24.587931+00	2025-11-14 15:25:24.587931+00	2025-11-14 15:25:24.587931+00	{"eTag": "\\"38a0147099c68df72b54c0aff366db28\\"", "size": 3540167, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:25:25.000Z", "contentLength": 3540167, "httpStatusCode": 200}	e70b15b8-9ca0-460f-92a4-2f4b4c845841	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+48f8ef5d-bd06-4712-81af-a6695f261945	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/126aa12f-e587-4fff-9491-248256ef2533.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:28:29.018553+00	2025-11-14 15:28:29.018553+00	2025-11-14 15:28:29.018553+00	{"eTag": "\\"64065f171a0b98869a3f73243f7bc055\\"", "size": 1050905, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:28:29.000Z", "contentLength": 1050905, "httpStatusCode": 200}	f5cb2046-e27b-4a48-bdfe-643885c568ea	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+6bbe9c15-4e8d-4fcb-a564-f231ec61438d	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/4ef57926-82cf-4382-ae18-62d9d53656ee.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:28:31.117273+00	2025-11-14 15:28:31.117273+00	2025-11-14 15:28:31.117273+00	{"eTag": "\\"38a0147099c68df72b54c0aff366db28\\"", "size": 3540167, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:28:31.000Z", "contentLength": 3540167, "httpStatusCode": 200}	c217a6ab-137b-4fd9-8cbe-cee7526379d0	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+a548e61a-e91c-438b-aca8-9a0e31e3cf24	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/46f3e0f9-5be9-4d71-8cd8-87eef912636c.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:31:49.175468+00	2025-11-14 15:31:49.175468+00	2025-11-14 15:31:49.175468+00	{"eTag": "\\"5f5fb411bb6cad7fbde27d72d4bb5f12\\"", "size": 4330275, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:31:50.000Z", "contentLength": 4330275, "httpStatusCode": 200}	dd05dfba-f6b1-424b-b46a-bf35230ffcbb	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+eba01feb-d7a6-49bb-b51b-78f10332392a	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/c554c239-c451-46bd-b92e-3997ce204166.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:31:49.212294+00	2025-11-14 15:31:49.212294+00	2025-11-14 15:31:49.212294+00	{"eTag": "\\"8da2850df4b5ecea7355f23e1c92c0e1\\"", "size": 3870552, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:31:49.000Z", "contentLength": 3870552, "httpStatusCode": 200}	20b98539-aea0-4710-83af-aeac7c071c33	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+db76d7a4-57e2-40cb-a532-7920d15712b2	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/4c0512bd-d56f-492d-b84f-7daeadf88a9e.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:40:09.611134+00	2025-11-14 15:40:09.611134+00	2025-11-14 15:40:09.611134+00	{"eTag": "\\"8da2850df4b5ecea7355f23e1c92c0e1\\"", "size": 3870552, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:40:10.000Z", "contentLength": 3870552, "httpStatusCode": 200}	7d52965a-33da-49db-b0ee-8867eb086d60	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+fe2da65a-5fff-431b-a38b-172e485001cd	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/a3b72534-3e12-4cec-b8c0-e2c964b1a417.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:40:09.904677+00	2025-11-14 15:40:09.904677+00	2025-11-14 15:40:09.904677+00	{"eTag": "\\"5f5fb411bb6cad7fbde27d72d4bb5f12\\"", "size": 4330275, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:40:10.000Z", "contentLength": 4330275, "httpStatusCode": 200}	8934af6b-b8db-4a57-9375-4e65a8159432	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+3e73e4eb-dee3-4be3-b34d-ff0260a4a0c5	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/92ec8b03-3a94-4397-91da-a234340fa6b5.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:44:14.809547+00	2025-11-14 15:44:14.809547+00	2025-11-14 15:44:14.809547+00	{"eTag": "\\"8da2850df4b5ecea7355f23e1c92c0e1\\"", "size": 3870552, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:44:15.000Z", "contentLength": 3870552, "httpStatusCode": 200}	1684e96c-1921-4617-a0cb-4a093450ffe4	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+b583386e-65a6-475e-b47b-d0bae51a6753	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/194c6c74-9b74-40fd-9165-1bc24f06a60e.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:44:15.069282+00	2025-11-14 15:44:15.069282+00	2025-11-14 15:44:15.069282+00	{"eTag": "\\"5f5fb411bb6cad7fbde27d72d4bb5f12\\"", "size": 4330275, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:44:15.000Z", "contentLength": 4330275, "httpStatusCode": 200}	5846d47e-d74e-4e33-a6c3-9a5129c7936e	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+d545afce-9138-4eeb-8715-0bb5fc95d10c	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/f7ffbe45-3baf-4757-ba2b-ea01a4632a44.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:50:34.816809+00	2025-11-14 15:50:34.816809+00	2025-11-14 15:50:34.816809+00	{"eTag": "\\"5f5fb411bb6cad7fbde27d72d4bb5f12\\"", "size": 4330275, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:50:35.000Z", "contentLength": 4330275, "httpStatusCode": 200}	33c954b5-21cb-428a-bd37-a8a439b6905e	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+9d93a7b4-09f6-4f84-89f2-a80ad0a64716	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/35746fbf-2903-462b-9c9a-7e46dfbccc14.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:59:28.764792+00	2025-11-14 15:59:28.764792+00	2025-11-14 15:59:28.764792+00	{"eTag": "\\"5f5fb411bb6cad7fbde27d72d4bb5f12\\"", "size": 4330275, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:59:29.000Z", "contentLength": 4330275, "httpStatusCode": 200}	9cf3fbe5-fceb-4058-b2b3-e0201f779afb	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+78790523-c30d-4792-a261-38d048621ab4	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/169ffe3f-eeef-4ed3-a7be-f1193e0eea27.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:50:34.75143+00	2025-11-14 15:50:34.75143+00	2025-11-14 15:50:34.75143+00	{"eTag": "\\"8da2850df4b5ecea7355f23e1c92c0e1\\"", "size": 3870552, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:50:35.000Z", "contentLength": 3870552, "httpStatusCode": 200}	def73630-e983-46be-953c-2314b31e19c9	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+88dbe796-2bec-4458-ad37-5bac5021d0e5	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/2d6f0889-bdb6-4761-86b3-49edcfb68ced.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 15:59:28.798403+00	2025-11-14 15:59:28.798403+00	2025-11-14 15:59:28.798403+00	{"eTag": "\\"8da2850df4b5ecea7355f23e1c92c0e1\\"", "size": 3870552, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T15:59:29.000Z", "contentLength": 3870552, "httpStatusCode": 200}	1839d64f-0625-4188-9beb-eb3cdd3ecb72	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+30d187e8-3462-412c-8ba9-02909afcc2e3	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/aeb8384f-de36-4999-8860-3b8bb8cae109.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 16:12:52.613123+00	2025-11-14 16:12:52.613123+00	2025-11-14 16:12:52.613123+00	{"eTag": "\\"5f5fb411bb6cad7fbde27d72d4bb5f12\\"", "size": 4330275, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T16:12:53.000Z", "contentLength": 4330275, "httpStatusCode": 200}	10619c97-24a7-446d-84c3-f384635be7a3	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+4d9375f6-a2df-4060-b6d1-34d9644dfc75	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/b944620f-e0a5-4b66-a49b-9881c6edea03.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 16:12:52.985236+00	2025-11-14 16:12:52.985236+00	2025-11-14 16:12:52.985236+00	{"eTag": "\\"8da2850df4b5ecea7355f23e1c92c0e1\\"", "size": 3870552, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T16:12:53.000Z", "contentLength": 3870552, "httpStatusCode": 200}	b6720182-c2a7-4c4c-947b-c1e1951ff849	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+f7bfa803-ae39-4fd9-b130-ecc0fb2df979	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/933a1f83-e2d0-476d-b442-4c3f388683ad.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 16:22:02.681019+00	2025-11-14 16:22:02.681019+00	2025-11-14 16:22:02.681019+00	{"eTag": "\\"8da2850df4b5ecea7355f23e1c92c0e1\\"", "size": 3870552, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T16:22:03.000Z", "contentLength": 3870552, "httpStatusCode": 200}	714e1c27-99cf-4ae1-b82b-4ebdf48295f8	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
+92fe6b7c-42ef-4414-a1bd-889e195d6145	venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2/934be679-e52a-432a-9710-3a9a2a571334.jpg	ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 16:22:03.31975+00	2025-11-14 16:22:03.31975+00	2025-11-14 16:22:03.31975+00	{"eTag": "\\"5f5fb411bb6cad7fbde27d72d4bb5f12\\"", "size": 4330275, "mimetype": "image/jpeg", "cacheControl": "max-age=3600", "lastModified": "2025-11-14T16:22:04.000Z", "contentLength": 4330275, "httpStatusCode": 200}	66d10854-65eb-4897-b72c-3b7a3b0d24ac	ba58a10f-adf2-4268-82df-023de1c272a2	{}	3
 \.
 
 
@@ -11066,6 +11592,7 @@ avatars	073c625c-eb02-45e8-9c67-50acbdc72cd6	2025-10-12 20:37:28.6448+00	2025-10
 venue-images	venue-images/d1dd9ab7-e67f-4440-830a-f41889cc0388	2025-11-07 10:56:18.170034+00	2025-11-07 10:56:18.170034+00
 venue-images	venue-images/ffaef875-be4c-4cc3-af20-ec6865aad7a2	2025-11-07 13:45:47.837901+00	2025-11-07 13:45:47.837901+00
 avatars	c90139a0-2de3-4237-89b8-032367f73a37	2025-11-07 17:13:28.810622+00	2025-11-07 17:13:28.810622+00
+venue-images	venue-images/ba58a10f-adf2-4268-82df-023de1c272a2	2025-11-14 14:23:35.241973+00	2025-11-14 14:23:35.241973+00
 \.
 
 
@@ -11116,28 +11643,28 @@ COPY vault.secrets (id, name, description, secret, key_id, nonce, created_at, up
 -- Name: refresh_tokens_id_seq; Type: SEQUENCE SET; Schema: auth; Owner: supabase_auth_admin
 --
 
-SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 1144, true);
+SELECT pg_catalog.setval('auth.refresh_tokens_id_seq', 1217, true);
 
 
 --
 -- Name: notification_recipients_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.notification_recipients_id_seq', 31, true);
+SELECT pg_catalog.setval('public.notification_recipients_id_seq', 44, true);
 
 
 --
 -- Name: notifications_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.notifications_id_seq', 13, true);
+SELECT pg_catalog.setval('public.notifications_id_seq', 36, true);
 
 
 --
 -- Name: subscription_id_seq; Type: SEQUENCE SET; Schema: realtime; Owner: supabase_admin
 --
 
-SELECT pg_catalog.setval('realtime.subscription_id_seq', 1, false);
+SELECT pg_catalog.setval('realtime.subscription_id_seq', 61, true);
 
 
 --
@@ -11549,19 +12076,19 @@ ALTER TABLE ONLY public.points_transactions
 
 
 --
+-- Name: reviews reviews_booking_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT reviews_booking_id_key UNIQUE (booking_id);
+
+
+--
 -- Name: reviews reviews_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.reviews
     ADD CONSTRAINT reviews_pkey PRIMARY KEY (review_id);
-
-
---
--- Name: reviews reviews_user_id_venue_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.reviews
-    ADD CONSTRAINT reviews_user_id_venue_id_key UNIQUE (user_id, venue_id);
 
 
 --
@@ -11650,6 +12177,54 @@ ALTER TABLE ONLY public.venues
 
 ALTER TABLE ONLY realtime.messages
     ADD CONSTRAINT messages_pkey PRIMARY KEY (id, inserted_at);
+
+
+--
+-- Name: messages_2025_11_13 messages_2025_11_13_pkey; Type: CONSTRAINT; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages_2025_11_13
+    ADD CONSTRAINT messages_2025_11_13_pkey PRIMARY KEY (id, inserted_at);
+
+
+--
+-- Name: messages_2025_11_14 messages_2025_11_14_pkey; Type: CONSTRAINT; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages_2025_11_14
+    ADD CONSTRAINT messages_2025_11_14_pkey PRIMARY KEY (id, inserted_at);
+
+
+--
+-- Name: messages_2025_11_15 messages_2025_11_15_pkey; Type: CONSTRAINT; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages_2025_11_15
+    ADD CONSTRAINT messages_2025_11_15_pkey PRIMARY KEY (id, inserted_at);
+
+
+--
+-- Name: messages_2025_11_16 messages_2025_11_16_pkey; Type: CONSTRAINT; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages_2025_11_16
+    ADD CONSTRAINT messages_2025_11_16_pkey PRIMARY KEY (id, inserted_at);
+
+
+--
+-- Name: messages_2025_11_17 messages_2025_11_17_pkey; Type: CONSTRAINT; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages_2025_11_17
+    ADD CONSTRAINT messages_2025_11_17_pkey PRIMARY KEY (id, inserted_at);
+
+
+--
+-- Name: messages_2025_11_18 messages_2025_11_18_pkey; Type: CONSTRAINT; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER TABLE ONLY realtime.messages_2025_11_18
+    ADD CONSTRAINT messages_2025_11_18_pkey PRIMARY KEY (id, inserted_at);
 
 
 --
@@ -12239,6 +12814,48 @@ CREATE INDEX messages_inserted_at_topic_index ON ONLY realtime.messages USING bt
 
 
 --
+-- Name: messages_2025_11_13_inserted_at_topic_idx; Type: INDEX; Schema: realtime; Owner: supabase_admin
+--
+
+CREATE INDEX messages_2025_11_13_inserted_at_topic_idx ON realtime.messages_2025_11_13 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+
+--
+-- Name: messages_2025_11_14_inserted_at_topic_idx; Type: INDEX; Schema: realtime; Owner: supabase_admin
+--
+
+CREATE INDEX messages_2025_11_14_inserted_at_topic_idx ON realtime.messages_2025_11_14 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+
+--
+-- Name: messages_2025_11_15_inserted_at_topic_idx; Type: INDEX; Schema: realtime; Owner: supabase_admin
+--
+
+CREATE INDEX messages_2025_11_15_inserted_at_topic_idx ON realtime.messages_2025_11_15 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+
+--
+-- Name: messages_2025_11_16_inserted_at_topic_idx; Type: INDEX; Schema: realtime; Owner: supabase_admin
+--
+
+CREATE INDEX messages_2025_11_16_inserted_at_topic_idx ON realtime.messages_2025_11_16 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+
+--
+-- Name: messages_2025_11_17_inserted_at_topic_idx; Type: INDEX; Schema: realtime; Owner: supabase_admin
+--
+
+CREATE INDEX messages_2025_11_17_inserted_at_topic_idx ON realtime.messages_2025_11_17 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+
+--
+-- Name: messages_2025_11_18_inserted_at_topic_idx; Type: INDEX; Schema: realtime; Owner: supabase_admin
+--
+
+CREATE INDEX messages_2025_11_18_inserted_at_topic_idx ON realtime.messages_2025_11_18 USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+
+
+--
 -- Name: subscription_subscription_id_entity_filters_key; Type: INDEX; Schema: realtime; Owner: supabase_admin
 --
 
@@ -12309,6 +12926,90 @@ CREATE UNIQUE INDEX objects_bucket_id_level_idx ON storage.objects USING btree (
 
 
 --
+-- Name: messages_2025_11_13_inserted_at_topic_idx; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+ALTER INDEX realtime.messages_inserted_at_topic_index ATTACH PARTITION realtime.messages_2025_11_13_inserted_at_topic_idx;
+
+
+--
+-- Name: messages_2025_11_13_pkey; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+ALTER INDEX realtime.messages_pkey ATTACH PARTITION realtime.messages_2025_11_13_pkey;
+
+
+--
+-- Name: messages_2025_11_14_inserted_at_topic_idx; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+ALTER INDEX realtime.messages_inserted_at_topic_index ATTACH PARTITION realtime.messages_2025_11_14_inserted_at_topic_idx;
+
+
+--
+-- Name: messages_2025_11_14_pkey; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+ALTER INDEX realtime.messages_pkey ATTACH PARTITION realtime.messages_2025_11_14_pkey;
+
+
+--
+-- Name: messages_2025_11_15_inserted_at_topic_idx; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+ALTER INDEX realtime.messages_inserted_at_topic_index ATTACH PARTITION realtime.messages_2025_11_15_inserted_at_topic_idx;
+
+
+--
+-- Name: messages_2025_11_15_pkey; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+ALTER INDEX realtime.messages_pkey ATTACH PARTITION realtime.messages_2025_11_15_pkey;
+
+
+--
+-- Name: messages_2025_11_16_inserted_at_topic_idx; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+ALTER INDEX realtime.messages_inserted_at_topic_index ATTACH PARTITION realtime.messages_2025_11_16_inserted_at_topic_idx;
+
+
+--
+-- Name: messages_2025_11_16_pkey; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+ALTER INDEX realtime.messages_pkey ATTACH PARTITION realtime.messages_2025_11_16_pkey;
+
+
+--
+-- Name: messages_2025_11_17_inserted_at_topic_idx; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+ALTER INDEX realtime.messages_inserted_at_topic_index ATTACH PARTITION realtime.messages_2025_11_17_inserted_at_topic_idx;
+
+
+--
+-- Name: messages_2025_11_17_pkey; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+ALTER INDEX realtime.messages_pkey ATTACH PARTITION realtime.messages_2025_11_17_pkey;
+
+
+--
+-- Name: messages_2025_11_18_inserted_at_topic_idx; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+ALTER INDEX realtime.messages_inserted_at_topic_index ATTACH PARTITION realtime.messages_2025_11_18_inserted_at_topic_idx;
+
+
+--
+-- Name: messages_2025_11_18_pkey; Type: INDEX ATTACH; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+ALTER INDEX realtime.messages_pkey ATTACH PARTITION realtime.messages_2025_11_18_pkey;
+
+
+--
 -- Name: users on_auth_user_created; Type: TRIGGER; Schema: auth; Owner: supabase_auth_admin
 --
 
@@ -12320,13 +13021,6 @@ CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXEC
 --
 
 CREATE TRIGGER on_new_user_set_username BEFORE INSERT ON public.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_username();
-
-
---
--- Name: bookings trigger_notify_admin_on_new_booking; Type: TRIGGER; Schema: public; Owner: postgres
---
-
-CREATE TRIGGER trigger_notify_admin_on_new_booking AFTER INSERT ON public.bookings FOR EACH ROW EXECUTE FUNCTION public.notify_admin_on_new_booking();
 
 
 --
@@ -12976,6 +13670,13 @@ CREATE POLICY "Allow admins to update any venue" ON public.venues FOR UPDATE TO 
 
 
 --
+-- Name: reviews Allow authenticated users to create reviews; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Allow authenticated users to create reviews" ON public.reviews FOR INSERT TO authenticated WITH CHECK ((auth.uid() = user_id));
+
+
+--
 -- Name: users Allow individual users to read their own data; Type: POLICY; Schema: public; Owner: postgres
 --
 
@@ -13018,6 +13719,25 @@ CREATE POLICY "Allow public insert for contact messages" ON public.contact_messa
 --
 
 CREATE POLICY "Allow public read access to all reviews" ON public.reviews FOR SELECT USING (true);
+
+
+--
+-- Name: time_slots Allow public read access to slots of approved venues; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Allow public read access to slots of approved venues" ON public.time_slots FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM (public.facilities
+     JOIN public.venues ON ((facilities.venue_id = venues.venue_id)))
+  WHERE ((facilities.facility_id = time_slots.facility_id) AND (venues.is_approved = true)))));
+
+
+--
+-- Name: notifications Allow recipients to see their notifications; Type: POLICY; Schema: public; Owner: postgres
+--
+
+CREATE POLICY "Allow recipients to see their notifications" ON public.notifications FOR SELECT USING ((EXISTS ( SELECT 1
+   FROM public.notification_recipients nr
+  WHERE ((nr.notification_id = notifications.id) AND (nr.user_id = auth.uid())))));
 
 
 --
@@ -13332,12 +14052,6 @@ ALTER TABLE public.favorites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notification_recipients ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: notifications; Type: ROW SECURITY; Schema: public; Owner: postgres
---
-
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-
---
 -- Name: offer_sports; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -13527,6 +14241,36 @@ CREATE PUBLICATION supabase_realtime WITH (publish = 'insert, update, delete, tr
 
 
 ALTER PUBLICATION supabase_realtime OWNER TO postgres;
+
+--
+-- Name: supabase_realtime_messages_publication; Type: PUBLICATION; Schema: -; Owner: supabase_admin
+--
+
+CREATE PUBLICATION supabase_realtime_messages_publication WITH (publish = 'insert, update, delete, truncate');
+
+
+ALTER PUBLICATION supabase_realtime_messages_publication OWNER TO supabase_admin;
+
+--
+-- Name: supabase_realtime_messages_publication notification_recipients; Type: PUBLICATION TABLE; Schema: public; Owner: supabase_admin
+--
+
+ALTER PUBLICATION supabase_realtime_messages_publication ADD TABLE ONLY public.notification_recipients;
+
+
+--
+-- Name: supabase_realtime notification_recipients; Type: PUBLICATION TABLE; Schema: public; Owner: postgres
+--
+
+ALTER PUBLICATION supabase_realtime ADD TABLE ONLY public.notification_recipients;
+
+
+--
+-- Name: supabase_realtime_messages_publication messages; Type: PUBLICATION TABLE; Schema: realtime; Owner: supabase_admin
+--
+
+ALTER PUBLICATION supabase_realtime_messages_publication ADD TABLE ONLY realtime.messages;
+
 
 --
 -- Name: SCHEMA auth; Type: ACL; Schema: -; Owner: supabase_admin
@@ -14163,12 +14907,21 @@ GRANT ALL ON FUNCTION public.create_booking_for_user(p_user_id uuid, p_facility_
 
 
 --
--- Name: FUNCTION create_notification(title text, body text, sender_type text, recipient_type text, recipient_ids uuid[], owner_id uuid); Type: ACL; Schema: public; Owner: postgres
+-- Name: FUNCTION create_booking_notifications(); Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON FUNCTION public.create_notification(title text, body text, sender_type text, recipient_type text, recipient_ids uuid[], owner_id uuid) TO anon;
-GRANT ALL ON FUNCTION public.create_notification(title text, body text, sender_type text, recipient_type text, recipient_ids uuid[], owner_id uuid) TO authenticated;
-GRANT ALL ON FUNCTION public.create_notification(title text, body text, sender_type text, recipient_type text, recipient_ids uuid[], owner_id uuid) TO service_role;
+GRANT ALL ON FUNCTION public.create_booking_notifications() TO anon;
+GRANT ALL ON FUNCTION public.create_booking_notifications() TO authenticated;
+GRANT ALL ON FUNCTION public.create_booking_notifications() TO service_role;
+
+
+--
+-- Name: FUNCTION create_notification(title text, body text, sender_type text, recipient_type text, recipient_ids uuid[], owner_id uuid, link_to text); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.create_notification(title text, body text, sender_type text, recipient_type text, recipient_ids uuid[], owner_id uuid, link_to text) TO anon;
+GRANT ALL ON FUNCTION public.create_notification(title text, body text, sender_type text, recipient_type text, recipient_ids uuid[], owner_id uuid, link_to text) TO authenticated;
+GRANT ALL ON FUNCTION public.create_notification(title text, body text, sender_type text, recipient_type text, recipient_ids uuid[], owner_id uuid, link_to text) TO service_role;
 
 
 --
@@ -14403,6 +15156,24 @@ GRANT ALL ON FUNCTION public.handle_new_user() TO service_role;
 GRANT ALL ON FUNCTION public.handle_new_user_username() TO anon;
 GRANT ALL ON FUNCTION public.handle_new_user_username() TO authenticated;
 GRANT ALL ON FUNCTION public.handle_new_user_username() TO service_role;
+
+
+--
+-- Name: FUNCTION handle_new_venue_owner(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.handle_new_venue_owner() TO anon;
+GRANT ALL ON FUNCTION public.handle_new_venue_owner() TO authenticated;
+GRANT ALL ON FUNCTION public.handle_new_venue_owner() TO service_role;
+
+
+--
+-- Name: FUNCTION mark_all_notifications_as_read(); Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON FUNCTION public.mark_all_notifications_as_read() TO anon;
+GRANT ALL ON FUNCTION public.mark_all_notifications_as_read() TO authenticated;
+GRANT ALL ON FUNCTION public.mark_all_notifications_as_read() TO service_role;
 
 
 --
@@ -15061,6 +15832,54 @@ GRANT ALL ON TABLE realtime.messages TO dashboard_user;
 GRANT SELECT,INSERT,UPDATE ON TABLE realtime.messages TO anon;
 GRANT SELECT,INSERT,UPDATE ON TABLE realtime.messages TO authenticated;
 GRANT SELECT,INSERT,UPDATE ON TABLE realtime.messages TO service_role;
+
+
+--
+-- Name: TABLE messages_2025_11_13; Type: ACL; Schema: realtime; Owner: supabase_admin
+--
+
+GRANT ALL ON TABLE realtime.messages_2025_11_13 TO postgres;
+GRANT ALL ON TABLE realtime.messages_2025_11_13 TO dashboard_user;
+
+
+--
+-- Name: TABLE messages_2025_11_14; Type: ACL; Schema: realtime; Owner: supabase_admin
+--
+
+GRANT ALL ON TABLE realtime.messages_2025_11_14 TO postgres;
+GRANT ALL ON TABLE realtime.messages_2025_11_14 TO dashboard_user;
+
+
+--
+-- Name: TABLE messages_2025_11_15; Type: ACL; Schema: realtime; Owner: supabase_admin
+--
+
+GRANT ALL ON TABLE realtime.messages_2025_11_15 TO postgres;
+GRANT ALL ON TABLE realtime.messages_2025_11_15 TO dashboard_user;
+
+
+--
+-- Name: TABLE messages_2025_11_16; Type: ACL; Schema: realtime; Owner: supabase_admin
+--
+
+GRANT ALL ON TABLE realtime.messages_2025_11_16 TO postgres;
+GRANT ALL ON TABLE realtime.messages_2025_11_16 TO dashboard_user;
+
+
+--
+-- Name: TABLE messages_2025_11_17; Type: ACL; Schema: realtime; Owner: supabase_admin
+--
+
+GRANT ALL ON TABLE realtime.messages_2025_11_17 TO postgres;
+GRANT ALL ON TABLE realtime.messages_2025_11_17 TO dashboard_user;
+
+
+--
+-- Name: TABLE messages_2025_11_18; Type: ACL; Schema: realtime; Owner: supabase_admin
+--
+
+GRANT ALL ON TABLE realtime.messages_2025_11_18 TO postgres;
+GRANT ALL ON TABLE realtime.messages_2025_11_18 TO dashboard_user;
 
 
 --

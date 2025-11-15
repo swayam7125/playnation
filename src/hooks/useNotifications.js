@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useEffect } from 'react'; // Import useEffect
 import useSupabaseQuery from './useSupabaseQuery';
 import { supabase } from '../supabaseClient';
 
@@ -30,6 +30,7 @@ const transformNotificationData = (data) => {
   return notifications;
 };
 
+// This is a NAMED export, which matches your component's import
 export function useNotifications() {
   
   // This is the explicit query that fixes the "ambiguous" error
@@ -62,6 +63,31 @@ export function useNotifications() {
     query
   );
 
+  // --- ADDED: Realtime Subscription ---
+  // This listens for new notifications and refetches the data
+  useEffect(() => {
+    const channel = supabase
+      .channel('notification-recipients-changes')
+      .on(
+        'postgres_changes',
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'notification_recipients' 
+        },
+        (payload) => {
+          console.log('New notification received, refetching!', payload);
+          refetch();
+        }
+      )
+      .subscribe();
+
+    // Cleanup function to remove the subscription when the component unmounts
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
+
   // Transform the raw data
   const notifications = useMemo(() => transformNotificationData(rawData), [rawData]);
 
@@ -82,6 +108,8 @@ export function useNotifications() {
   // Create the 'markAllAsRead' function
   const markAllAsRead = useCallback(async () => {
     try {
+      // Note: This RPC is in your SQL but not defined in playnation.sql
+      // Ensure 'mark_all_notifications_as_read' exists in your database.
       const { error: rpcError } = await supabase.rpc('mark_all_notifications_as_read');
       if (rpcError) throw rpcError;
       refetch();

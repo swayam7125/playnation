@@ -236,6 +236,10 @@ serve(async (req) => {
 
   const logPrefixMain = `[create-booking ${new Date().toISOString()}]`;
 
+  // *** FIX: Declare bookingId and offerValidationErrorMessage outside the try block ***
+  let bookingId: string | null = null;
+  let offerValidationErrorMessage: string | undefined;
+  
   try {
     // 1. Authenticate User
     console.log(`${logPrefixMain} Authenticating user...`);
@@ -307,8 +311,8 @@ serve(async (req) => {
     let finalAmount = total_amount;
     let appliedDiscount = 0;
     let validatedOfferId: string | null = null;
-    let offerValidationErrorMessage: string | undefined;
     let validatedOfferTitle: string | null = null;
+    // 'offerValidationErrorMessage' is now declared outside the try block
 
     if (offer_id) {
       console.log(`${logPrefixMain} Offer ID ${offer_id} provided. Re-validating on server...`);
@@ -355,7 +359,7 @@ serve(async (req) => {
 
 
     // 6. Insert the Booking Record
-    let bookingId: string | null = null;
+    // 'bookingId' is now declared outside the try block
     const bookingPayload = {
         user_id: user.id,
         facility_id: facility_id,
@@ -391,8 +395,8 @@ serve(async (req) => {
         else { console.log(`${logPrefixMain} Successfully reverted slot ${slot_id}.`); }
 
         // ... (return booking error response) ...
-        const statusCode = bookingInsertError.code === '23505' ? 409 : 500;
-        return new Response(JSON.stringify({ error: `Failed to create booking: ${bookingInsertError.message}` }), { status: statusCode, headers: corsHeaders });
+        // Re-throw the original error to be caught by the main catch block
+        throw bookingInsertError;
     }
 
     // --- Transaction Logic End ---
@@ -409,77 +413,17 @@ serve(async (req) => {
                 discount_amount: appliedDiscount // Log the actual discount applied
             });
         if (redemptionInsertError) {
+            // Log this error but don't fail the booking
             console.error(`${logPrefixMain} Failed to log redemption:`, redemptionInsertError.message);
         } else {
             console.log(`${logPrefixMain} Redemption logged successfully.`);
         }
     }
 
-    // --- ⬇⬇ NEW CODE BLOCK FOR OWNER NOTIFICATION ⬇⬇ ---
-    // 8. Send Notification to Venue Owner
-    console.log(`${logPrefixMain} Attempting to send notification for booking ${bookingId}...`);
-    try {
-      // Get Player's Name and Facility/Owner Details
-      const [facilityDetails, playerDetails] = await Promise.all([
-        supabaseAdmin
-          .from('facilities')
-          .select('name, venues ( owner_id )') // Get facility name and nested owner_id
-          .eq('facility_id', facility_id)
-          .single(),
-        supabaseAdmin
-          .from('users') // Get player's username
-          .select('username')
-          .eq('user_id', user.id)
-          .single()
-      ]);
-
-      if (facilityDetails.error) throw new Error(`Failed to get facility details: ${facilityDetails.error.message}`);
-      if (playerDetails.error) throw new Error(`Failed to get player details: ${playerDetails.error.message}`);
-
-      // Extract data
-      const facilityName = facilityDetails.data?.name || 'Unknown Facility';
-      const playerName = playerDetails.data?.username || 'A player';
-      // deno-lint-ignore no-explicit-any
-      const ownerId = (facilityDetails.data?.venues as any)?.owner_id;
+    // --- *** FIX: SECTION 8 (Duplicate Notification Logic) IS REMOVED *** ---
 
 
-      if (!ownerId) {
-        throw new Error(`Could not find owner for facility ${facility_id}`);
-      }
-
-      // Format the time
-      const formattedTime = new Date(timeSlot.start_time).toLocaleString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        month: 'short',
-        day: 'numeric'
-      });
-
-      // Call the create_notification function
-      const { error: notificationError } = await supabaseAdmin.rpc('create_notification', {
-        title: 'New Booking Confirmed',
-        body: `${playerName} has booked ${facilityName} for ${formattedTime}.`,
-        sender_type: 'system',      // Notification is from the system
-        recipient_type: 'owner',    // This must match your function's expected role type
-        recipient_ids: [ownerId],   // Pass the owner's ID in an array
-        link_to: '/owner/calendar'  // This is the new redirect link
-      });
-
-      if (notificationError) {
-        throw new Error(`Failed to create notification RPC: ${notificationError.message}`);
-      }
-
-      console.log(`${logPrefixMain} Successfully created notification for owner ${ownerId}.`);
-
-    } catch (notificationError) {
-      // IMPORTANT: Log the error but DO NOT fail the request.
-      // The booking succeeded, which is the most important part.
-      console.error(`${logPrefixMain} CRITICAL: Booking ${bookingId} succeeded, but notification FAILED:`, notificationError.message);
-    }
-    // --- ⬆⬆ END OF NEW CODE BLOCK ⬆⬆ ---
-
-
-    // 9. Return Success Response (was step 8)
+    // 9. Return Success Response
     let message = 'Booking created successfully';
     if (offerValidationErrorMessage) { message += `. Note: The provided offer code could not be applied (${offerValidationErrorMessage})`; }
     else if (appliedDiscount > 0 && validatedOfferTitle) { message += ` with offer "${validatedOfferTitle}" applied.`; }
@@ -487,7 +431,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        booking_id: bookingId, // Changed from bookingId to booking_id
+        booking_id: bookingId,
         message: message,
         final_amount: finalAmount
       }),
@@ -500,9 +444,27 @@ serve(async (req) => {
   } catch (error) {
      // Catch-all
      console.error(`${logPrefixMain} UNHANDLED ERROR:`, error);
+     
+     // Check if the error is the one we were seeing
+     if (error.message?.includes('invalid input syntax for type boolean')) {
+         return new Response(JSON.stringify({ 
+           error: 'A database error occurred while confirming the booking. Please contact support.',
+           details: error.message // Keep details for client-side logging if needed
+         }), {
+           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+           status: 500,
+         });
+     }
+     
+     // Handle the "slot taken" error specifically if it bubbles up
+     if (error.code === '23505' || error.message?.includes('Failed to create booking')) {
+        return new Response(JSON.stringify({ error: 'This slot has just been taken. Please choose another one.' }), { status: 409, headers: corsHeaders });
+     }
+     
+     // Generic error for everything else
      return new Response(JSON.stringify({ error: error.message || 'An unexpected server error occurred' }), {
        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-       status: error.message?.includes('authenticated') || error.message?.includes('authorization') ? 401 : 500,
+       status: 500,
      });
   }
 });
