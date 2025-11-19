@@ -4,7 +4,7 @@ import Skeleton from "../common/Skeleton";
 
 export default function ExploreSkeleton() {
   return (
-    <div className="px-6 py-8 space-y-8">
+    <div data-testid="explore-skeleton" className="px-6 py-8 space-y-8">
       {/* Top Filters / Search Section */}
       <div className="flex flex-wrap gap-4 mb-6">
         <Skeleton className="h-10 w-40 rounded-full" />

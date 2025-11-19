@@ -7,6 +7,7 @@ import { useModal } from "../../ModalContext";
 import toast from "react-hot-toast";
 import { FaPlus, FaTrash, FaRupeeSign, FaUsers, FaArrowLeft, FaSpinner } from "react-icons/fa";
 import { v4 as uuidv4 } from 'uuid';
+import { ChevronDown } from "lucide-react";
 
 // Helper function to upload a single image
 const uploadVenueImage = async (file, userId) => {
@@ -280,11 +281,12 @@ function AddFacilitiesPage() {
                 className="w-full py-2 px-3 bg-white/50 border rounded-lg text-sm"
                 placeholder="Facility Name (e.g., Court 1) *"
               />
+              <div className="relative">
               <select
                 name="sport_id"
                 value={newFacility.sport_id}
                 onChange={handleFacilityChange}
-                className="w-full py-2 px-3 bg-white/50 border rounded-lg text-sm"
+                className="appearance-none w-full py-2 px-3 bg-white/50 border rounded-lg text-sm pr-10"
               >
                 <option value="">Select Sport *</option>
                 {sports.map((sport) => (
@@ -293,6 +295,8 @@ function AddFacilitiesPage() {
                   </option>
                 ))}
               </select>
+              <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
               <input
                 name="hourly_rate"
                 type="number"

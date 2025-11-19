@@ -8,6 +8,7 @@ import FilterDropdown from "../components/common/FilterDropdown";
 import SegmentedControl from "../components/common/SegmentedControl";
 import ExploreSkeleton from "../components/skeletons/ExploreSkeleton";
 import VenueCardSkeleton from "../components/skeletons/VenueCardSkeleton";
+import { ChevronDown } from 'lucide-react'; // Import the icon
 
 function ExplorePage() {
   const [sports, setSports] = useState([]);
@@ -89,7 +90,7 @@ function ExplorePage() {
     setSortBy("name");
   };
 
-  if (error && isInitialLoading) {
+  if (error) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] text-red-600 font-semibold">
         Oops! Something went wrong while loading venues. Please try again.
@@ -175,14 +176,17 @@ function ExplorePage() {
                     loading={amenitiesLoading}
                   />
                   <div className="flex items-center justify-between gap-4">
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="w-full px-4 py-3 text-gray-700 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
-                    >
-                      <option value="name">Sort by Name</option>
-                      <option value="rating">Sort by Rating</option>
-                    </select>
+                    <div className="relative w-full"> {/* Wrapper div for custom styling */}
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="appearance-none w-full px-4 py-2.5 text-gray-700 bg-white border border-gray-200 rounded-lg pr-10 focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent cursor-pointer"
+                      >
+                        <option value="name">Sort by Name</option>
+                        <option value="rating">Sort by Rating</option>
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                    </div>
                     <SegmentedControl
                       options={[
                         {

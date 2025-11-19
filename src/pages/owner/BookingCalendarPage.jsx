@@ -8,6 +8,7 @@ import DownloadInvoiceButton from '../../components/common/DownloadInvoiceButton
 // --- SKELETON IMPORTS ADDED ---
 import useSkeletonLoader from '../../hooks/useSkeletonLoader';
 import { ManageBookingsSkeleton } from '../../components/skeletons/owner';
+import { ChevronDown } from 'lucide-react';
 // --- END SKELETON IMPORTS ---
 
 const getDateStringForInput = (date) => new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
@@ -364,10 +365,11 @@ function BookingCalendarPage() {
                   <FaFilter className="text-primary-green" />
                   <span>Filter by Venue:</span>
                 </div>
+                <div className="relative">
                 <select 
                   value={selectedVenueId} 
                   onChange={(e) => setSelectedVenueId(e.target.value)} 
-                  className="px-4 py-3 border border-border-color rounded-xl text-dark-text bg-white focus:outline-none focus:border-primary-green focus:ring-4 focus:ring-primary-green/10 transition-all duration-200 min-w-[200px] shadow-sm"
+                  className="appearance-none w-full min-w-[200px] px-4 py-3 border border-border-color rounded-xl text-dark-text bg-white pr-10 focus:outline-none focus:border-primary-green focus:ring-4 focus:ring-primary-green/10 transition-all duration-200 shadow-sm cursor-pointer"
                 >
                   <option value="all">All Venues ({venues.length})</option>
                   {venues.map(venue => (
@@ -376,6 +378,8 @@ function BookingCalendarPage() {
                     </option>
                   ))}
                 </select>
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                </div>
               </div>
             </div>
             

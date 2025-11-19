@@ -3,6 +3,7 @@ import { supabase } from "../../supabaseClient";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../../AuthContext";
 import toast from "react-hot-toast";
+import { ChevronDown } from "lucide-react";
 
 function RegisterForm() {
   const navigate = useNavigate();
@@ -206,16 +207,19 @@ function RegisterForm() {
           <label htmlFor="role" className={labelStyles}>
             I am a...
           </label>
-          <select
-            id="role"
-            name="role"
-            value={formData.role}
-            onChange={handleChange}
-            className={inputStyles}
-          >
-            <option value="player">Player</option>
-            <option value="venue_owner">Venue Owner</option>
-          </select>
+          <div className="relative">
+            <select
+              id="role"
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              className={`${inputStyles} appearance-none pr-10 cursor-pointer`}
+            >
+              <option value="player">Player</option>
+              <option value="venue_owner">Venue Owner</option>
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
         </div>
         <div className="md:col-span-2 flex items-center mt-2">
           <input

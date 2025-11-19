@@ -516,6 +516,7 @@ const ManageSlotsPage = () => {
                 <label className="block text-sm font-medium text-medium-text mb-2">
                   Select Venue
                 </label>
+                <div className="relative">
                 <select
                   value={selectedVenue?.venue_id || ""}
                   onChange={(e) =>
@@ -523,7 +524,7 @@ const ManageSlotsPage = () => {
                       venues.find((v) => v.venue_id === e.target.value)
                     )
                   }
-                  className="w-full px-4 py-2 bg-background border border-border-color rounded-lg"
+                  className="appearance-none w-full px-4 py-2 bg-background border border-border-color rounded-lg pr-10 focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent cursor-pointer"
                 >
                   {venues.map((v) => (
                     <option key={v.venue_id} value={v.venue_id}>
@@ -531,11 +532,14 @@ const ManageSlotsPage = () => {
                     </option>
                   ))}
                 </select>
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-medium-text mb-2">
-                  Select Facility
-                </label>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-medium-text mb-2">
+                Select Facility
+              </label>
+              <div className="relative">
                 <select
                   value={selectedFacility?.facility_id || ""}
                   onChange={(e) =>
@@ -543,7 +547,7 @@ const ManageSlotsPage = () => {
                       facilities.find((f) => f.facility_id === e.target.value)
                     )
                   }
-                  className="w-full px-4 py-2 bg-background border border-border-color rounded-lg"
+                  className="appearance-none w-full px-4 py-2 bg-background border border-border-color rounded-lg pr-10 focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent cursor-pointer"
                   disabled={!selectedVenue || facilities.length === 0}
                 >
                   {facilities.map((f) => (
@@ -552,6 +556,8 @@ const ManageSlotsPage = () => {
                     </option>
                   ))}
                 </select>
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
               </div>
               {selectedFacility && (
                 <div className="bg-light-green-bg p-3 rounded-lg border border-primary-green/30">

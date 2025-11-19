@@ -118,6 +118,7 @@ function NotificationsDropdown() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={handleToggle}
+        data-testid="notification-bell"
         className="relative p-2 rounded-full text-medium-text hover:text-dark-text hover:bg-hover-bg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-green"
       >
         <FaBell className="w-6 h-6" />

@@ -4,6 +4,15 @@ import { FaArrowRight, FaPlay } from "react-icons/fa";
 import heroImage from "../../assets/images/hero/hero-img-1.svg";
 
 const Hero = () => {
+  const handleScroll = (e) => {
+    e.preventDefault();
+    const targetId = e.currentTarget.getAttribute("href").slice(1);
+    const targetElement = document.getElementById(targetId);
+    if (targetElement) {
+      targetElement.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-primary-green/5 to-primary-green-light/10">
       <div className="container mx-auto px-6 relative">
@@ -29,13 +38,14 @@ const Hero = () => {
                 Start Playing
                 <FaArrowRight className="group-hover:translate-x-1 transition-transform duration-300" />
               </Link>
-              <Link
-                to="/how-it-works"
+              <a
+                href="#how-it-works"
+                onClick={handleScroll}
                 className="bg-card-bg text-dark-text px-8 py-4 rounded-xl font-semibold text-lg border-2 border-border-color hover:border-primary-green transition-all duration-300 flex items-center justify-center gap-3 hover:shadow-lg"
               >
                 <FaPlay className="text-primary-green" />
                 How It Works
-              </Link>
+              </a>
             </div>
           </div>
 

@@ -7,7 +7,7 @@ export default function CategoryCard({ category }) { // Changed to default expor
 
   // This function will navigate to the explore page with the sport ID as a URL parameter
   const handleCategoryClick = () => {
-    navigate(`/explore?sportId=${category?.sport_id}`);
+    navigate(`/explore?sportIds=${category?.sport_id}`);
   };
 
   if (!category) {

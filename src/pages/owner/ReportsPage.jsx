@@ -234,21 +234,24 @@ function ReportsPage() {
             </div>
 
             <div className="flex flex-col md:flex-row gap-4 w-full items-end">
-              <div className="w-full md:w-auto md:flex-grow lg:flex-grow-0 lg:w-48">
+              <div className="relative w-full md:w-auto md:flex-grow lg:flex-grow-0 lg:w-48">
                 <label htmlFor="venueSelect" className="block text-sm font-medium text-medium-text mb-1">Venue</label>
-                <select
-                  id="venueSelect"
-                  value={selectedVenueId}
-                  onChange={(e) => setSelectedVenueId(e.target.value)}
-                  className="w-full bg-background border border-border-color rounded-md shadow-sm p-2 text-dark-text focus:ring-primary-green focus:border-primary-green"
-                >
-                  <option value="">All Venues</option>
-                  {venues.map((venue) => (
-                    <option key={venue.venue_id} value={venue.venue_id}>
-                      {venue.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    id="venueSelect"
+                    value={selectedVenueId}
+                    onChange={(e) => setSelectedVenueId(e.target.value)}
+                    className="appearance-none w-full bg-background border border-border-color rounded-md shadow-sm p-2 pr-10 text-dark-text focus:ring-primary-green focus:border-primary-green cursor-pointer"
+                  >
+                    <option value="">All Venues</option>
+                    {venues.map((venue) => (
+                      <option key={venue.venue_id} value={venue.venue_id}>
+                        {venue.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                </div>
               </div>
 
               {dateRangePreset === 'custom' && (

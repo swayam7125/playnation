@@ -2,6 +2,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import { BrowserRouter } from 'react-router-dom'; // Import BrowserRouter
 import NotificationsDropdown from '../components/notifications/NotificationsDropdown';
 import { useNotifications } from '../hooks/useNotifications';
 import { useAuth } from '../AuthContext';
@@ -31,33 +32,49 @@ describe('NotificationsDropdown', () => {
 
   it('renders the notification bell', () => {
     useAuth.mockReturnValue({ user: mockUser });
-    useNotifications.mockReturnValue({ data: [], isLoading: false, error: null });
-    render(<NotificationsDropdown />);
-    expect(screen.getByLabelText('Open notifications')).toBeInTheDocument();
+    useNotifications.mockReturnValue({ notifications: [], unreadCount: 0, isLoading: false, error: null });
+    render(
+      <BrowserRouter>
+        <NotificationsDropdown />
+      </BrowserRouter>
+    );
+    expect(screen.getByTestId('notification-bell')).toBeInTheDocument();
   });
 
   it('shows the unread count', () => {
     useAuth.mockReturnValue({ user: mockUser });
-    useNotifications.mockReturnValue({ data: mockNotifications, isLoading: false, error: null });
-    render(<NotificationsDropdown />);
-    const bell = screen.getByLabelText('Open notifications');
+    useNotifications.mockReturnValue({ notifications: mockNotifications, unreadCount: 1, isLoading: false, error: null });
+    render(
+      <BrowserRouter>
+        <NotificationsDropdown />
+      </BrowserRouter>
+    );
+    const bell = screen.getByTestId('notification-bell');
     expect(bell.querySelector('span')).toBeInTheDocument();
   });
 
   it('opens the dropdown on click', () => {
     useAuth.mockReturnValue({ user: mockUser });
-    useNotifications.mockReturnValue({ data: mockNotifications, isLoading: false, error: null });
-    render(<NotificationsDropdown />);
-    fireEvent.click(screen.getByLabelText('Open notifications'));
+    useNotifications.mockReturnValue({ notifications: mockNotifications, unreadCount: 1, isLoading: false, error: null });
+    render(
+      <BrowserRouter>
+        <NotificationsDropdown />
+      </BrowserRouter>
+    );
+    fireEvent.click(screen.getByTestId('notification-bell'));
     expect(screen.getByText('Notifications')).toBeInTheDocument();
     expect(screen.getByText('Test Notification 1')).toBeInTheDocument();
   });
 
   it('shows a message when there are no notifications', () => {
     useAuth.mockReturnValue({ user: mockUser });
-    useNotifications.mockReturnValue({ data: [], isLoading: false, error: null });
-    render(<NotificationsDropdown />);
-    fireEvent.click(screen.getByLabelText('Open notifications'));
-    expect(screen.getByText('No notifications yet.')).toBeInTheDocument();
+    useNotifications.mockReturnValue({ notifications: [], unreadCount: 0, isLoading: false, error: null });
+    render(
+      <BrowserRouter>
+        <NotificationsDropdown />
+      </BrowserRouter>
+    );
+    fireEvent.click(screen.getByTestId('notification-bell'));
+    expect(screen.getByText('No new notifications')).toBeInTheDocument();
   });
 });

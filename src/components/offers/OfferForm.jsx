@@ -17,6 +17,7 @@ import {
   FiImage,
   FiAward, // Icon for Sports
 } from "react-icons/fi";
+import { ChevronDown } from "lucide-react";
 
 // --- Helper Functions ---
 const formatDateForInput = (dateString) => {
@@ -380,17 +381,20 @@ const OfferForm = ({ offer, onSave, onCancel }) => {
              <div className="relative">
                {/* Icon can be adjusted */}
                <FiPercent className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+               <div className="relative">
                <select
                  name="offer_type"
                  value={formData.offer_type}
                  onChange={handleChange}
                  required
-                 className="w-full pl-10 pr-4 py-3 bg-background border border-border-color rounded-lg appearance-none focus:ring-2 focus:ring-primary-green-light focus:border-primary-green text-sm sm:text-base"
+                 className="appearance-none w-full pl-10 pr-4 py-3 bg-background border border-border-color rounded-lg focus:ring-2 focus:ring-primary-green-light focus:border-primary-green text-sm sm:text-base cursor-pointer"
                >
                  <option value="percentage_discount">Percentage Discount</option>
                  <option value="fixed_amount_discount">Fixed Amount Discount</option>
                  {/* Add more types here as needed */}
                </select>
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                </div>
             </div>
 
             {/* Discount Amount (Conditional) & Global Toggle */}
@@ -454,12 +458,13 @@ const OfferForm = ({ offer, onSave, onCancel }) => {
             {isAdmin && !formData.is_global && (
               <div className="relative">
                 <FiMapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <div className="relative">
                 <select
                   name="venue_id"
                   value={formData.venue_id || ""}
                   onChange={handleChange}
                   required={!formData.is_global} // Required only if NOT global
-                  className="w-full pl-10 pr-4 py-3 bg-background border border-border-color rounded-lg appearance-none focus:ring-2 focus:ring-primary-green-light focus:border-primary-green text-sm sm:text-base"
+                  className="appearance-none w-full pl-10 pr-4 py-3 bg-background border border-border-color rounded-lg focus:ring-2 focus:ring-primary-green-light focus:border-primary-green text-sm sm:text-base cursor-pointer"
                 >
                   <option value="" disabled>Select a venue</option>
                   {venues.map((venue) => (
@@ -469,8 +474,7 @@ const OfferForm = ({ offer, onSave, onCancel }) => {
                   ))}
                 </select>
                  {/* Arrow indicator for select */}
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M5.516 7.548c.436-.446 1.144-.446 1.58 0L10 10.404l2.904-2.856c.436-.446 1.144-.446 1.58 0 .436.446.436 1.16 0 1.606l-3.7 3.648c-.436.446-1.144.446-1.58 0l-3.7-3.648c-.436-.446-.436-1.16 0-1.606z"/></svg>
+                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                 </div>
               </div>
             )}

@@ -46,7 +46,7 @@ function VenueCard({ venue, viewMode = "grid" }) {
 
   return (
     <Link
-      to={`/venues/${venue.venue_id}`}
+      to={`/venue/${venue.venue_id}`}
       className="block h-full"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

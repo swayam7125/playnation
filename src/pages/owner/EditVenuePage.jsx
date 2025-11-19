@@ -724,13 +724,16 @@ const EditVenuePage = () => {
                                              name="name" type="text" value={newFacility.name} onChange={handleNewFacilityChange} required
                                              className="w-full py-2 px-3 bg-white/50 border border-slate-200 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-green" placeholder="Facility Name *"
                                          />
+                                         <div className="relative">
                                          <select
                                              name="sport_id" value={newFacility.sport_id} onChange={handleNewFacilityChange} required
-                                             className="w-full py-2 px-3 bg-white/50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-primary-green"
+                                             className="appearance-none w-full py-2 px-3 bg-white/50 border border-slate-200 rounded-lg text-sm text-slate-700 pr-10 focus:outline-none focus:ring-1 focus:ring-primary-green cursor-pointer"
                                          >
                                              <option value="">Select Sport *</option>
                                              {sports.map(s => <option key={s.sport_id} value={s.sport_id}>{s.name}</option>)}
                                          </select>
+                                         <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                                         </div>
                                          <input
                                              name="capacity" type="number" min="1" value={newFacility.capacity} onChange={handleNewFacilityChange} required
                                              className="w-full py-2 px-3 bg-white/50 border border-slate-200 rounded-lg text-sm placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-primary-green" placeholder="Capacity *"

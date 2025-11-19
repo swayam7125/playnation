@@ -14,7 +14,6 @@ import {
   FaMapMarkerAlt,
   FaCreditCard,
   FaChevronDown,
-  FaChevronUp,
   FaSortAmountDown,
   FaSortAmountUp,
 } from "react-icons/fa";
@@ -125,7 +124,7 @@ function AdminBookingsPage() {
         try {
                       if (isApprove) {
                         // Call the serverless function to process the refund
-                        const { data, error } = await supabase.functions.invoke("create-refund", {
+                        const { error } = await supabase.functions.invoke("create-refund", {
                           body: { booking_id: bookingId },
                         });
           
@@ -387,7 +386,7 @@ function AdminBookingsPage() {
         </div>
         {showFilters && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 mt-3 border-t border-border-color-light">
-            <div>
+            <div className="relative">
               <label className="block text-xs font-medium text-dark-text mb-1">
                 Status
               </label>
@@ -396,15 +395,16 @@ function AdminBookingsPage() {
                 onChange={(e) =>
                   setFilters({ ...filters, status: e.target.value })
                 }
-                className="w-full p-2 text-sm bg-hover-bg border-2 border-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
+                className="appearance-none w-full p-2 text-sm bg-hover-bg border-2 border-border-color rounded-lg pr-10 focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent cursor-pointer"
               >
                 <option value="all">All</option>
                 <option value="confirmed">Confirmed</option>
                 <option value="completed">Completed</option>
                 <option value="cancelled">Cancelled</option>
               </select>
+              <FaChevronDown className="absolute right-3 top-7 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
             </div>
-            <div>
+            <div className="relative">
               <label className="block text-xs font-medium text-dark-text mb-1">
                 Payment Status
               </label>
@@ -413,30 +413,17 @@ function AdminBookingsPage() {
                 onChange={(e) =>
                   setFilters({ ...filters, payment_status: e.target.value })
                 }
-                className="w-full p-2 text-sm bg-hover-bg border-2 border-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
+                className="appearance-none w-full p-2 text-sm bg-hover-bg border-2 border-border-color rounded-lg pr-10 focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent cursor-pointer"
               >
                 <option value="all">All</option>
                 <option value="paid">Paid</option>
                 <option value="refunded">Refunded</option>
                 <option value="pending_refund">Pending Refund</option>
               </select>
+              <FaChevronDown className="absolute right-3 top-7 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-dark-text mb-1">
-                Date Range
-              </label>
-              <select
-                value={filters.date_range}
-                onChange={(e) =>
-                  setFilters({ ...filters, date_range: e.target.value })
-                }
-                className="w-full p-2 text-sm bg-hover-bg border-2 border-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-green focus:border-transparent"
-              >
-                <option value="all">All Time</option>
-                <option value="today">Today</option>
-                <option value="week">Last 7 Days</option>
-                <option value="month">Last 30 Days</option>
-              </select>
+            <div className="relative">
+<FaChevronDown className="absolute right-3 top-7 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
             </div>
           </div>
         )}
